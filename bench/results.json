@@ -1,0 +1,294 @@
+{
+	"date": "2026-09-20",
+	"results": {
+		"native": {
+			"engine": "native (maxScreenTexel 1.4)",
+			"viewport": [
+				800,
+				500
+			],
+			"poses": [
+				{
+					"name": "earth",
+					"requests": 5,
+					"drawCalls": 4,
+					"triangles": 2048,
+					"textures": 5,
+					"geometries": 5,
+					"timeToStableMs": 429,
+					"heapMB": 6,
+					"timedOut": false,
+					"counters": {
+						"selected": 4,
+						"rendered": 4,
+						"loading": 0,
+						"culled": 0
+					}
+				},
+				{
+					"name": "region",
+					"requests": 93,
+					"drawCalls": 59,
+					"triangles": 30208,
+					"textures": 93,
+					"geometries": 93,
+					"timeToStableMs": 2389,
+					"heapMB": 10,
+					"timedOut": false,
+					"counters": {
+						"selected": 64,
+						"rendered": 64,
+						"loading": 0,
+						"culled": 66
+					}
+				},
+				{
+					"name": "city",
+					"requests": 43,
+					"drawCalls": 58,
+					"triangles": 29696,
+					"textures": 136,
+					"geometries": 136,
+					"timeToStableMs": 2228,
+					"heapMB": 12,
+					"timedOut": false,
+					"counters": {
+						"selected": 58,
+						"rendered": 58,
+						"loading": 0,
+						"culled": 99
+					}
+				},
+				{
+					"name": "street",
+					"requests": 167,
+					"drawCalls": 149,
+					"triangles": 76288,
+					"textures": 302,
+					"geometries": 302,
+					"timeToStableMs": 6280,
+					"heapMB": 14,
+					"timedOut": false,
+					"counters": {
+						"selected": 151,
+						"rendered": 151,
+						"loading": 0,
+						"culled": 108
+					}
+				}
+			],
+			"fly": {
+				"frames": 240,
+				"requests": 17,
+				"meanFrameCpuMs": 3.36,
+				"maxFrameCpuMs": 83.8,
+				"settleMs": 3871,
+				"requestsTotal": 17,
+				"texturesAfter": 317,
+				"timedOut": false,
+				"counters": {
+					"selected": 151,
+					"rendered": 151,
+					"loading": 0,
+					"culled": 108
+				}
+			}
+		},
+		"native-texel1": {
+			"engine": "native (maxScreenTexel 1)",
+			"viewport": [
+				800,
+				500
+			],
+			"poses": [
+				{
+					"name": "earth",
+					"requests": 5,
+					"drawCalls": 4,
+					"triangles": 2048,
+					"textures": 5,
+					"geometries": 5,
+					"timeToStableMs": 427,
+					"heapMB": 7,
+					"timedOut": false,
+					"counters": {
+						"selected": 4,
+						"rendered": 4,
+						"loading": 0,
+						"culled": 0
+					}
+				},
+				{
+					"name": "region",
+					"requests": 121,
+					"drawCalls": 84,
+					"triangles": 43008,
+					"textures": 125,
+					"geometries": 125,
+					"timeToStableMs": 3650,
+					"heapMB": 11,
+					"timedOut": false,
+					"counters": {
+						"selected": 85,
+						"rendered": 85,
+						"loading": 0,
+						"culled": 90
+					}
+				},
+				{
+					"name": "city",
+					"requests": 46,
+					"drawCalls": 74,
+					"triangles": 37888,
+					"textures": 171,
+					"geometries": 171,
+					"timeToStableMs": 3063,
+					"heapMB": 13,
+					"timedOut": false,
+					"counters": {
+						"selected": 74,
+						"rendered": 74,
+						"loading": 0,
+						"culled": 107
+					}
+				},
+				{
+					"name": "street",
+					"requests": 268,
+					"drawCalls": 229,
+					"triangles": 117248,
+					"textures": 438,
+					"geometries": 409,
+					"timeToStableMs": 14290,
+					"heapMB": 19,
+					"timedOut": false,
+					"counters": {
+						"selected": 230,
+						"rendered": 230,
+						"loading": 0,
+						"culled": 125
+					}
+				}
+			],
+			"fly": {
+				"frames": 240,
+				"requests": 42,
+				"meanFrameCpuMs": 5.87,
+				"maxFrameCpuMs": 221.4,
+				"settleMs": 4511,
+				"requestsTotal": 42,
+				"texturesAfter": 477,
+				"timedOut": false,
+				"counters": {
+					"selected": 230,
+					"rendered": 230,
+					"loading": 0,
+					"culled": 125
+				}
+			}
+		},
+		"plugin": {
+			"engine": "3d-tiles-renderer GeneratedSurfacePlugin (errorTarget 1)",
+			"viewport": [
+				800,
+				500
+			],
+			"poses": [
+				{
+					"name": "earth",
+					"requests": 21,
+					"drawCalls": 16,
+					"triangles": 18432,
+					"textures": 20,
+					"geometries": 20,
+					"timeToStableMs": 957,
+					"heapMB": 11,
+					"timedOut": false,
+					"counters": {
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 21,
+						"visible": 16,
+						"active": 16
+					}
+				},
+				{
+					"name": "region",
+					"requests": 112,
+					"drawCalls": 57,
+					"triangles": 62016,
+					"textures": 91,
+					"geometries": 91,
+					"timeToStableMs": 18176,
+					"heapMB": 29,
+					"timedOut": false,
+					"counters": {
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 133,
+						"visible": 57,
+						"active": 100
+					}
+				},
+				{
+					"name": "city",
+					"requests": 52,
+					"drawCalls": 55,
+					"triangles": 59840,
+					"textures": 121,
+					"geometries": 121,
+					"timeToStableMs": 9610,
+					"heapMB": 29,
+					"timedOut": false,
+					"counters": {
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 185,
+						"visible": 55,
+						"active": 103
+					}
+				},
+				{
+					"name": "street",
+					"requests": 316,
+					"drawCalls": 238,
+					"triangles": 258944,
+					"textures": 405,
+					"geometries": 405,
+					"timeToStableMs": 80190,
+					"heapMB": 64,
+					"timedOut": false,
+					"counters": {
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 501,
+						"visible": 238,
+						"active": 337
+					}
+				}
+			],
+			"fly": {
+				"frames": 240,
+				"requests": 24,
+				"meanFrameCpuMs": 3.45,
+				"maxFrameCpuMs": 140.9,
+				"settleMs": 5603,
+				"requestsTotal": 24,
+				"texturesAfter": 431,
+				"timedOut": false,
+				"counters": {
+					"queued": 0,
+					"downloading": 0,
+					"parsing": 0,
+					"inCache": 525,
+					"visible": 238,
+					"active": 337
+				}
+			}
+		}
+	}
+}

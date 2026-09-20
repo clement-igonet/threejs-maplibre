@@ -13,7 +13,8 @@
 	"scripts": {
 		"dev": "vite",
 		"test": "vitest run",
-		"screenshot": "node scripts/screenshot.mjs"
+		"screenshot": "node scripts/screenshot.mjs",
+		"bench": "node scripts/bench.mjs"
 	},
 	"keywords": [
 		"three",
@@ -35,6 +36,7 @@
 		"three": ">=0.160.0"
 	},
 	"devDependencies": {
+		"3d-tiles-renderer": "^0.5.3",
 		"puppeteer": "^24.0.0",
 		"three": "^0.180.0",
 		"vite": "^7.0.0",

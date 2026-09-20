@@ -2,6 +2,7 @@
 #   compose up dev          -> demos on http://localhost:5173/demo/
 #   compose run --rm test   -> unit tests
 #   compose run --rm screenshot -> deterministic demo screenshots in ./screenshots
+#   compose run --rm bench  -> engine benchmark vs 3d-tiles-renderer, table on stdout + bench/results.json
 services:
   dev:
     image: docker.io/library/node:22-bookworm
@@ -33,3 +34,14 @@ services:
       - PUPPETEER_SKIP_DOWNLOAD=1
       - PUPPETEER_CACHE_DIR=/home/pptruser/.cache/puppeteer
     command: bash -lc "[ -d node_modules ] || npm install --no-audit --no-fund; npm run screenshot"
+
+  bench:
+    image: ghcr.io/puppeteer/puppeteer:latest
+    user: root
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - PUPPETEER_SKIP_DOWNLOAD=1
+      - PUPPETEER_CACHE_DIR=/home/pptruser/.cache/puppeteer
+    command: bash -lc "[ -d node_modules ] || npm install --no-audit --no-fund; npm run bench"
