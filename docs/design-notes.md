@@ -105,6 +105,21 @@ zoom; the center itself lives in the mesh transform (Float64 in JS until it
 reaches the GPU as a matrix). Patch grids are uniform in Web Mercator space,
 so the (Mercator) tile texture maps linearly with no reprojection artifacts.
 
+## Globe controls
+
+The globe demo uses stock `OrbitControls` around the globe center, whose
+rotate and zoom speeds are an orbit angle and a distance-to-center factor:
+constant from 20 000 km down to street level, where a 100 px drag moved the
+ground by ~100 km and one wheel notch by 16 km of altitude. `globeOrbitSpeeds`
+rescales both every frame from the camera's height above the ellipsoid so a
+drag moves the ground by what the pointer covered at nadir and a wheel notch
+or pinch changes the altitude by 5% (`npm run controls-check` measures both
+in headless Chrome: x0.951 per notch, 262 m moved for 297 m expected at 2 km).
+Remaining OrbitControls behaviour: a horizontal drag rotates about the pole,
+so it moves cos(latitude) of the pointer distance and the map stays north-up;
+proper globe controls (drag the ground under the pointer, heading, tilt) are
+M3 work alongside the MapLibre camera bridge.
+
 ## Known limits (accepted for M1)
 
 - Perspective cameras only (SSE uses `camera.fov`).

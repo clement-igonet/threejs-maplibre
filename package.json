@@ -15,7 +15,8 @@
 		"build": "vite build",
 		"test": "vitest run",
 		"screenshot": "node scripts/screenshot.mjs",
-		"bench": "node scripts/bench.mjs"
+		"bench": "node scripts/bench.mjs",
+		"controls-check": "node scripts/controls-check.mjs"
 	},
 	"keywords": [
 		"three",

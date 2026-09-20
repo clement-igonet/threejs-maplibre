@@ -29,3 +29,20 @@ export function latLonToEcef( lat, lon, height, target ) {
 	return target;
 
 }
+
+// Height of a world-space point above the ellipsoid along the ray from the
+// center (geocentric, so a few meters off the geodetic height at mid
+// latitudes: enough for LOD and control scaling, not for surveying).
+export function geocentricHeight( point ) {
+
+	const length = Math.hypot( point.x, point.y, point.z );
+	if ( length === 0 ) return - WGS84_RADIUS_POLAR;
+
+	const sinPhi = point.y / length;
+	const cosPhi2 = 1 - sinPhi * sinPhi;
+	const a = WGS84_RADIUS;
+	const b = WGS84_RADIUS_POLAR;
+	const surface = ( a * b ) / Math.sqrt( b * b * cosPhi2 + a * a * sinPhi * sinPhi );
+	return length - surface;
+
+}

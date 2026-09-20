@@ -15,7 +15,7 @@
 
 			import { PerspectiveCamera, Scene, WebGLRenderer } from 'three';
 			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-			import { AttributionControl, RasterTileMap, WGS84_RADIUS, createOSMSource } from '../src/index.js';
+			import { AttributionControl, RasterTileMap, WGS84_RADIUS, WGS84_RADIUS_POLAR, createOSMSource, geocentricHeight, latLonToEcef, updateGlobeOrbitSpeeds } from '../src/index.js';
 			import { createStubSource } from './stub-tiles.js';
 
 			const params = new URLSearchParams( location.search );
@@ -28,7 +28,17 @@
 
 			const scene = new Scene();
 			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 10, 1e8 );
-			camera.position.set( 2.5 * WGS84_RADIUS, 1.2 * WGS84_RADIUS, 1.5 * WGS84_RADIUS );
+
+			// ?lat=&lon=&alt= (meters) starts above a place; default is the whole earth
+			if ( params.has( 'lat' ) ) {
+
+				latLonToEcef( parseFloat( params.get( 'lat' ) ), parseFloat( params.get( 'lon' ) || '0' ), parseFloat( params.get( 'alt' ) || '5000' ), camera.position );
+
+			} else {
+
+				camera.position.set( 2.5 * WGS84_RADIUS, 1.2 * WGS84_RADIUS, 1.5 * WGS84_RADIUS );
+
+			}
 
 			const map = new RasterTileMap( source, { mode: 'globe' } );
 			scene.add( map );
@@ -36,21 +46,16 @@
 			const attribution = new AttributionControl( document.body );
 			attribution.addSource( source );
 
+			// orbit around the globe center; panning would move the target off it
 			const controls = new OrbitControls( camera, renderer.domElement );
 			controls.enableDamping = true;
-			controls.minDistance = WGS84_RADIUS + 200;
+			controls.enablePan = false;
+			controls.minDistance = WGS84_RADIUS_POLAR; // the real floor is MIN_ALTITUDE below
 			controls.maxDistance = 10 * WGS84_RADIUS;
-
-			// slow zoom near the ground so SSE refinement is explorable
-			controls.addEventListener( 'change', () => {
-
-				const altitude = camera.position.length() - WGS84_RADIUS;
-				controls.zoomSpeed = Math.max( 0.05, Math.min( 1, altitude / WGS84_RADIUS ) );
-				controls.rotateSpeed = Math.max( 0.02, Math.min( 1, altitude / WGS84_RADIUS ) );
-
-			} );
+			const MIN_ALTITUDE = 200;
 
 			const info = document.getElementById( 'info' );
+			const formatAltitude = m => m >= 10000 ? `${ Math.round( m / 1000 ) } km` : `${ Math.round( m ) } m`;
 			let last = performance.now();
 			let stableFrames = 0;
 
@@ -60,12 +65,19 @@
 				const delta = now - last;
 				last = now;
 
+				// drag and zoom sensitivity follow the altitude
+				updateGlobeOrbitSpeeds( controls, camera );
 				controls.update();
+
+				// keep the camera above the ellipsoid, whatever the latitude
+				const altitude = geocentricHeight( camera.position );
+				if ( altitude < MIN_ALTITUDE ) camera.position.multiplyScalar( 1 + ( MIN_ALTITUDE - altitude ) / camera.position.length() );
 				map.update( camera, renderer, delta );
 				renderer.render( scene, camera );
 
+				window.__CAMERA = camera; // for the control e2e check
 				const s = map.stats;
-				info.textContent = `threejs-maplibre M1 - globe | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | culled ${ s.culled }`;
+				info.textContent = `threejs-maplibre M1 - globe | alt ${ formatAltitude( altitude ) } | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | culled ${ s.culled }`;
 
 				// screenshot harness: flag once the frame content is stable
 				stableFrames = ( s.loading === 0 && s.rendered > 0 && s.rendered >= s.selected ) ? stableFrames + 1 : 0;
