@@ -7,10 +7,12 @@
 		<style>
 			body { margin: 0; background: #10161a; overflow: hidden; }
 			#info { position: absolute; top: 8px; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; pointer-events: none; }
+			#version { position: absolute; bottom: 8px; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; pointer-events: none; }
 		</style>
 	</head>
 	<body>
 		<div id="info">threejs-maplibre M1 - planar mode</div>
+		<div id="version"></div>
 		<script type="module">
 
 			import { MathUtils, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
@@ -46,6 +48,7 @@
 			controls.maxPolarAngle = MathUtils.degToRad( 85 );
 			controls.minDistance = 50;
 
+			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
 			const info = document.getElementById( 'info' );
 			let last = performance.now();
 			let stableFrames = 0;
