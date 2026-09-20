@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>threejs-maplibre - engine benchmark</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<style>
+			body { margin: 0; background: #10161a; overflow: hidden; }
+			#info { position: absolute; top: 8px; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; white-space: pre; pointer-events: none; }
+		</style>
+	</head>
+	<body>
+		<div id="info">benchmark</div>
+		<script type="module">
+
+			// Drives one raster tile engine through a fixed set of camera poses
+			// over the offline stub tile source and records, per pose, the tile
+			// requests issued, draw calls, triangles, resident textures, time to
+			// a stable frame and JS heap; then a scripted fly-in from city to
+			// street level. Results land in window.__BENCH for scripts/bench.mjs.
+			//
+			//   ?engine=native            RasterTileMap (this library)
+			//   ?engine=native&texel=1    RasterTileMap with maxScreenTexel = 1
+			//   ?engine=plugin            3d-tiles-renderer GeneratedSurfacePlugin + XYZTilesOverlay
+
+			import { PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
+			import { RasterTileMap, latLonToEcef } from '../src/index.js';
+			import { createStubSource, stubTileDataUrl } from '../demo/stub-tiles.js';
+
+			const params = new URLSearchParams( location.search );
+			const engine = params.get( 'engine' ) || 'native';
+			const texel = parseFloat( params.get( 'texel' ) || '1.4' );
+
+			// every tile request from either engine goes through fetch() with a
+			// PNG data URL, so counting those is engine-neutral
+			let requests = 0;
+			const nativeFetch = window.fetch.bind( window );
+			window.fetch = ( url, ...rest ) => {
+
+				if ( typeof url === 'string' && url.startsWith( 'data:image/png' ) ) requests ++;
+				return nativeFetch( url, ...rest );
+
+			};
+
+			const renderer = new WebGLRenderer( { antialias: false } );
+			renderer.setPixelRatio( 1 );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+
+			const scene = new Scene();
+			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 10, 1e8 );
+
+			// --- engines -------------------------------------------------------
+
+			let update, isStable, dispose, label, counters;
+
+			if ( engine === 'native' ) {
+
+				const map = new RasterTileMap( createStubSource(), { mode: 'globe', maxScreenTexel: texel } );
+				scene.add( map );
+				label = `native (maxScreenTexel ${ texel })`;
+				update = delta => map.update( camera, renderer, delta );
+				isStable = () => map.stats.loading === 0 && map.stats.rendered > 0 && map.stats.rendered >= map.stats.selected;
+				dispose = () => map.dispose();
+				counters = () => ( { ...map.stats } );
+
+			} else {
+
+				const { TilesRenderer } = await import( '3d-tiles-renderer' );
+				const { GeneratedSurfacePlugin, XYZTilesOverlay, TilesFadePlugin } = await import( '3d-tiles-renderer/three/plugins' );
+
+				const overlay = new XYZTilesOverlay( { url: 'stub://{z}/{x}/{y}', levels: 20 } );
+				overlay.imageSource.getUrl = ( x, y, level ) => stubTileDataUrl( level, x, y );
+
+				const tiles = new TilesRenderer();
+				tiles.registerPlugin( new GeneratedSurfacePlugin( { overlay, projection: 'ellipsoid', applyOverlayTexture: true } ) );
+				tiles.registerPlugin( new TilesFadePlugin() );
+				tiles.setCamera( camera );
+				tiles.setResolutionFromRenderer( camera, renderer );
+
+				// ECEF (+Z pole) to this library's frame (+Y pole, z = -ECEF y)
+				tiles.group.rotation.x = - Math.PI / 2;
+				scene.add( tiles.group );
+
+				label = `3d-tiles-renderer GeneratedSurfacePlugin (errorTarget ${ tiles.errorTarget })`;
+				update = () => tiles.update();
+				isStable = () => {
+
+					const s = tiles.stats;
+					return s.queued + s.downloading + s.parsing === 0 && tiles.loadProgress === 1 && s.visible > 0;
+
+				};
+				dispose = () => tiles.dispose();
+				counters = () => {
+
+					const { queued, downloading, parsing, inCache, visible, active } = tiles.stats;
+					return { queued, downloading, parsing, inCache, visible, active };
+
+				};
+
+			}
+
+			// --- camera poses ----------------------------------------------------
+
+			const PARIS = { lat: 48.8566, lon: 2.3522 };
+			const POSES = [
+				{ name: 'earth', lat: 30, lon: 10, alt: 2.0e7, tilt: 0 },
+				{ name: 'region', ...PARIS, alt: 4.0e5, tilt: 0 },
+				{ name: 'city', ...PARIS, alt: 8000, tilt: 0 },
+				{ name: 'street', ...PARIS, alt: 1500, tilt: 60 },
+			];
+			const FLY = { from: POSES[ 2 ], to: POSES[ 3 ], frames: 240 };
+
+			// diagnostics: ?only=<pose> runs a single pose and exposes live counters
+			const only = params.get( 'only' );
+			if ( only ) POSES.splice( 0, POSES.length, ...POSES.filter( p => p.name === only ) );
+			window.__COUNTERS = () => ( { requests, ...counters() } );
+
+			const _target = new Vector3();
+			const _up = new Vector3();
+			const _north = new Vector3();
+			const _offset = new Vector3();
+
+			function setPose( { lat, lon, alt, tilt } ) {
+
+				latLonToEcef( lat, lon, 0, _target );
+				_up.copy( _target ).normalize();
+				_north.set( 0, 1, 0 ).addScaledVector( _up, - _up.y ).normalize();
+				const t = tilt * Math.PI / 180;
+				_offset.copy( _up ).multiplyScalar( Math.cos( t ) ).addScaledVector( _north, - Math.sin( t ) );
+				camera.position.copy( _target ).addScaledVector( _offset, alt );
+				camera.up.copy( _up );
+				camera.lookAt( _target );
+				camera.updateMatrixWorld();
+
+			}
+
+			function lerpPose( a, b, f ) {
+
+				return {
+					lat: a.lat + ( b.lat - a.lat ) * f,
+					lon: a.lon + ( b.lon - a.lon ) * f,
+					alt: Math.exp( Math.log( a.alt ) + ( Math.log( b.alt ) - Math.log( a.alt ) ) * f ),
+					tilt: a.tilt + ( b.tilt - a.tilt ) * f,
+				};
+
+			}
+
+			// --- run -------------------------------------------------------------
+
+			const STABLE_FRAMES = 20;
+			const POSE_TIMEOUT = parseInt( params.get( 'timeout' ) || '120000' );
+
+			const info = document.getElementById( 'info' );
+			const results = { engine: label, viewport: [ renderer.domElement.width, renderer.domElement.height ], poses: [], fly: null };
+
+			function snapshot( pose, t0, requests0, timedOut ) {
+
+				const heap = performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null;
+				return {
+					name: pose.name,
+					requests: requests - requests0,
+					drawCalls: renderer.info.render.calls,
+					triangles: renderer.info.render.triangles,
+					textures: renderer.info.memory.textures,
+					geometries: renderer.info.memory.geometries,
+					timeToStableMs: Math.round( performance.now() - t0 ),
+					heapMB: heap === null ? null : Math.round( heap ),
+					timedOut,
+					counters: counters(),
+				};
+
+			}
+
+			let last = performance.now();
+			let poseIndex = 0;
+			let stable = 0;
+			let t0 = performance.now();
+			let requests0 = 0;
+			let phase = 'poses';
+			let flyFrame = 0;
+			const frameTimes = [];
+
+			setPose( POSES[ 0 ] );
+
+			renderer.setAnimationLoop( () => {
+
+				const now = performance.now();
+				const delta = Math.min( now - last, 100 );
+				last = now;
+
+				const cpu0 = performance.now();
+				update( delta );
+				renderer.render( scene, camera );
+				const cpu = performance.now() - cpu0;
+
+				if ( phase === 'poses' ) {
+
+					const pose = POSES[ poseIndex ];
+					stable = isStable() ? stable + 1 : 0;
+					const timedOut = now - t0 > POSE_TIMEOUT;
+					info.textContent = `${ label }\n${ pose.name }: requests ${ requests - requests0 } calls ${ renderer.info.render.calls } stable ${ stable }`;
+
+					if ( stable >= STABLE_FRAMES || timedOut ) {
+
+						results.poses.push( snapshot( pose, t0, requests0, timedOut ) );
+						poseIndex ++;
+						if ( poseIndex < POSES.length ) {
+
+							setPose( POSES[ poseIndex ] );
+
+						} else if ( only ) {
+
+							phase = 'done';
+							renderer.setAnimationLoop( null );
+							window.__BENCH = results;
+
+						} else {
+
+							phase = 'fly';
+							setPose( FLY.from );
+
+						}
+
+						stable = 0;
+						t0 = performance.now();
+						requests0 = requests;
+
+					}
+
+				} else if ( phase === 'fly' ) {
+
+					frameTimes.push( cpu );
+					flyFrame ++;
+					setPose( lerpPose( FLY.from, FLY.to, Math.min( 1, flyFrame / FLY.frames ) ) );
+					info.textContent = `${ label }\nfly ${ flyFrame }/${ FLY.frames }: requests ${ requests - requests0 }`;
+					if ( flyFrame >= FLY.frames ) {
+
+						results.fly = {
+							frames: FLY.frames,
+							requests: requests - requests0,
+							meanFrameCpuMs: + ( frameTimes.reduce( ( a, b ) => a + b, 0 ) / frameTimes.length ).toFixed( 2 ),
+							maxFrameCpuMs: + Math.max( ...frameTimes ).toFixed( 2 ),
+						};
+						phase = 'settle';
+						stable = 0;
+						t0 = performance.now();
+
+					}
+
+				} else if ( phase === 'settle' ) {
+
+					stable = isStable() ? stable + 1 : 0;
+					const timedOut = now - t0 > POSE_TIMEOUT;
+					if ( stable >= STABLE_FRAMES || timedOut ) {
+
+						results.fly.settleMs = Math.round( performance.now() - t0 );
+						results.fly.requestsTotal = requests - requests0;
+						results.fly.texturesAfter = renderer.info.memory.textures;
+						results.fly.timedOut = timedOut;
+						results.fly.counters = counters();
+						phase = 'done';
+						renderer.setAnimationLoop( null );
+						window.__BENCH = results;
+						info.textContent = `${ label }\ndone`;
+
+					}
+
+				}
+
+			} );
+
+		</script>
+	</body>
+</html>
