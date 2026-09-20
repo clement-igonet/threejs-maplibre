@@ -6,8 +6,9 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<style>
 			body { margin: 0; background: #10161a; overflow: hidden; }
-			#info { position: absolute; top: 8px; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; pointer-events: none; }
-			#version { position: absolute; bottom: 8px; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; pointer-events: none; }
+			#info, #version { position: absolute; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; pointer-events: none; background: rgba(16, 22, 26, 0.6); padding: 2px 6px; border-radius: 3px; }
+			#info { top: 8px; }
+			#version { bottom: 8px; }
 		</style>
 	</head>
 	<body>
@@ -15,9 +16,8 @@
 		<div id="version"></div>
 		<script type="module">
 
-			import { PerspectiveCamera, Scene, TOUCH, WebGLRenderer } from 'three';
-			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-			import { AttributionControl, RasterTileMap, WGS84_RADIUS, WGS84_RADIUS_POLAR, createOSMSource, geocentricHeight, latLonToEcef, updateGlobeOrbitSpeeds } from '../src/index.js';
+			import { PerspectiveCamera, Scene, WebGLRenderer } from 'three';
+			import { AttributionControl, GlobeControls, RasterTileMap, createOSMSource, geocentricHeight } from '../src/index.js';
 			import { createStubSource } from './stub-tiles.js';
 
 			const params = new URLSearchParams( location.search );
@@ -31,14 +31,20 @@
 			const scene = new Scene();
 			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 10, 1e8 );
 
-			// ?lat=&lon=&alt= (meters) starts above a place; default is the whole earth
+			// map-style controls: drag pans, wheel or pinch zooms, right drag
+			// (or two fingers sliding together) tilts and turns
+			const controls = new GlobeControls( camera, renderer.domElement );
+			controls.minAltitude = 200;
+
+			// ?lat=&lon=&alt=&heading=&pitch= starts above a place; default is the whole earth
+			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
 			if ( params.has( 'lat' ) ) {
 
-				latLonToEcef( parseFloat( params.get( 'lat' ) ), parseFloat( params.get( 'lon' ) || '0' ), parseFloat( params.get( 'alt' ) || '5000' ), camera.position );
+				controls.setView( { lat: num( 'lat', 0 ), lon: num( 'lon', 0 ), distance: num( 'alt', 5000 ), heading: num( 'heading', 0 ), pitch: num( 'pitch', 0 ) } );
 
 			} else {
 
-				camera.position.set( 2.5 * WGS84_RADIUS, 1.2 * WGS84_RADIUS, 1.5 * WGS84_RADIUS );
+				controls.setView( { lat: 30, lon: 10, distance: 2e7 } );
 
 			}
 
@@ -47,15 +53,6 @@
 
 			const attribution = new AttributionControl( document.body );
 			attribution.addSource( source );
-
-			// orbit around the globe center; panning would move the target off it
-			const controls = new OrbitControls( camera, renderer.domElement );
-			controls.enableDamping = true;
-			controls.enablePan = false;
-			controls.touches.TWO = TOUCH.DOLLY_ROTATE; // pinch zooms while the two fingers also drag the ground
-			controls.minDistance = WGS84_RADIUS_POLAR; // the real floor is MIN_ALTITUDE below
-			controls.maxDistance = 10 * WGS84_RADIUS;
-			const MIN_ALTITUDE = 200;
 
 			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
 			const info = document.getElementById( 'info' );
@@ -69,19 +66,16 @@
 				const delta = now - last;
 				last = now;
 
-				// drag and zoom sensitivity follow the altitude
-				updateGlobeOrbitSpeeds( controls, camera );
 				controls.update();
-
-				// keep the camera above the ellipsoid, whatever the latitude
-				const altitude = geocentricHeight( camera.position );
-				if ( altitude < MIN_ALTITUDE ) camera.position.multiplyScalar( 1 + ( MIN_ALTITUDE - altitude ) / camera.position.length() );
 				map.update( camera, renderer, delta );
 				renderer.render( scene, camera );
 
 				window.__CAMERA = camera; // for the control e2e check
+				window.__CONTROLS = controls;
+				const altitude = geocentricHeight( camera.position );
+				window.__ALTITUDE = altitude;
 				const s = map.stats;
-				info.textContent = `threejs-maplibre M1 - globe | alt ${ formatAltitude( altitude ) } | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | culled ${ s.culled }`;
+				info.textContent = `threejs-maplibre M1 - globe | alt ${ formatAltitude( altitude ) } | heading ${ Math.round( controls.heading ) }° | pitch ${ Math.round( controls.pitch ) }° | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | culled ${ s.culled }`;
 
 				// screenshot harness: flag once the frame content is stable
 				stableFrames = ( s.loading === 0 && s.rendered > 0 && s.rendered >= s.selected ) ? stableFrames + 1 : 0;

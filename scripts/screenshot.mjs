@@ -22,8 +22,15 @@ const browser = await puppeteer.launch( {
 	defaultViewport: { width: 800, height: 500 },
 } );
 
+// a third shot of the globe tilted over Paris, for the controls
+const SHOTS = [
+	{ name: 'globe', query: '' },
+	{ name: 'planar', query: '' },
+	{ name: 'globe-tilted', page: 'globe', query: '&lat=48.8566&lon=2.3522&alt=1500&heading=30&pitch=60' },
+];
+
 let failed = false;
-for ( const name of [ 'globe', 'planar' ] ) {
+for ( const { name, page: pageName = name, query } of SHOTS ) {
 
 	const page = await browser.newPage();
 	page.on( 'pageerror', e => {
@@ -33,7 +40,7 @@ for ( const name of [ 'globe', 'planar' ] ) {
 
 	} );
 
-	await page.goto( `${ base }demo/${ name }.html?tiles=stub`, { waitUntil: 'domcontentloaded' } );
+	await page.goto( `${ base }demo/${ pageName }.html?tiles=stub${ query }`, { waitUntil: 'domcontentloaded' } );
 
 	try {
 

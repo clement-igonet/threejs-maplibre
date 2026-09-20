@@ -19,6 +19,11 @@ rather than a thin overlay, plus the bridge in both directions.
 planar demos plus the engine benchmark, deployed from `main` by the Pages workflow.
 Run locally with `docker compose up dev` (or `podman compose`), no install needed.
 
+Globe controls follow MapLibre: drag to pan, wheel or pinch to zoom, right drag
+(ctrl/shift + drag on a trackpad) to turn and tilt, two fingers sliding together
+to tilt. `?lat=&lon=&alt=&heading=&pitch=` opens a view, e.g.
+[Paris, tilted](https://clement-igonet.github.io/threejs-maplibre/demo/globe.html?lat=48.8566&lon=2.3522&alt=1500&heading=30&pitch=60).
+
 ## Milestones
 
 | Milestone | Tracking issue |

@@ -107,21 +107,39 @@ so the (Mercator) tile texture maps linearly with no reprojection artifacts.
 
 ## Globe controls
 
-The globe demo uses stock `OrbitControls` around the globe center, whose
-rotate and zoom speeds are an orbit angle and a distance-to-center factor:
-constant from 20 000 km down to street level, where a 100 px drag moved the
-ground by ~100 km and one wheel notch by 16 km of altitude. `globeOrbitSpeeds`
-rescales both every frame from the camera's height above the ellipsoid so a
-drag moves the ground by what the pointer covered at nadir and a wheel notch
-or pinch changes the altitude by 5%. Two fingers pinch and drag at once
-(`TOUCH.DOLLY_ROTATE`), as on a 2D map. `npm run controls-check` measures all
-three in headless Chrome: x0.951 per notch, 264 m moved for 297 m expected on
-a 100 px drag at 2 km, and a 1.2x pinch combined with a 100 px two-finger drag
-lowers the altitude and moves the ground in the same gesture.
-Remaining OrbitControls behaviour: a horizontal drag rotates about the pole,
-so it moves cos(latitude) of the pointer distance and the map stays north-up;
-proper globe controls (drag the ground under the pointer, heading, tilt) are
-M3 work alongside the MapLibre camera bridge.
+Stock `OrbitControls` around the globe center do not make a map: their rotate
+and zoom speeds are an orbit angle and a distance-to-center factor, constant
+from 20 000 km down to street level (a 100 px drag moved the ground by
+~100 km at 2 km altitude), a horizontal drag rotates about the pole, and the
+camera always looks at the center, so there is no tilt. `GlobeControls` keeps
+MapLibre's camera state instead: a ground point at the screen center
+(lat, lon), the distance from it to the camera, a heading and a pitch. The
+camera is placed from that state each frame, and the gestures edit the state
+in ground units:
+
+- one pointer drag pans by `2 * distance * tan(fov / 2) / clientHeight` meters
+  per pixel (divided by `cos(pitch)` along the screen's vertical axis);
+- a wheel notch scales the distance by 0.95 and keeps the ground under the
+  cursor in place; a pinch does the same around the fingers' midpoint while
+  their motion pans and their twist turns;
+- two fingers sliding vertically together at a steady spread tilt the view
+  (0.5 degree per pixel); on desktop, a right drag (or ctrl/shift + drag)
+  turns (0.25 degree per pixel) and tilts;
+- pitch is clamped to [0, 85] degrees, latitude to +/-85 (the Web Mercator
+  edge), and the distance so the camera stays above `minAltitude`.
+
+Pointer events arrive one finger at a time, so the two-finger intent is
+decided once both fingers have moved 8 px (or one finger 30 px with the other
+still, which is a pinch with an anchor). `npm run controls-check` drives all
+of this in headless Chrome with real multi-touch emulation: x0.950 per notch,
+439 m moved for 439 m of pixels on a 100 px drag at 1.9 km, a 1.2x pinch
+combined with a 100 px two-finger drag lowers the distance x0.850 and moves
+the ground by 337 m for 373 m of pixels at the new scale, a 100 px two-finger
+slide tilts by 46 degrees without zooming, a 100 px right drag turns by
+25 degrees, and the camera altitude matches `distance * cos(pitch)`.
+No inertia yet; MapLibre-style fling and easing are M3 work with the camera
+bridge, together with the exact pan (raycast the pointer onto the ellipsoid
+rather than scale by the center's meters per pixel).
 
 ## Known limits (accepted for M1)
 
