@@ -13,6 +13,12 @@ What none of the existing bridges (threebox, maplibre-three-plugin) provide:
 a three.js-**native** map engine (tiles, vector styling, buildings, indoor)
 rather than a thin overlay, plus the bridge in both directions.
 
+## Live demo
+
+[clement-igonet.github.io/threejs-maplibre](https://clement-igonet.github.io/threejs-maplibre/): M1 globe and
+planar demos plus the engine benchmark, deployed from `main` by the Pages workflow.
+Run locally with `docker compose up dev` (or `podman compose`), no install needed.
+
 ## Milestones
 
 | Milestone | Tracking issue |

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>threejs-maplibre</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<style>
+			body { margin: 0; padding: 40px; background: #10161a; color: #cdd6dd; font: 15px/1.7 sans-serif; max-width: 720px; }
+			a { color: #7cc4ff; }
+			code { color: #e9c46a; }
+		</style>
+	</head>
+	<body>
+		<h1>threejs-maplibre</h1>
+		<p>A three.js map engine for OpenStreetMap data, with MapLibre interop.
+		<a href="https://github.com/clement-igonet/threejs-maplibre">Source and milestones on GitHub</a>.</p>
+		<h2>M1 tile foundations</h2>
+		<ul>
+			<li><a href="demo/globe.html">Globe</a>: OSM raster tiles on the WGS84 ellipsoid</li>
+			<li><a href="demo/planar.html">Planar</a>: flat Web Mercator map over Paris, same tile tree</li>
+			<li><a href="bench/index.html?engine=native">Benchmark</a>: the native engine (or <a href="bench/index.html?engine=plugin">3d-tiles-renderer</a>) over offline stub tiles; results land in <code>window.__BENCH</code></li>
+		</ul>
+		<p>The demos load tiles live from <a href="https://www.openstreetmap.org/">OpenStreetMap</a> under its
+		<a href="https://operations.osmfoundation.org/policies/tiles/">tile usage policy</a>; please keep this page to light use.
+		Append <code>?tiles=stub</code> to a demo for the offline tile source used by CI.</p>
+	</body>
+</html>

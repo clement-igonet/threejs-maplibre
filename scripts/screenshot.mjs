@@ -1,15 +1,20 @@
 // CI screenshot: renders both demos with the offline stub tile source and
 // saves deterministic PNGs to screenshots/. No external tile host is hit.
+// SHOT_DIST=1 serves the production build in dist/ (with its base path)
+// instead of the sources, to check a Pages build before it deploys.
 import { mkdirSync } from 'fs';
-import { createServer } from 'vite';
+import { createServer, preview } from 'vite';
 import puppeteer from 'puppeteer';
 
 const root = new URL( '..', import.meta.url ).pathname;
 mkdirSync( `${ root }/screenshots`, { recursive: true } );
 
-const server = await createServer( { root, server: { host: '127.0.0.1', port: 5199, strictPort: true } } );
-await server.listen();
-console.log( 'vite serving', server.resolvedUrls?.local );
+const serverOptions = { host: '127.0.0.1', port: 5199, strictPort: true };
+const server = process.env.SHOT_DIST
+	? await preview( { root, preview: serverOptions } )
+	: await ( await createServer( { root, server: serverOptions } ) ).listen();
+const base = server.resolvedUrls.local[ 0 ];
+console.log( 'vite serving', base );
 
 const browser = await puppeteer.launch( {
 	headless: true,
@@ -28,7 +33,7 @@ for ( const name of [ 'globe', 'planar' ] ) {
 
 	} );
 
-	await page.goto( `http://127.0.0.1:5199/demo/${ name }.html?tiles=stub`, { waitUntil: 'domcontentloaded' } );
+	await page.goto( `${ base }demo/${ name }.html?tiles=stub`, { waitUntil: 'domcontentloaded' } );
 
 	try {
 
@@ -48,5 +53,5 @@ for ( const name of [ 'globe', 'planar' ] ) {
 }
 
 await browser.close();
-await server.close();
+await ( server.close ? server.close() : new Promise( r => server.httpServer.close( r ) ) );
 process.exit( failed ? 1 : 0 );
