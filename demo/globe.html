@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>threejs-maplibre - OSM globe</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<style>
+			body { margin: 0; background: #10161a; overflow: hidden; }
+			#info { position: absolute; top: 8px; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; pointer-events: none; }
+		</style>
+	</head>
+	<body>
+		<div id="info">threejs-maplibre M1 - globe mode</div>
+		<script type="module">
+
+			import { PerspectiveCamera, Scene, WebGLRenderer } from 'three';
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { AttributionControl, RasterTileMap, WGS84_RADIUS, createOSMSource } from '../src/index.js';
+			import { createStubSource } from './stub-tiles.js';
+
+			const params = new URLSearchParams( location.search );
+			const source = params.get( 'tiles' ) === 'stub' ? createStubSource() : createOSMSource();
+
+			const renderer = new WebGLRenderer( { antialias: true } );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+
+			const scene = new Scene();
+			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 10, 1e8 );
+			camera.position.set( 2.5 * WGS84_RADIUS, 1.2 * WGS84_RADIUS, 1.5 * WGS84_RADIUS );
+
+			const map = new RasterTileMap( source, { mode: 'globe' } );
+			scene.add( map );
+
+			const attribution = new AttributionControl( document.body );
+			attribution.addSource( source );
+
+			const controls = new OrbitControls( camera, renderer.domElement );
+			controls.enableDamping = true;
+			controls.minDistance = WGS84_RADIUS + 200;
+			controls.maxDistance = 10 * WGS84_RADIUS;
+
+			// slow zoom near the ground so SSE refinement is explorable
+			controls.addEventListener( 'change', () => {
+
+				const altitude = camera.position.length() - WGS84_RADIUS;
+				controls.zoomSpeed = Math.max( 0.05, Math.min( 1, altitude / WGS84_RADIUS ) );
+				controls.rotateSpeed = Math.max( 0.02, Math.min( 1, altitude / WGS84_RADIUS ) );
+
+			} );
+
+			const info = document.getElementById( 'info' );
+			let last = performance.now();
+			let stableFrames = 0;
+
+			renderer.setAnimationLoop( () => {
+
+				const now = performance.now();
+				const delta = now - last;
+				last = now;
+
+				controls.update();
+				map.update( camera, renderer, delta );
+				renderer.render( scene, camera );
+
+				const s = map.stats;
+				info.textContent = `threejs-maplibre M1 - globe | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | culled ${ s.culled }`;
+
+				// screenshot harness: flag once the frame content is stable
+				stableFrames = ( s.loading === 0 && s.rendered > 0 && s.rendered >= s.selected ) ? stableFrames + 1 : 0;
+				window.__SHOT_READY = stableFrames > 30;
+
+			} );
+
+			window.addEventListener( 'resize', () => {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			} );
+
+		</script>
+	</body>
+</html>

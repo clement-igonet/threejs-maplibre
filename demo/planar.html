@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>threejs-maplibre - OSM planar map</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<style>
+			body { margin: 0; background: #10161a; overflow: hidden; }
+			#info { position: absolute; top: 8px; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; pointer-events: none; }
+		</style>
+	</head>
+	<body>
+		<div id="info">threejs-maplibre M1 - planar mode</div>
+		<script type="module">
+
+			import { MathUtils, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three';
+			import { MapControls } from 'three/addons/controls/MapControls.js';
+			import { AttributionControl, RasterTileMap, createOSMSource, latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/index.js';
+			import { createStubSource } from './stub-tiles.js';
+
+			const params = new URLSearchParams( location.search );
+			const source = params.get( 'tiles' ) === 'stub' ? createStubSource() : createOSMSource();
+
+			const renderer = new WebGLRenderer( { antialias: true } );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+
+			const scene = new Scene();
+			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1e8 );
+
+			// start over Paris at neighborhood scale
+			const [ mx, my ] = normalizedToMeters( longitudeToNormalized( 2.3522 ), latitudeToNormalized( 48.8566 ) );
+			const target = new Vector3( mx, 0, - my );
+			camera.position.copy( target ).add( new Vector3( 0, 4000, 2000 ) );
+
+			const map = new RasterTileMap( source, { mode: 'planar' } );
+			scene.add( map );
+
+			const attribution = new AttributionControl( document.body );
+			attribution.addSource( source );
+
+			const controls = new MapControls( camera, renderer.domElement );
+			controls.target.copy( target );
+			controls.enableDamping = true;
+			controls.maxPolarAngle = MathUtils.degToRad( 85 );
+			controls.minDistance = 50;
+
+			const info = document.getElementById( 'info' );
+			let last = performance.now();
+			let stableFrames = 0;
+
+			renderer.setAnimationLoop( () => {
+
+				const now = performance.now();
+				const delta = now - last;
+				last = now;
+
+				controls.update();
+				map.update( camera, renderer, delta );
+				renderer.render( scene, camera );
+
+				const s = map.stats;
+				info.textContent = `threejs-maplibre M1 - planar | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | culled ${ s.culled }`;
+
+				stableFrames = ( s.loading === 0 && s.rendered > 0 && s.rendered >= s.selected ) ? stableFrames + 1 : 0;
+				window.__SHOT_READY = stableFrames > 30;
+
+			} );
+
+			window.addEventListener( 'resize', () => {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			} );
+
+		</script>
+	</body>
+</html>
