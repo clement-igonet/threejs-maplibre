@@ -62,6 +62,29 @@ const moved = groundDistance( afterWheel, afterDrag );
 console.log( `100 px drag: ground moved ${ moved.toFixed( 0 ) } m, expected ~${ expected.toFixed( 0 ) } m` );
 if ( moved < 0.8 * expected || moved > 1.25 * expected ) failed = true;
 
+// two fingers: pinch 1.2x apart while both move 100 px right; the altitude
+// must drop and the ground must move under the fingers at the same time
+const beforeTouch = await state();
+const finger1 = await page.touchscreen.touchStart( 350, 250 );
+const finger2 = await page.touchscreen.touchStart( 450, 250 );
+for ( let i = 1; i <= 10; i ++ ) {
+
+	const spread = 50 * ( 1 + 0.02 * i ); // 100 px -> 120 px apart
+	await finger1.move( 400 + 10 * i - spread, 250 );
+	await finger2.move( 400 + 10 * i + spread, 250 );
+
+}
+await finger1.end();
+await finger2.end();
+await settle();
+const afterTouch = await state();
+const touchRatio = altitudeOf( afterTouch ) / altitudeOf( beforeTouch );
+const touchMoved = groundDistance( beforeTouch, afterTouch );
+const touchExpected = 100 * 2 * altitudeOf( afterTouch ) * Math.tan( Math.PI / 6 ) / 500 * Math.cos( 48.8566 * Math.PI / 180 );
+console.log( `two-finger pinch 1.2x + 100 px drag: altitude x${ touchRatio.toFixed( 3 ) }, ground moved ${ touchMoved.toFixed( 0 ) } m, expected ~${ touchExpected.toFixed( 0 ) } m` );
+if ( touchRatio > 0.95 || touchRatio < 0.7 ) failed = true;
+if ( touchMoved < 0.7 * touchExpected || touchMoved > 1.3 * touchExpected ) failed = true;
+
 await browser.close();
 await server.close();
 process.exit( failed ? 1 : 0 );

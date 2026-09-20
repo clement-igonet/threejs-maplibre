@@ -13,7 +13,7 @@
 		<div id="info">threejs-maplibre M1 - globe mode</div>
 		<script type="module">
 
-			import { PerspectiveCamera, Scene, WebGLRenderer } from 'three';
+			import { PerspectiveCamera, Scene, TOUCH, WebGLRenderer } from 'three';
 			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 			import { AttributionControl, RasterTileMap, WGS84_RADIUS, WGS84_RADIUS_POLAR, createOSMSource, geocentricHeight, latLonToEcef, updateGlobeOrbitSpeeds } from '../src/index.js';
 			import { createStubSource } from './stub-tiles.js';
@@ -50,6 +50,7 @@
 			const controls = new OrbitControls( camera, renderer.domElement );
 			controls.enableDamping = true;
 			controls.enablePan = false;
+			controls.touches.TWO = TOUCH.DOLLY_ROTATE; // pinch zooms while the two fingers also drag the ground
 			controls.minDistance = WGS84_RADIUS_POLAR; // the real floor is MIN_ALTITUDE below
 			controls.maxDistance = 10 * WGS84_RADIUS;
 			const MIN_ALTITUDE = 200;

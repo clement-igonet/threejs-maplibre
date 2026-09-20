@@ -113,8 +113,11 @@ constant from 20 000 km down to street level, where a 100 px drag moved the
 ground by ~100 km and one wheel notch by 16 km of altitude. `globeOrbitSpeeds`
 rescales both every frame from the camera's height above the ellipsoid so a
 drag moves the ground by what the pointer covered at nadir and a wheel notch
-or pinch changes the altitude by 5% (`npm run controls-check` measures both
-in headless Chrome: x0.951 per notch, 262 m moved for 297 m expected at 2 km).
+or pinch changes the altitude by 5%. Two fingers pinch and drag at once
+(`TOUCH.DOLLY_ROTATE`), as on a 2D map. `npm run controls-check` measures all
+three in headless Chrome: x0.951 per notch, 264 m moved for 297 m expected on
+a 100 px drag at 2 km, and a 1.2x pinch combined with a 100 px two-finger drag
+lowers the altitude and moves the ground in the same gesture.
 Remaining OrbitControls behaviour: a horizontal drag rotates about the pole,
 so it moves cos(latitude) of the pointer distance and the map stays north-up;
 proper globe controls (drag the ground under the pointer, heading, tilt) are
