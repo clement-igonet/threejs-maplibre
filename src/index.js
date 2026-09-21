@@ -6,4 +6,4 @@ export { ImageTileLoader } from './core/ImageTileLoader.js';
 export { RasterTileMap } from './three/RasterTileMap.js';
 export { AttributionControl } from './three/AttributionControl.js';
 export { createGlobePatch, createPlanarPatch } from './three/TilePatchGeometry.js';
-export { GlobeControls } from './three/GlobeControls.js';
+export { MapControls } from './three/MapControls.js';

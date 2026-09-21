@@ -117,13 +117,13 @@ zoom; the center itself lives in the mesh transform (Float64 in JS until it
 reaches the GPU as a matrix). Patch grids are uniform in Web Mercator space,
 so the (Mercator) tile texture maps linearly with no reprojection artifacts.
 
-## Globe controls
+## Controls
 
 Stock `OrbitControls` around the globe center do not make a map: their rotate
 and zoom speeds are an orbit angle and a distance-to-center factor, constant
 from 20 000 km down to street level (a 100 px drag moved the ground by
 ~100 km at 2 km altitude), a horizontal drag rotates about the pole, and the
-camera always looks at the center, so there is no tilt. `GlobeControls` keeps
+camera always looks at the center, so there is no tilt. `MapControls` keeps
 MapLibre's camera state instead: a ground point at the screen center
 (lat, lon), the distance from it to the camera, a heading and a pitch. The
 camera is placed from that state each frame, and the gestures edit the state
@@ -138,7 +138,9 @@ in ground units:
   (0.5 degree per pixel); on desktop, a right drag (or ctrl/shift + drag)
   turns (0.25 degree per pixel) and tilts;
 - pitch is clamped to [0, 85] degrees, latitude to +/-85 (the Web Mercator
-  edge), and the distance so the camera stays above `minAltitude`.
+  edge), and the distance so the camera stays above `minAltitude`;
+- `mode: 'planar'` places the same state on the Web Mercator plane, in
+  mercator meters like the scene, so both demos share one set of gestures.
 
 Pointer events arrive one finger at a time, so the two-finger intent is
 decided once both fingers have moved 8 px (or one finger 30 px with the other
@@ -148,7 +150,8 @@ of this in headless Chrome with real multi-touch emulation: x0.950 per notch,
 combined with a 100 px two-finger drag lowers the distance x0.850 and moves
 the ground by 337 m for 373 m of pixels at the new scale, a 100 px two-finger
 slide tilts by 46 degrees without zooming, a 100 px right drag turns by
-25 degrees, and the camera altitude matches `distance * cos(pitch)`.
+25 degrees, and the camera altitude matches `distance * cos(pitch)`; the same
+run passes on the planar demo.
 No inertia yet; MapLibre-style fling and easing are M3 work with the camera
 bridge, together with the exact pan (raycast the pointer onto the ellipsoid
 rather than scale by the center's meters per pixel).

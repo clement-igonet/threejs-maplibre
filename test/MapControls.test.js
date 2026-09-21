@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
-import { GlobeControls } from '../src/three/GlobeControls.js';
+import { MapControls } from '../src/three/MapControls.js';
 import { geocentricHeight, latLonToEcef, WGS84_RADIUS } from '../src/math/Ellipsoid.js';
+import { latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/math/WebMercator.js';
 
 const PARIS = { lat: 48.8566, lon: 2.3522 };
 
 // enough of an element for the pixel math; no events are dispatched here
 const fakeElement = { clientWidth: 800, clientHeight: 500, style: {}, addEventListener() {}, removeEventListener() {} };
 
-function createControls( view ) {
+function createControls( view, options ) {
 
 	const camera = new PerspectiveCamera( 60, 1.6, 10, 1e8 );
-	const controls = new GlobeControls( camera, fakeElement );
+	const controls = new MapControls( camera, fakeElement, options );
 	controls.setView( view );
 	controls.update();
 	return { camera, controls };
@@ -24,7 +25,7 @@ function groundDistance( a, b ) {
 
 }
 
-describe( 'GlobeControls', () => {
+describe( 'MapControls', () => {
 
 	it( 'places the camera at the distance above the center, looking down, north up', () => {
 
@@ -109,6 +110,27 @@ describe( 'GlobeControls', () => {
 		controls.setView( { lat: 89, lon: 181 } );
 		expect( controls.lat ).toBe( 85 );
 		expect( controls.lon ).toBe( - 179 );
+
+	} );
+
+	it( 'places and pans the camera on the Web Mercator plane in planar mode', () => {
+
+		const { camera, controls } = createControls( { ...PARIS, distance: 2000, heading: 0, pitch: 60 }, { mode: 'planar' } );
+		const [ mx, my ] = normalizedToMeters( longitudeToNormalized( PARIS.lon ), latitudeToNormalized( PARIS.lat ) );
+		// heading 0, pitch 60: 1000 m up, 1732 m south (+z) of the center
+		expect( camera.position.x ).toBeCloseTo( mx, 3 );
+		expect( camera.position.y ).toBeCloseTo( 1000, 3 );
+		expect( camera.position.z ).toBeCloseTo( - my + 2000 * Math.sin( Math.PI / 3 ), 3 );
+		const forward = new Vector3( 0, 0, - 1 ).applyQuaternion( camera.quaternion );
+		expect( forward.z ).toBeLessThan( 0 ); // looking north
+		expect( forward.y ).toBeCloseTo( - Math.cos( Math.PI / 3 ), 6 );
+
+		// a drag right moves the center west by the mercator meters the pixels cover
+		controls.setView( { pitch: 0 } );
+		controls.panByPixels( 100, 0 );
+		controls.update();
+		expect( camera.position.x ).toBeCloseTo( mx - 100 * controls.metersPerPixel(), 3 );
+		expect( controls.lat ).toBeCloseTo( PARIS.lat, 8 );
 
 	} );
 

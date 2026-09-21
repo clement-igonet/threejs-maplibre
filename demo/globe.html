@@ -17,7 +17,7 @@
 		<script type="module">
 
 			import { PerspectiveCamera, Scene, WebGLRenderer } from 'three';
-			import { AttributionControl, GlobeControls, RasterTileMap, createOSMSource, geocentricHeight } from '../src/index.js';
+			import { AttributionControl, MapControls, RasterTileMap, createOSMSource, geocentricHeight } from '../src/index.js';
 			import { createStubSource } from './stub-tiles.js';
 
 			const params = new URLSearchParams( location.search );
@@ -33,7 +33,7 @@
 
 			// map-style controls: drag pans, wheel or pinch zooms, right drag
 			// (or two fingers sliding together) tilts and turns
-			const controls = new GlobeControls( camera, renderer.domElement );
+			const controls = new MapControls( camera, renderer.domElement, { mode: 'globe' } );
 			controls.minAltitude = 200;
 
 			// ?lat=&lon=&alt=&heading=&pitch= starts above a place; default is the whole earth

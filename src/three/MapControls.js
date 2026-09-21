@@ -1,8 +1,10 @@
-// Map-style camera controls for the globe: the state is a ground point at the
-// screen center (lat, lon), the distance from that point to the camera, a
-// heading and a pitch, as in MapLibre. The camera is placed from that state
-// every frame, so drags move the ground under the pointer and zoom steps are
-// a fixed fraction of the distance, at any altitude and latitude.
+// Map-style camera controls for both RasterTileMap modes: the state is a
+// ground point at the screen center (lat, lon), the distance from that point
+// to the camera, a heading and a pitch, as in MapLibre. The camera is placed
+// from that state every frame, on the WGS84 globe or on the Web Mercator
+// plane, so drags move the ground under the pointer and zoom steps are a
+// fixed fraction of the distance, at any altitude and latitude. In planar
+// mode distances are Web Mercator meters, like the scene.
 //
 // Gestures follow MapLibre's conventions:
 // - one pointer drag: pan
@@ -13,6 +15,7 @@
 
 import { Vector3 } from 'three';
 import { latLonToEcef, WGS84_RADIUS } from '../math/Ellipsoid.js';
+import { latitudeToNormalized, longitudeToNormalized, metersToNormalized, normalizedToLatitude, normalizedToLongitude, normalizedToMeters } from '../math/WebMercator.js';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -39,16 +42,18 @@ function localFrame( lat, lon, up, east, north ) {
 
 }
 
-export class GlobeControls {
+export class MapControls {
 
 	/**
 	 * @param {PerspectiveCamera} camera
 	 * @param {HTMLElement} [domElement] element receiving the gestures; omit to drive the state from code only
+	 * @param {{ mode?: 'globe' | 'planar' }} [options] the RasterTileMap mode the camera looks at
 	 */
-	constructor( camera, domElement = null ) {
+	constructor( camera, domElement = null, { mode = 'globe' } = {} ) {
 
 		this.camera = camera;
 		this.domElement = domElement;
+		this.mode = mode;
 		this.enabled = true;
 
 		// view state; degrees and meters
@@ -100,14 +105,27 @@ export class GlobeControls {
 
 	}
 
-	/** Move the center by screen-right and screen-up ground distances, in meters. */
+	/** Move the center by screen-right and screen-up ground distances, in meters (Web Mercator meters in planar mode). */
 	moveByMeters( right, up ) {
 
 		const h = this.heading * DEG2RAD;
 		const northMeters = up * Math.cos( h ) - right * Math.sin( h );
 		const eastMeters = up * Math.sin( h ) + right * Math.cos( h );
-		this.lat += northMeters / WGS84_RADIUS * RAD2DEG;
-		this.lon += eastMeters / ( WGS84_RADIUS * Math.cos( this.lat * DEG2RAD ) ) * RAD2DEG;
+
+		if ( this.mode === 'planar' ) {
+
+			const [ mx, my ] = normalizedToMeters( longitudeToNormalized( this.lon ), latitudeToNormalized( this.lat ) );
+			const [ nx, ny ] = metersToNormalized( mx + eastMeters, my + northMeters );
+			this.lon = normalizedToLongitude( nx );
+			this.lat = normalizedToLatitude( Math.min( 1, Math.max( 0, ny ) ) );
+
+		} else {
+
+			this.lat += northMeters / WGS84_RADIUS * RAD2DEG;
+			this.lon += eastMeters / ( WGS84_RADIUS * Math.cos( this.lat * DEG2RAD ) ) * RAD2DEG;
+
+		}
+
 		this._clamp();
 		this._changed = true;
 
@@ -144,8 +162,21 @@ export class GlobeControls {
 		this._changed = false;
 
 		const camera = this.camera;
-		latLonToEcef( this.lat, this.lon, 0, _target );
-		localFrame( this.lat, this.lon, _up, _east, _north );
+		if ( this.mode === 'planar' ) {
+
+			// RasterTileMap planar frame: x east, y up, -z north
+			const [ mx, my ] = normalizedToMeters( longitudeToNormalized( this.lon ), latitudeToNormalized( this.lat ) );
+			_target.set( mx, 0, - my );
+			_up.set( 0, 1, 0 );
+			_east.set( 1, 0, 0 );
+			_north.set( 0, 0, - 1 );
+
+		} else {
+
+			latLonToEcef( this.lat, this.lon, 0, _target );
+			localFrame( this.lat, this.lon, _up, _east, _north );
+
+		}
 
 		// horizontal look direction, clockwise from north
 		const h = this.heading * DEG2RAD;

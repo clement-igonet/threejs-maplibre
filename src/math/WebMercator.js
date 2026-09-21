@@ -79,3 +79,10 @@ export function normalizedToMeters( nx, ny ) {
 	return [ ( nx - 0.5 ) * s, ( 0.5 - ny ) * s ];
 
 }
+
+export function metersToNormalized( mx, my ) {
+
+	const s = 2 * Math.PI * EARTH_RADIUS;
+	return [ mx / s + 0.5, 0.5 - my / s ];
+
+}
