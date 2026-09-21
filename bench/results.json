@@ -15,14 +15,17 @@
 					"triangles": 2048,
 					"textures": 5,
 					"geometries": 5,
-					"timeToStableMs": 429,
-					"heapMB": 6,
+					"timeToStableMs": 498,
+					"heapMB": 7,
 					"timedOut": false,
 					"counters": {
 						"selected": 4,
 						"rendered": 4,
 						"loading": 0,
-						"culled": 0
+						"culled": 0,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
 					}
 				},
 				{
@@ -30,16 +33,19 @@
 					"requests": 93,
 					"drawCalls": 59,
 					"triangles": 30208,
-					"textures": 93,
-					"geometries": 93,
-					"timeToStableMs": 2389,
-					"heapMB": 10,
+					"textures": 98,
+					"geometries": 92,
+					"timeToStableMs": 3011,
+					"heapMB": 9,
 					"timedOut": false,
 					"counters": {
 						"selected": 64,
 						"rendered": 64,
 						"loading": 0,
-						"culled": 66
+						"culled": 66,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
 					}
 				},
 				{
@@ -47,16 +53,19 @@
 					"requests": 43,
 					"drawCalls": 58,
 					"triangles": 29696,
-					"textures": 136,
-					"geometries": 136,
-					"timeToStableMs": 2228,
-					"heapMB": 12,
+					"textures": 141,
+					"geometries": 134,
+					"timeToStableMs": 4071,
+					"heapMB": 10,
 					"timedOut": false,
 					"counters": {
 						"selected": 58,
 						"rendered": 58,
 						"loading": 0,
-						"culled": 99
+						"culled": 99,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
 					}
 				},
 				{
@@ -64,33 +73,153 @@
 					"requests": 167,
 					"drawCalls": 149,
 					"triangles": 76288,
-					"textures": 302,
-					"geometries": 302,
-					"timeToStableMs": 6280,
-					"heapMB": 14,
+					"textures": 308,
+					"geometries": 274,
+					"timeToStableMs": 9005,
+					"heapMB": 15,
 					"timedOut": false,
 					"counters": {
 						"selected": 151,
 						"rendered": 151,
 						"loading": 0,
-						"culled": 108
+						"culled": 108,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
 					}
 				}
 			],
 			"fly": {
 				"frames": 240,
 				"requests": 17,
-				"meanFrameCpuMs": 3.36,
-				"maxFrameCpuMs": 83.8,
-				"settleMs": 3871,
+				"meanFrameCpuMs": 8.73,
+				"maxFrameCpuMs": 538.8,
+				"p95FrameCpuMs": 7.1,
+				"framesOver16Ms": 8,
+				"framesOver50Ms": 8,
+				"worstFrame": {
+					"frame": 59,
+					"cpuMs": 538.8,
+					"updateMs": 5.1,
+					"renderMs": 533.7,
+					"selected": 57,
+					"rendered": 53,
+					"loading": 6,
+					"culled": 100,
+					"created": 0,
+					"uploaded": 0,
+					"uploadMs": 0
+				},
+				"slowFrames": [
+					{
+						"frame": 4,
+						"cpuMs": 170.6,
+						"updateMs": 0.6,
+						"selected": 58,
+						"rendered": 58,
+						"loading": 0,
+						"culled": 111,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 39,
+						"cpuMs": 88.8,
+						"updateMs": 0.2,
+						"selected": 48,
+						"rendered": 48,
+						"loading": 0,
+						"culled": 106,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 48,
+						"cpuMs": 184,
+						"updateMs": 0.2,
+						"selected": 48,
+						"rendered": 48,
+						"loading": 0,
+						"culled": 103,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 59,
+						"cpuMs": 538.8,
+						"updateMs": 5.1,
+						"selected": 57,
+						"rendered": 53,
+						"loading": 6,
+						"culled": 100,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 72,
+						"cpuMs": 54.9,
+						"updateMs": 0.2,
+						"selected": 55,
+						"rendered": 55,
+						"loading": 0,
+						"culled": 99,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 182,
+						"cpuMs": 316.9,
+						"updateMs": 5.4,
+						"selected": 113,
+						"rendered": 116,
+						"loading": 0,
+						"culled": 140,
+						"created": 6,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 204,
+						"cpuMs": 256,
+						"updateMs": 1,
+						"selected": 142,
+						"rendered": 144,
+						"loading": 0,
+						"culled": 108,
+						"created": 3,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 211,
+						"cpuMs": 73.9,
+						"updateMs": 0.2,
+						"selected": 144,
+						"rendered": 144,
+						"loading": 0,
+						"culled": 106,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
+					}
+				],
+				"settleMs": 3773,
 				"requestsTotal": 17,
-				"texturesAfter": 317,
+				"texturesAfter": 323,
 				"timedOut": false,
 				"counters": {
 					"selected": 151,
 					"rendered": 151,
 					"loading": 0,
-					"culled": 108
+					"culled": 108,
+					"created": 0,
+					"uploaded": 0,
+					"uploadMs": 0
 				}
 			}
 		},
@@ -108,14 +237,17 @@
 					"triangles": 2048,
 					"textures": 5,
 					"geometries": 5,
-					"timeToStableMs": 427,
+					"timeToStableMs": 454,
 					"heapMB": 7,
 					"timedOut": false,
 					"counters": {
 						"selected": 4,
 						"rendered": 4,
 						"loading": 0,
-						"culled": 0
+						"culled": 0,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
 					}
 				},
 				{
@@ -123,16 +255,19 @@
 					"requests": 121,
 					"drawCalls": 84,
 					"triangles": 43008,
-					"textures": 125,
-					"geometries": 125,
-					"timeToStableMs": 3650,
-					"heapMB": 11,
+					"textures": 126,
+					"geometries": 124,
+					"timeToStableMs": 3936,
+					"heapMB": 12,
 					"timedOut": false,
 					"counters": {
 						"selected": 85,
 						"rendered": 85,
 						"loading": 0,
-						"culled": 90
+						"culled": 90,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
 					}
 				},
 				{
@@ -140,16 +275,19 @@
 					"requests": 46,
 					"drawCalls": 74,
 					"triangles": 37888,
-					"textures": 171,
-					"geometries": 171,
-					"timeToStableMs": 3063,
+					"textures": 172,
+					"geometries": 170,
+					"timeToStableMs": 2304,
 					"heapMB": 13,
 					"timedOut": false,
 					"counters": {
 						"selected": 74,
 						"rendered": 74,
 						"loading": 0,
-						"culled": 107
+						"culled": 107,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
 					}
 				},
 				{
@@ -157,33 +295,129 @@
 					"requests": 268,
 					"drawCalls": 229,
 					"triangles": 117248,
-					"textures": 438,
-					"geometries": 409,
-					"timeToStableMs": 14290,
-					"heapMB": 19,
+					"textures": 440,
+					"geometries": 405,
+					"timeToStableMs": 12894,
+					"heapMB": 20,
 					"timedOut": false,
 					"counters": {
 						"selected": 230,
 						"rendered": 230,
 						"loading": 0,
-						"culled": 125
+						"culled": 125,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
 					}
 				}
 			],
 			"fly": {
 				"frames": 240,
 				"requests": 42,
-				"meanFrameCpuMs": 5.87,
-				"maxFrameCpuMs": 221.4,
-				"settleMs": 4511,
+				"meanFrameCpuMs": 4.88,
+				"maxFrameCpuMs": 367.4,
+				"p95FrameCpuMs": 7.4,
+				"framesOver16Ms": 6,
+				"framesOver50Ms": 3,
+				"worstFrame": {
+					"frame": 182,
+					"cpuMs": 367.4,
+					"updateMs": 65.3,
+					"renderMs": 302.1,
+					"selected": 139,
+					"rendered": 142,
+					"loading": 4,
+					"culled": 201,
+					"created": 6,
+					"uploaded": 0,
+					"uploadMs": 0
+				},
+				"slowFrames": [
+					{
+						"frame": 146,
+						"cpuMs": 133.3,
+						"updateMs": 0.3,
+						"selected": 88,
+						"rendered": 88,
+						"loading": 0,
+						"culled": 189,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 152,
+						"cpuMs": 17.6,
+						"updateMs": 15.1,
+						"selected": 98,
+						"rendered": 95,
+						"loading": 6,
+						"culled": 188,
+						"created": 2,
+						"uploaded": 0,
+						"uploadMs": 0.10000038146972656
+					},
+					{
+						"frame": 169,
+						"cpuMs": 38.8,
+						"updateMs": 0.9,
+						"selected": 117,
+						"rendered": 119,
+						"loading": 0,
+						"culled": 211,
+						"created": 2,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 182,
+						"cpuMs": 367.4,
+						"updateMs": 65.3,
+						"selected": 139,
+						"rendered": 142,
+						"loading": 4,
+						"culled": 201,
+						"created": 6,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 194,
+						"cpuMs": 23,
+						"updateMs": 17.9,
+						"selected": 171,
+						"rendered": 175,
+						"loading": 4,
+						"culled": 169,
+						"created": 6,
+						"uploaded": 0,
+						"uploadMs": 0
+					},
+					{
+						"frame": 204,
+						"cpuMs": 70.5,
+						"updateMs": 1,
+						"selected": 203,
+						"rendered": 207,
+						"loading": 0,
+						"culled": 137,
+						"created": 5,
+						"uploaded": 0,
+						"uploadMs": 0
+					}
+				],
+				"settleMs": 5094,
 				"requestsTotal": 42,
-				"texturesAfter": 477,
+				"texturesAfter": 479,
 				"timedOut": false,
 				"counters": {
 					"selected": 230,
 					"rendered": 230,
 					"loading": 0,
-					"culled": 125
+					"culled": 125,
+					"created": 0,
+					"uploaded": 0,
+					"uploadMs": 0
 				}
 			}
 		},
@@ -201,8 +435,8 @@
 					"triangles": 18432,
 					"textures": 20,
 					"geometries": 20,
-					"timeToStableMs": 957,
-					"heapMB": 11,
+					"timeToStableMs": 931,
+					"heapMB": 12,
 					"timedOut": false,
 					"counters": {
 						"queued": 0,
@@ -220,8 +454,8 @@
 					"triangles": 62016,
 					"textures": 91,
 					"geometries": 91,
-					"timeToStableMs": 18176,
-					"heapMB": 29,
+					"timeToStableMs": 15270,
+					"heapMB": 23,
 					"timedOut": false,
 					"counters": {
 						"queued": 0,
@@ -237,10 +471,10 @@
 					"requests": 52,
 					"drawCalls": 55,
 					"triangles": 59840,
-					"textures": 121,
-					"geometries": 121,
-					"timeToStableMs": 9610,
-					"heapMB": 29,
+					"textures": 120,
+					"geometries": 120,
+					"timeToStableMs": 10024,
+					"heapMB": 34,
 					"timedOut": false,
 					"counters": {
 						"queued": 0,
@@ -256,10 +490,10 @@
 					"requests": 316,
 					"drawCalls": 238,
 					"triangles": 258944,
-					"textures": 405,
-					"geometries": 405,
-					"timeToStableMs": 80190,
-					"heapMB": 64,
+					"textures": 404,
+					"geometries": 404,
+					"timeToStableMs": 78899,
+					"heapMB": 75,
 					"timedOut": false,
 					"counters": {
 						"queued": 0,
@@ -274,11 +508,116 @@
 			"fly": {
 				"frames": 240,
 				"requests": 24,
-				"meanFrameCpuMs": 3.45,
-				"maxFrameCpuMs": 140.9,
-				"settleMs": 5603,
+				"meanFrameCpuMs": 6.07,
+				"maxFrameCpuMs": 422.4,
+				"p95FrameCpuMs": 9.5,
+				"framesOver16Ms": 8,
+				"framesOver50Ms": 5,
+				"worstFrame": {
+					"frame": 208,
+					"cpuMs": 422.4,
+					"updateMs": 1.2,
+					"renderMs": 421.2,
+					"queued": 0,
+					"downloading": 0,
+					"parsing": 0,
+					"inCache": 521,
+					"visible": 131,
+					"active": 211
+				},
+				"slowFrames": [
+					{
+						"frame": 11,
+						"cpuMs": 92.6,
+						"updateMs": 1,
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 501,
+						"visible": 58,
+						"active": 103
+					},
+					{
+						"frame": 22,
+						"cpuMs": 49.2,
+						"updateMs": 0.8,
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 501,
+						"visible": 57,
+						"active": 103
+					},
+					{
+						"frame": 41,
+						"cpuMs": 125.5,
+						"updateMs": 0.7,
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 501,
+						"visible": 52,
+						"active": 109
+					},
+					{
+						"frame": 82,
+						"cpuMs": 84,
+						"updateMs": 83,
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 513,
+						"visible": 63,
+						"active": 130
+					},
+					{
+						"frame": 121,
+						"cpuMs": 23,
+						"updateMs": 0.9,
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 513,
+						"visible": 73,
+						"active": 139
+					},
+					{
+						"frame": 200,
+						"cpuMs": 66,
+						"updateMs": 1.3,
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 521,
+						"visible": 122,
+						"active": 199
+					},
+					{
+						"frame": 208,
+						"cpuMs": 422.4,
+						"updateMs": 1.2,
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 521,
+						"visible": 131,
+						"active": 211
+					},
+					{
+						"frame": 235,
+						"cpuMs": 16.6,
+						"updateMs": 8.7,
+						"queued": 0,
+						"downloading": 0,
+						"parsing": 0,
+						"inCache": 525,
+						"visible": 237,
+						"active": 337
+					}
+				],
+				"settleMs": 5676,
 				"requestsTotal": 24,
-				"texturesAfter": 431,
+				"texturesAfter": 430,
 				"timedOut": false,
 				"counters": {
 					"queued": 0,

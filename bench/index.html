@@ -191,6 +191,7 @@
 
 				const cpu0 = performance.now();
 				update( delta );
+				const updateMs = performance.now() - cpu0;
 				renderer.render( scene, camera );
 				const cpu = performance.now() - cpu0;
 
@@ -231,6 +232,15 @@
 				} else if ( phase === 'fly' ) {
 
 					frameTimes.push( cpu );
+					// where the worst frame spends its time; created/activated
+					// only exist on the native engine
+					if ( ! results.worstFrame || cpu > results.worstFrame.cpuMs ) {
+
+						results.worstFrame = { frame: flyFrame, cpuMs: + cpu.toFixed( 1 ), updateMs: + updateMs.toFixed( 1 ), renderMs: + ( cpu - updateMs ).toFixed( 1 ), ...( counters() ) };
+
+					}
+					// every slow frame, for profiling
+					if ( cpu > 16 ) ( results.slowFrames = results.slowFrames || [] ).push( { frame: flyFrame, cpuMs: + cpu.toFixed( 1 ), updateMs: + updateMs.toFixed( 1 ), ...( counters() ) } );
 					flyFrame ++;
 					setPose( lerpPose( FLY.from, FLY.to, Math.min( 1, flyFrame / FLY.frames ) ) );
 					info.textContent = `${ label }\nfly ${ flyFrame }/${ FLY.frames }: requests ${ requests - requests0 }`;
@@ -241,7 +251,14 @@
 							requests: requests - requests0,
 							meanFrameCpuMs: + ( frameTimes.reduce( ( a, b ) => a + b, 0 ) / frameTimes.length ).toFixed( 2 ),
 							maxFrameCpuMs: + Math.max( ...frameTimes ).toFixed( 2 ),
+							p95FrameCpuMs: + [ ...frameTimes ].sort( ( a, b ) => a - b )[ Math.floor( 0.95 * frameTimes.length ) ].toFixed( 2 ),
+							framesOver16Ms: frameTimes.filter( t => t > 16 ).length,
+							framesOver50Ms: frameTimes.filter( t => t > 50 ).length,
+							worstFrame: results.worstFrame,
+							slowFrames: results.slowFrames || [],
 						};
+						delete results.worstFrame;
+						delete results.slowFrames;
 						phase = 'settle';
 						stable = 0;
 						t0 = performance.now();

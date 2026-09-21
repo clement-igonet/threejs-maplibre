@@ -20,6 +20,9 @@ const _vec = new Vector3();
 //    underneath so refinement never opens holes.
 // 3. Tiles that left the selection keep their texture in an LRU cache;
 //    in-flight requests for tiles that left the selection are aborted.
+// 4. Decoded textures reach the GPU through a per-frame time budget: a tile
+//    whose texture is not uploaded yet counts as not ready, so its ancestor
+//    keeps drawing and a burst of arrivals never stalls one frame.
 
 export class RasterTileMap extends Group {
 
@@ -30,6 +33,7 @@ export class RasterTileMap extends Group {
 		cacheSize = 512,
 		globeSegments = 16,
 		retainFrames = 60, // frames an unused tile keeps its mesh
+		uploadBudgetMs = 2, // texture uploads per frame stop once this is spent (at least one)
 	} = {} ) {
 
 		super();
@@ -40,6 +44,7 @@ export class RasterTileMap extends Group {
 		this.fadeDuration = fadeDuration;
 		this.retainFrames = retainFrames;
 		this.globeSegments = globeSegments;
+		this.uploadBudgetMs = uploadBudgetMs;
 
 		this._loader = new ImageTileLoader();
 		this._cache = new LRUTileCache( {
@@ -49,9 +54,10 @@ export class RasterTileMap extends Group {
 		this._records = new Map();
 		this._frame = 0;
 		this._shown = new Set();
+		this._uploadQueue = [];
 
 		// stats for tests, demos and CI budgets
-		this.stats = { selected: 0, rendered: 0, loading: 0, culled: 0 };
+		this.stats = { selected: 0, rendered: 0, loading: 0, culled: 0, created: 0, uploaded: 0, uploadMs: 0 };
 
 	}
 
@@ -78,6 +84,7 @@ export class RasterTileMap extends Group {
 				opacity: 0,
 				bounds: null,
 				lastUsed: 0,
+				queued: false,
 			};
 			this._records.set( key, record );
 
@@ -164,6 +171,7 @@ export class RasterTileMap extends Group {
 		mesh.visible = false;
 		record.mesh = mesh;
 		this.add( mesh );
+		this.stats.created ++;
 
 	}
 
@@ -196,6 +204,7 @@ export class RasterTileMap extends Group {
 		stats.selected = 0;
 		stats.rendered = 0;
 		stats.culled = 0;
+		stats.created = 0;
 
 		this._frame ++;
 		this.updateWorldMatrix( true, false );
@@ -237,7 +246,10 @@ export class RasterTileMap extends Group {
 
 		this._shown = shownNow;
 
-		// 3. sweep: abort stale loads, drop stale meshes
+		// 3. upload textures that the walk asked for, within the time budget
+		this._uploadPending( renderer );
+
+		// 4. sweep: abort stale loads, drop stale meshes
 		for ( const record of this._records.values() ) {
 
 			const stale = this._frame - record.lastUsed;
@@ -262,6 +274,31 @@ export class RasterTileMap extends Group {
 		}
 
 		stats.loading = this._loader.pendingCount;
+
+	}
+
+	_uploadPending( renderer ) {
+
+		const queue = this._uploadQueue;
+		const stats = this.stats;
+		stats.uploaded = 0;
+		stats.uploadMs = 0;
+		const t0 = performance.now();
+
+		while ( queue.length > 0 && ( stats.uploaded === 0 || performance.now() - t0 < this.uploadBudgetMs ) ) {
+
+			const record = queue.shift();
+			record.queued = false;
+			// no longer wanted, or evicted meanwhile: it re-queues if it comes back
+			if ( record.lastUsed !== this._frame || record.state !== 'ready' ) continue;
+
+			renderer.initTexture( record.texture );
+			record.texture.userData.uploaded = true;
+			stats.uploaded ++;
+
+		}
+
+		stats.uploadMs = performance.now() - t0;
 
 	}
 
@@ -338,6 +375,19 @@ export class RasterTileMap extends Group {
 		this._ensureLoaded( record );
 		if ( record.state === 'failed' ) return false;
 		if ( record.state !== 'ready' ) return false;
+
+		if ( ! record.texture.userData.uploaded ) {
+
+			if ( ! record.queued ) {
+
+				record.queued = true;
+				this._uploadQueue.push( record );
+
+			}
+
+			return false;
+
+		}
 
 		this._ensureMesh( record );
 

@@ -44,8 +44,15 @@ two libraries.
    `renderOrder` resolve the coplanar overlap), so refinement never opens
    holes.
 
-Textures for tiles that leave the selection are parked in an LRU cache
-(dispose on evict); in-flight fetches for deselected tiles are aborted.
+Decoded textures reach the GPU through a per-frame time budget
+(`uploadBudgetMs`, default 2 ms, at least one upload per frame): the walk
+queues the tiles it wants, `renderer.initTexture()` uploads them in order
+after the walk, and a tile whose texture is not uploaded yet counts as not
+ready, so its ancestor keeps drawing. A burst of arrivals (typical after a
+fast zoom, when a whole level lands within a few frames) then costs a few
+milliseconds per frame instead of one long frame. Textures for tiles that
+leave the selection are parked in an LRU cache (dispose on evict); in-flight
+fetches for deselected tiles are aborted.
 
 ## Measured against 3d-tiles-renderer
 
@@ -54,24 +61,24 @@ same four camera poses and a scripted city-to-street fly-in, over the same
 offline stub tile source, in headless Chrome. Both engines fetch tiles through
 `fetch()` + `createImageBitmap`, so "requests" counts the same thing for both.
 Full output is in `bench/results.json`; the table below is from a run on
-2026-09-20 with three.js 0.180 and 3d-tiles-renderer 0.5.3, SwiftShader on
-2 CPUs, 800x500 viewport. Absolute times are for that environment only; the
+2026-09-21 with three.js 0.180 and 3d-tiles-renderer 0.5.3, SwiftShader on
+2 CPUs of a shared VM (load average 5), 800x500 viewport. Absolute times are for that environment only; the
 ratios are what matters.
 
 | pose | metric | native (maxScreenTexel 1.4) | native (maxScreenTexel 1) | 3d-tiles-renderer (errorTarget 1) |
 |---|---|---|---|---|
 | earth, 20 000 km | requests / draw calls / triangles | 5 / 4 / 2 048 | 5 / 4 / 2 048 | 21 / 16 / 18 432 |
-| | time to stable | 0.4 s | 0.4 s | 1.0 s |
+| | time to stable | 0.5 s | 0.5 s | 0.9 s |
 | region, 400 km over Paris | requests / draw calls / triangles | 93 / 59 / 30 208 | 121 / 84 / 43 008 | 112 / 57 / 62 016 |
-| | time to stable | 2.4 s | 3.7 s | 18.2 s |
+| | time to stable | 3.0 s | 3.9 s | 15.3 s |
 | city, 8 km nadir | requests / draw calls / triangles | 43 / 58 / 29 696 | 46 / 74 / 37 888 | 52 / 55 / 59 840 |
-| | time to stable | 2.2 s | 3.1 s | 9.6 s |
+| | time to stable | 4.1 s | 2.3 s | 10.0 s |
 | street, 1.5 km tilted 60 degrees | requests / draw calls / triangles | 167 / 149 / 76 288 | 268 / 229 / 117 248 | 316 / 238 / 258 944 |
-| | time to stable | 6.3 s | 14.3 s | 80.2 s |
-| | JS heap | 14 MB | 19 MB | 64 MB |
+| | time to stable | 9.0 s | 12.9 s | 78.9 s |
+| | JS heap | 15 MB | 20 MB | 75 MB |
 | fly city to street, 240 frames | requests during fly and settle | 17 | 42 | 24 |
-| | mean / max frame CPU | 3.4 / 84 ms | 5.9 / 221 ms | 3.5 / 141 ms |
-| | settle after fly | 3.9 s | 4.5 s | 5.6 s |
+| | mean / p95 frame CPU | 8.7 / 7.1 ms | 4.9 / 7.4 ms | 6.1 / 9.5 ms |
+| | settle after fly | 3.8 s | 5.1 s | 5.7 s |
 
 Reading it:
 
@@ -92,10 +99,15 @@ Reading it:
   minimum per tile) than the 16x16 patches here, hence 2 to 3x the triangles
   for a similar draw count.
 - **Memory**: the native engine's heap stays 3 to 4x smaller at street level.
-- **Native follow-up**: the native max frame CPU (84 to 221 ms) is most
-  likely the burst of patch-geometry building when many tiles arrive in one
-  frame (to be profiled in M1's fade polish task, which should spread mesh
-  creation across frames).
+- **Frame spikes**: the max frame is not a usable number in this
+  environment. Logging every fly-in frame over 16 ms showed most of them with
+  nothing happening in the engine (no new mesh, no upload, no request; up to
+  540 ms on a frame that only redrew 58 tiles), which is the software
+  rasterizer and the shared host, so the table reports the p95 instead. The
+  engine-side burst that was visible before (six textures uploaded in one
+  frame at 318 ms) is gone: uploads are budgeted per frame, and one 256x256
+  upload with mipmaps costs ~100 ms under SwiftShader, well under a
+  millisecond on a GPU.
 
 ## Precision
 

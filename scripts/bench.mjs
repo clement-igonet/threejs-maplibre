@@ -12,7 +12,7 @@ const RUNS = [
 	{ id: 'native', query: 'engine=native' },
 	{ id: 'native-texel1', query: 'engine=native&texel=1' },
 	{ id: 'plugin', query: 'engine=plugin' },
-];
+].filter( run => run.discard || ! process.env.BENCH_RUNS || process.env.BENCH_RUNS.split( ',' ).includes( run.id ) ); // BENCH_RUNS=native,plugin to run a subset
 
 const server = await createServer( { root, server: { host: '127.0.0.1', port: 5198, strictPort: true }, logLevel: 'warn' } );
 await server.listen();
@@ -86,12 +86,13 @@ for ( const name of poseNames ) {
 
 }
 
-for ( const [ metric, key ] of [ [ 'requests (fly + settle)', 'requestsTotal' ], [ 'mean frame CPU (ms)', 'meanFrameCpuMs' ], [ 'max frame CPU (ms)', 'maxFrameCpuMs' ], [ 'settle after fly (ms)', 'settleMs' ], [ 'textures after settle', 'texturesAfter' ] ] ) {
+for ( const [ metric, key ] of [ [ 'requests (fly + settle)', 'requestsTotal' ], [ 'mean frame CPU (ms)', 'meanFrameCpuMs' ], [ 'max frame CPU (ms)', 'maxFrameCpuMs' ], [ 'p95 frame CPU (ms)', 'p95FrameCpuMs' ], [ 'frames over 16 ms', 'framesOver16Ms' ], [ 'frames over 50 ms', 'framesOver50Ms' ], [ 'settle after fly (ms)', 'settleMs' ], [ 'textures after settle', 'texturesAfter' ] ] ) {
 
 	const cells = ids.map( id => results[ id ].fly ? String( results[ id ].fly[ key ] ) : '-' );
 	lines.push( `| fly city to street: ${ metric } | ${ cells.join( ' | ' ) } |` );
 
 }
 
+for ( const id of ids ) if ( results[ id ].fly ) lines.push( `\nslow fly frames, ${ id }:\n${ results[ id ].fly.slowFrames.map( f => JSON.stringify( f ) ).join( '\n' ) }` );
 console.log( lines.join( '\n' ) );
 process.exit( failed ? 1 : 0 );

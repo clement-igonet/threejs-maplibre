@@ -16,7 +16,7 @@ function createStubSource( { minZoom = 0, maxZoom = 19 } = {} ) {
 
 }
 
-const rendererStub = { domElement: { height: 800 } };
+const rendererStub = { domElement: { height: 800 }, initTexture() {} };
 
 function createCamera( position, target ) {
 
@@ -138,6 +138,52 @@ describe( 'RasterTileMap selection', () => {
 		}
 
 		map.dispose();
+
+	} );
+
+	it( 'uploads ready textures within the per-frame budget, ancestors covering meanwhile', () => {
+
+		const uploads = [];
+		const slowRenderer = { domElement: { height: 800 }, initTexture( texture ) {
+
+			uploads.push( texture );
+			const t0 = performance.now();
+			while ( performance.now() - t0 < 3 ); // one upload alone exhausts the budget
+
+		} };
+		const map = new RasterTileMap( createStubSource( { maxZoom: 1 } ), { mode: 'globe', uploadBudgetMs: 2, fadeDuration: 0 } );
+
+		// every tile down to maxZoom is already decoded, as if just loaded
+		const fakeTexture = () => ( { userData: {}, dispose() {} } );
+		for ( const key of [ '0/0/0', '1/0/0', '1/1/0', '1/0/1', '1/1/1' ] ) map._cache.set( key, fakeTexture() );
+
+		const eye = latLonToEcef( 48.8566, 2.3522, 500, new Vector3() );
+		const camera = createCamera( eye, latLonToEcef( 48.8566, 2.3522, 0, new Vector3() ) );
+
+		map.update( camera, slowRenderer );
+		expect( map.stats.uploaded ).toBe( 1 ); // the budget lets exactly one through
+		expect( map.stats.rendered ).toBe( 0 ); // nothing was uploaded before the walk
+
+		let frames = 1;
+		while ( uploads.length < 5 && frames < 10 ) {
+
+			map.update( camera, slowRenderer );
+			frames ++;
+
+		}
+
+		expect( uploads.length ).toBe( 5 ); // the four z1 tiles (their boxes all meet the frustum) and the root behind them
+		expect( frames ).toBe( 5 );
+		expect( map.stats.rendered ).toBeGreaterThan( 0 );
+
+		// a fast renderer takes everything in one frame
+		const fastMap = new RasterTileMap( createStubSource( { maxZoom: 1 } ), { mode: 'globe' } );
+		for ( const key of [ '0/0/0', '1/0/0', '1/1/0', '1/0/1', '1/1/1' ] ) fastMap._cache.set( key, fakeTexture() );
+		fastMap.update( camera, rendererStub );
+		expect( fastMap.stats.uploaded ).toBe( 5 );
+
+		map.dispose();
+		fastMap.dispose();
 
 	} );
 
