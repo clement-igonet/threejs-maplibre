@@ -7,3 +7,7 @@ export { RasterTileMap } from './three/RasterTileMap.js';
 export { AttributionControl } from './three/AttributionControl.js';
 export { createGlobePatch, createPlanarPatch } from './three/TilePatchGeometry.js';
 export { MapControls } from './three/MapControls.js';
+export { VectorTileSource, loadOpenFreeMapSource, OPENFREEMAP_TILEJSON_URL } from './core/VectorTileSource.js';
+export { VectorTileLoader } from './core/VectorTileLoader.js';
+export { decodeVectorTile, featureRings } from './core/decodeVectorTile.js';
+export { Style, StyleLayer, HONOURED_PROPERTIES } from './style/Style.js';

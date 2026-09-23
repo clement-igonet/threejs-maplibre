@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>threejs-maplibre vector decode check</title>
+		<style>
+			body { margin: 0; font: 13px/1.4 monospace; color: #ddd; background: #10161a; padding: 12px; white-space: pre; }
+		</style>
+	</head>
+	<body>decoding...</body>
+	<script type="module">
+		// Decodes every stub tile covering the city at ?z= (default 15) through
+		// VectorTileLoader, with ?workers= Workers (default 2, 0 for inline), and
+		// reports wall time per tile and feature counts in window.__DECODE. Tile
+		// bytes are generated up front so only fetch + decode is timed.
+		import { VectorTileLoader, latitudeToNormalized, longitudeToNormalized } from '../src/index.js';
+		import { createStubVectorSource, STUB_CITY_CENTER } from '../demo/stub-vector-tiles.js';
+
+		const params = new URLSearchParams( location.search );
+		const z = Number( params.get( 'z' ) ?? 15 );
+		const workers = Number( params.get( 'workers' ) ?? 2 );
+		const source = createStubVectorSource();
+		const n = 2 ** z;
+		const halfDeg = 1400 / 111320; // the city is 2.4 km wide, plus margin
+		const x0 = Math.floor( longitudeToNormalized( STUB_CITY_CENTER.lon - halfDeg / Math.cos( STUB_CITY_CENTER.lat * Math.PI / 180 ) ) * n );
+		const x1 = Math.floor( longitudeToNormalized( STUB_CITY_CENTER.lon + halfDeg / Math.cos( STUB_CITY_CENTER.lat * Math.PI / 180 ) ) * n );
+		const y0 = Math.floor( latitudeToNormalized( STUB_CITY_CENTER.lat + halfDeg ) * n );
+		const y1 = Math.floor( latitudeToNormalized( STUB_CITY_CENTER.lat - halfDeg ) * n );
+
+		const urls = [];
+		let bytes = 0;
+		for ( let x = x0; x <= x1; x ++ ) for ( let y = y0; y <= y1; y ++ ) {
+
+			const url = source.tileUrl( x, y, z );
+			urls.push( [ `${ z }/${ x }/${ y }`, url ] );
+			bytes += Math.floor( ( url.length - url.indexOf( ',' ) - 1 ) * 3 / 4 );
+
+		}
+
+		const loader = new VectorTileLoader( { workers } );
+		const t0 = performance.now();
+		const tiles = await Promise.all( urls.map( ( [ key, url ] ) => loader.load( key, url ) ) );
+		const ms = performance.now() - t0;
+		loader.dispose();
+
+		let features = 0;
+		let vertices = 0;
+		const layers = new Set();
+		for ( const tile of tiles ) for ( const name in tile.layers ) {
+
+			const layer = tile.layers[ name ];
+			layers.add( name );
+			features += layer.featureCount;
+			vertices += layer.positions.length / 2;
+
+		}
+
+		window.__DECODE = { z, workers, tiles: urls.length, bytes, ms: + ms.toFixed( 1 ), perTileMs: + ( ms / urls.length ).toFixed( 2 ), features, vertices, layers: [ ...layers ].sort() };
+		document.body.textContent = JSON.stringify( window.__DECODE, null, 2 );
+	</script>
+</html>

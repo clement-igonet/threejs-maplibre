@@ -21,6 +21,7 @@ export default defineConfig( {
 				globe: 'demo/globe.html',
 				planar: 'demo/planar.html',
 				bench: 'bench/index.html',
+				decode: 'bench/decode.html',
 			},
 		},
 	},

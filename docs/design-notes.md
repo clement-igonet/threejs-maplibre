@@ -1,6 +1,8 @@
-# M1 design notes
+# Design notes
 
-## Why a native tile engine and not 3d-tiles-renderer's generated surface
+## M1 Tile foundations
+
+### Why a native tile engine and not 3d-tiles-renderer's generated surface
 
 [3d-tiles-renderer](https://github.com/NASA-AMMOS/3DTilesRendererJS)'s
 `GeneratedSurfacePlugin` + `XYZTilesOverlay` (the former `XYZTilesPlugin`)
@@ -29,7 +31,7 @@ work (the upstream example uses `GlobeControls`), and the ellipsoid math
 conventions (+Y pole, lat/lon frames) so scenes are interoperable between the
 two libraries.
 
-## How LOD works
+### How LOD works
 
 `RasterTileMap.update()` runs two walks per frame:
 
@@ -54,7 +56,7 @@ milliseconds per frame instead of one long frame. Textures for tiles that
 leave the selection are parked in an LRU cache (dispose on evict); in-flight
 fetches for deselected tiles are aborted.
 
-## Measured against 3d-tiles-renderer
+### Measured against 3d-tiles-renderer
 
 `npm run bench` (or `compose run --rm bench`) drives both engines through the
 same four camera poses and a scripted city-to-street fly-in, over the same
@@ -109,7 +111,7 @@ Reading it:
   upload with mipmaps costs ~100 ms under SwiftShader, well under a
   millisecond on a GPU.
 
-## Precision
+### Precision
 
 Tile meshes anchor their vertices relative to the tile center
 (`TilePatchGeometry`), so Float32 vertex precision holds at street-level
@@ -117,7 +119,7 @@ zoom; the center itself lives in the mesh transform (Float64 in JS until it
 reaches the GPU as a matrix). Patch grids are uniform in Web Mercator space,
 so the (Mercator) tile texture maps linearly with no reprojection artifacts.
 
-## Controls
+### Controls
 
 Stock `OrbitControls` around the globe center do not make a map: their rotate
 and zoom speeds are an orbit angle and a distance-to-center factor, constant
@@ -156,7 +158,7 @@ No inertia yet; MapLibre-style fling and easing are M3 work with the camera
 bridge, together with the exact pan (raycast the pointer onto the ellipsoid
 rather than scale by the center's meters per pixel).
 
-## Known limits (accepted for M1)
+### Known limits (accepted for M1)
 
 - Perspective cameras only (SSE uses `camera.fov`).
 - Frustum culling only; no horizon culling yet, so the far side of the globe
@@ -164,3 +166,42 @@ rather than scale by the center's meters per pixel).
 - Web Mercator polar caps (above ~85.05 degrees) are not filled.
 - One raster source per `RasterTileMap`; overlay compositing is out of scope
   until M2.
+
+## M2 Vector tiles
+
+### Vector tile decoding
+
+`VectorTileLoader` fetches the `.pbf` on the main thread (abortable, same as
+the raster loader) and hands the buffer to a small pool of Workers that decode
+it with `@mapbox/vector-tile`. The worker answers with flat arrays per source
+layer (`decodeVectorTile`): feature types, ids and properties, plus a single
+`Int32Array` of tile coordinates indexed through `featureStart` and
+`ringStart`. That is the layout the geometry builders read, and it transfers
+between threads without copying. Without Workers (Node, tests) the same
+function runs inline. Polygon rings keep their MVT winding; classifying
+exterior rings and holes belongs to the polygon builder.
+
+`npm run decode-check` decodes the stub city's tiles in headless Chrome
+through real Workers and inline. The stub tiles are small (under 1 kB each,
+the city is 2.4 km of grid), so they time the pipeline, not the parser: 0.6
+to 1.4 ms per tile inline, 1.7 to 3.5 ms per tile through the Workers once
+they are warm (the first Worker start under the dev server costs ~600 ms of
+module loading). A real OpenMapTiles tile is another order: the z14 tile over
+central Paris from OpenFreeMap is 1.07 MB, 13 layers, 16 952 features,
+96 027 vertices, and decodes in 93 ms cold, 25 to 35 ms warm in Node 20 on the
+shared VM; z12 (338 kB) and z10 (268 kB) take 10 to 12 ms. This is what the
+Workers are for: at street zoom a screen shows a handful of such tiles, and
+the geometry build that follows (M2 PR B) costs more than the decode.
+
+### Style evaluation
+
+`Style` compiles a MapLibre style with `@maplibre/maplibre-gl-style-spec`
+(the first runtime dependency besides three.js: `featureFilter`,
+`normalizePropertyExpression` and the v8 spec for defaults, 76 kB minified
+with the engine's own code, 23 kB gzipped). The honoured layer types and
+properties are listed in `style-subset.md`; anything else stays on the layer
+and is reported once per layer in `style.warnings`. Each property's
+`kind` (constant, camera, source, composite) tells the builders whether a
+value is a material constant, a per-frame uniform or baked per vertex, which
+is the same split MapLibre makes between paint uniforms and data-driven
+attributes.
