@@ -20,6 +20,12 @@
 			<li><a href="demo/planar.html">Planar</a>: flat Web Mercator map over Paris, same tile tree</li>
 			<li><a href="bench/index.html?engine=native">Benchmark</a>: the native engine (or <a href="bench/index.html?engine=plugin">3d-tiles-renderer</a>) over offline stub tiles; results land in <code>window.__BENCH</code></li>
 		</ul>
+		<h2>M2 vector tiles and styling</h2>
+		<ul>
+			<li><a href="demo/vector.html">Vector</a>: the Louvre from an OSM extract, styled by a MapLibre style (fills, lines, extrusions); <a href="demo/vector.html?data=openfreemap">any city</a> from OpenFreeMap's Liberty style</li>
+			<li><a href="demo/objects.html">Objects</a>: three.js objects placed by latitude and longitude, a 34 m antenna and a marker pin over the Louvre</li>
+			<li><a href="demo/standalone.html">Standalone</a>: the built library from one <code>&lt;script&gt;</code> tag, no bundler, no sources</li>
+		</ul>
 		<p>The demos load tiles live from <a href="https://www.openstreetmap.org/">OpenStreetMap</a> under its
 		<a href="https://operations.osmfoundation.org/policies/tiles/">tile usage policy</a>; please keep this page to light use.
 		Append <code>?tiles=stub</code> to a demo for the offline tile source used by CI.</p>

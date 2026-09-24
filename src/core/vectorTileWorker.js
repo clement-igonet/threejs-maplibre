@@ -1,25 +1,67 @@
 import { decodeVectorTile, vectorTileTransferables } from './decodeVectorTile.js';
+import { buildTile, builtTileTransferables } from '../build/buildTile.js';
+import { Style } from '../style/Style.js';
 
-// Worker entry: receives { id, buffer }, answers { id, tile } with the tile's
-// arrays transferred, or { id, error }. The message handling lives in
-// handleVectorTileMessage so the loader can be tested without a Worker.
+// Worker entry. Messages:
+//   { type: 'init', style, sourceId, mode }
+//       compiles the style once; no answer
+//   { type: 'build', id, buffer, x, y, z }
+//       decodes and builds the tile, answers { id, built } with the geometry
+//       blocks transferred (see build/buildTile.js)
+//   { id, buffer }
+//       decodes only, answers { id, tile } with the tile's arrays transferred
+// Errors answer { id, error }. The handling lives in a plain function so the
+// loader can run it inline without a Worker (Node, tests).
 
-export function handleVectorTileMessage( data, post ) {
+export function createVectorTileHandler() {
 
-	const { id, buffer } = data;
+	let config = null;
 
-	try {
+	return function handleVectorTileMessage( data, post ) {
 
-		const tile = decodeVectorTile( buffer );
-		post( { id, tile }, vectorTileTransferables( tile ) );
+		if ( data.type === 'init' ) {
 
-	} catch ( error ) {
+			config = {
+				style: new Style( data.style ),
+				sourceId: data.sourceId,
+				mode: data.mode,
+			};
+			return;
 
-		post( { id, error: String( error && error.message || error ) } );
+		}
 
-	}
+		const { id, buffer } = data;
+
+		try {
+
+			const t0 = performance.now();
+			const tile = decodeVectorTile( buffer );
+			const decodeMs = performance.now() - t0;
+
+			if ( data.type === 'build' ) {
+
+				if ( config === null ) throw new Error( 'vectorTileWorker: build before init' );
+				const built = buildTile( tile, config.style, { ...config, x: data.x, y: data.y, z: data.z } );
+				built.stats.decodeMs = decodeMs;
+				post( { id, built }, builtTileTransferables( built ) );
+
+			} else {
+
+				post( { id, tile }, vectorTileTransferables( tile ) );
+
+			}
+
+		} catch ( error ) {
+
+			post( { id, error: String( error && error.message || error ) } );
+
+		}
+
+	};
 
 }
+
+export const handleVectorTileMessage = createVectorTileHandler();
 
 if ( typeof self !== 'undefined' && typeof self.postMessage === 'function' && typeof window === 'undefined' ) {
 

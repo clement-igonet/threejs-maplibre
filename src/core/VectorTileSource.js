@@ -8,9 +8,11 @@ import { XYZTileSource } from './XYZTileSource.js';
 
 export class VectorTileSource extends XYZTileSource {
 
-	constructor( { maxZoom = 14, extent = 4096, ...options } = {} ) {
+	// tileResolution 512 makes the screen-space error split tiles at the zoom
+	// MapLibre would show them (its vector tiles are 512 px)
+	constructor( { maxZoom = 14, extent = 4096, tileResolution = 512, ...options } = {} ) {
 
-		super( { maxZoom, ...options } );
+		super( { maxZoom, tileResolution, ...options } );
 		this.type = 'vector';
 		this.extent = extent;
 

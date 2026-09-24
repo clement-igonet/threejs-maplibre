@@ -56,7 +56,12 @@ export class StyleLayer {
 		}
 
 		this._filter = json.filter === undefined ? null : featureFilter( json.filter ).filter;
+		// a fill or line drawn with an image pattern shows the pattern, not its
+		// color: without pattern support the layer is left out rather than
+		// painted in the default black
+		this.patterned = !! ( json.paint && json.paint[ `${ this.type }-pattern` ] !== undefined );
 		this._properties = new Map();
+		this._defaults = new Map(); // compiled spec defaults, filled by get()
 		this.visible = ( json.layout && json.layout.visibility ) !== 'none';
 
 		const ignored = [];
@@ -81,7 +86,11 @@ export class StyleLayer {
 
 		}
 
-		if ( ignored.length && honoured && this.type !== 'symbol' ) {
+		if ( this.patterned ) {
+
+			warnings.push( `layer "${ this.id }": ${ this.type }-pattern is not supported, layer not drawn` );
+
+		} else if ( ignored.length && honoured && this.type !== 'symbol' ) {
 
 			warnings.push( `layer "${ this.id }": ignored ${ ignored.join( ', ' ) }` );
 
@@ -105,11 +114,18 @@ export class StyleLayer {
 	// components).
 	get( name, zoom, feature = null ) {
 
-		const expression = this._properties.get( name );
-		if ( expression ) return expression.evaluate( { zoom }, feature );
+		let expression = this._properties.get( name ) ?? this._defaults.get( name );
+		if ( ! expression ) {
 
-		const table = spec[ `paint_${ this.type }` ]?.[ name ] || spec[ `layout_${ this.type }` ]?.[ name ];
-		return table ? table.default : undefined;
+			// the spec default, compiled like a set value so a color is a Color
+			const table = spec[ `paint_${ this.type }` ]?.[ name ] || spec[ `layout_${ this.type }` ]?.[ name ];
+			if ( ! table || table.default === undefined ) return undefined;
+			expression = normalizePropertyExpression( table.default, table );
+			this._defaults.set( name, expression );
+
+		}
+
+		return expression.evaluate( { zoom }, feature );
 
 	}
 

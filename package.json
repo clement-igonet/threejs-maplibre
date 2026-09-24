@@ -3,16 +3,28 @@
 	"version": "0.1.0",
 	"description": "A three.js map engine for OpenStreetMap data, with MapLibre interop",
 	"type": "module",
-	"main": "src/index.js",
+	"main": "./build/threejs-maplibre.module.js",
+	"module": "./build/threejs-maplibre.module.js",
+	"unpkg": "./build/threejs-maplibre.js",
+	"jsdelivr": "./build/threejs-maplibre.js",
 	"exports": {
-		".": "./src/index.js"
+		".": {
+			"import": "./build/threejs-maplibre.module.js",
+			"default": "./build/threejs-maplibre.module.js"
+		},
+		"./src/*": "./src/*",
+		"./package.json": "./package.json"
 	},
+	"sideEffects": false,
 	"files": [
+		"build",
 		"src"
 	],
 	"scripts": {
 		"dev": "vite",
-		"build": "vite build",
+		"build": "vite build -c vite.lib.config.js && vite build -c vite.lib.config.js --mode standalone",
+		"build:site": "vite build",
+		"prepack": "npm run build",
 		"test": "vitest run",
 		"screenshot": "node scripts/screenshot.mjs",
 		"bench": "node scripts/bench.mjs",
@@ -46,6 +58,7 @@
 	"devDependencies": {
 		"3d-tiles-renderer": "^0.5.3",
 		"geojson-vt": "^4.0.2",
+		"osmtogeojson": "^3.0.0-beta.5",
 		"puppeteer": "^24.0.0",
 		"three": "^0.180.0",
 		"vite": "^7.0.0",

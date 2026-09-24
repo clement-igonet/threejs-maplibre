@@ -1,9 +1,32 @@
-# Zero-install workflow (docker compose or podman compose):
-#   compose up dev          -> demos on http://localhost:5173/demo/
+# Zero-install workflow (docker compose or podman compose), nothing but the
+# container runtime on the host:
+#   compose run --rm build  -> the library in ./build (threejs-maplibre.module.js, threejs-maplibre.js)
+#   compose up dev          -> demos from the sources on http://localhost:5173/demo/
+#   compose up preview      -> the built site (library + demos, as deployed) on http://localhost:4173/
 #   compose run --rm test   -> unit tests
 #   compose run --rm screenshot -> deterministic demo screenshots in ./screenshots
 #   compose run --rm bench  -> engine benchmark vs 3d-tiles-renderer, table on stdout + bench/results.json
 services:
+  build:
+    image: docker.io/library/node:22-bookworm
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - PUPPETEER_SKIP_DOWNLOAD=1
+    command: bash -lc "[ -d node_modules ] || npm install --no-audit --no-fund; npm run build && ls -l build"
+
+  preview:
+    image: docker.io/library/node:22-bookworm
+    ports:
+      - "4173:4173"
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - PUPPETEER_SKIP_DOWNLOAD=1
+    command: bash -lc "[ -d node_modules ] || npm install --no-audit --no-fund; npm run build && npm run build:site && npx vite preview --host 0.0.0.0 --port 4173"
+
   dev:
     image: docker.io/library/node:22-bookworm
     ports:

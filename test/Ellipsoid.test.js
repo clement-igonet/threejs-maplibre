@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { geocentricHeight, latLonToEcef } from '../src/math/Ellipsoid.js';
+import { geocentricHeight, latLonToEcef, rayEllipsoidIntersection } from '../src/math/Ellipsoid.js';
 
 describe( 'geocentricHeight', () => {
 
@@ -15,6 +15,31 @@ describe( 'geocentricHeight', () => {
 			expect( geocentricHeight( up ) ).toBeLessThan( 1530 );
 
 		}
+
+	} );
+
+} );
+
+describe( 'rayEllipsoidIntersection', () => {
+
+	it( 'finds the ground under a camera looking down at mid latitude', () => {
+
+		// the ellipsoid there lies inside the equatorial sphere: a sphere test
+		// would hit the far side
+		const ground = latLonToEcef( 48.8566, 2.3522, 0, new Vector3() );
+		const eye = latLonToEcef( 48.8566, 2.3522, 500, new Vector3() );
+		const direction = ground.clone().sub( eye ).normalize();
+		const hit = rayEllipsoidIntersection( eye, direction, new Vector3() );
+		expect( hit ).not.toBeNull();
+		expect( hit.distanceTo( ground ) ).toBeLessThan( 1 );
+		expect( hit.distanceTo( eye ) ).toBeCloseTo( 500, 0 );
+
+	} );
+
+	it( 'misses when looking away from the planet', () => {
+
+		const eye = latLonToEcef( 10, 20, 2000, new Vector3() );
+		expect( rayEllipsoidIntersection( eye, eye.clone().normalize(), new Vector3() ) ).toBeNull();
 
 	} );
 
