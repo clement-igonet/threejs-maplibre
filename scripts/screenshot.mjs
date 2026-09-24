@@ -41,18 +41,20 @@ const SHOTS = [
 ];
 
 // live shots on OpenFreeMap's Liberty style (SHOT_LIVE=0 skips them): the
-// vector demo, and the standalone page once the library is built
+// vector demo, and the standalone page once the library is built. A full
+// city style is ~1000 draw calls, more than software rendering settles in a
+// minute, so these are saved as they stand and do not fail the run.
 if ( process.env.SHOT_LIVE !== '0' ) {
 
-	SHOTS.push( { name: 'vector-openfreemap', page: 'vector', query: '&data=openfreemap' } );
-	if ( existsSync( `${ root }/build/threejs-maplibre.js` ) ) SHOTS.push( { name: 'standalone', query: '' } );
+	SHOTS.push( { name: 'vector-openfreemap', page: 'vector', query: '&data=openfreemap', live: true } );
+	if ( existsSync( `${ root }/build/threejs-maplibre.js` ) ) SHOTS.push( { name: 'standalone', query: '', live: true } );
 
 }
 
 const only = process.env.SHOT_ONLY ? process.env.SHOT_ONLY.split( ',' ) : null;
 
 let failed = false;
-for ( const { name, page: pageName = name, query } of SHOTS ) {
+for ( const { name, page: pageName = name, query, live = false } of SHOTS ) {
 
 	if ( only && ! only.includes( name ) ) continue;
 
@@ -77,8 +79,8 @@ for ( const { name, page: pageName = name, query } of SHOTS ) {
 
 	} catch {
 
-		console.error( `[${ name }] never became stable` );
-		failed = true;
+		console.error( `[${ name }] never became stable${ live ? ' (live shot, not a failure)' : '' }` );
+		if ( ! live ) failed = true;
 
 	}
 
