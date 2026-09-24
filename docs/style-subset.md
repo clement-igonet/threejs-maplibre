@@ -32,9 +32,13 @@ are dereferenced.
 | `symbol` | | | parsed and kept, not rendered (M2 label decision pending) |
 | `circle`, `heatmap`, `raster`, `hillshade`, `color-relief` | | | not rendered (warning) |
 
-Properties not in the table (`*-pattern`, `*-translate`, `line-dasharray`,
-`line-blur`, `line-gradient`, `fill-antialias`, `fill-extrusion-vertical-gradient`, ...)
-are ignored with a warning.
+Properties not in the table (`*-translate`, `line-dasharray`, `line-blur`,
+`line-gradient`, `fill-antialias`, `fill-extrusion-vertical-gradient`, ...)
+are ignored with a warning. Round joins fall back to bevel, round and square
+caps to butt. A `fill` or `line` layer with a `*-pattern` is
+not drawn at all (`layer.patterned`): MapLibre shows the image there, not
+the color, and painting such a layer with its color would put the spec's
+default black on pedestrian areas and the like.
 
 ## Evaluation
 
@@ -48,7 +52,7 @@ varies, which decides where the builders evaluate it:
 | `constant` | nothing | material |
 | `camera` | zoom | material uniform, updated per frame |
 | `source` | feature | baked per vertex when the tile is built |
-| `composite` | zoom and feature | baked per vertex at the tile's zoom, rebuilt when the tile's zoom changes |
+| `composite` | zoom and feature | baked per vertex at the tile's zoom (frozen there: the one known limitation) |
 
 Feature objects are `{ type: 1 | 2 | 3, properties, id }` as decoded from the
 tile (`decodeVectorTile`); `$type` / `geometry-type` filters read `type`.

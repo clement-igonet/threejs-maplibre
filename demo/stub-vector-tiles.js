@@ -1,18 +1,15 @@
 // Deterministic offline vector tile source for tests, CI screenshots and
 // benchmarks: a synthetic city (road grid, river, parks, buildings, one
-// place label) around Paris, cut into MVT tiles at request time with
-// geojson-vt + vt-pbf and served as data URLs, so no tile host is
-// contacted and every run decodes the same bytes. Layer and attribute names
-// follow the OpenMapTiles schema so a stock style renders it.
+// place label) around Paris, cut into MVT tiles at request time (see
+// geojson-vector-source.js), so no tile host is contacted and every run
+// decodes the same bytes. Layer and attribute names follow the OpenMapTiles
+// schema so a stock style renders it.
 
-import geojsonvt from 'geojson-vt';
-import vtpbf from 'vt-pbf';
-import { VectorTileSource } from '../src/index.js';
+import { createGeoJSONVectorSource } from './geojson-vector-source.js';
 
 export const STUB_CITY_CENTER = { lat: 48.8566, lon: 2.3522 };
 const SIZE = 2400; // meters, square
 const BLOCK = 200; // road spacing
-const EXTENT = 4096;
 
 // small deterministic generator so building heights and footprints are
 // the same in every environment
@@ -121,80 +118,24 @@ export function createStubCity() {
 
 }
 
-let indexes = null;
-const cache = new Map();
+let stub = null;
 
-function getIndexes() {
+function getStub() {
 
-	if ( ! indexes ) {
-
-		const city = createStubCity();
-		indexes = {};
-		for ( const name in city ) {
-
-			indexes[ name ] = geojsonvt( city[ name ], { maxZoom: 16, indexMaxZoom: 10, tolerance: 1, extent: EXTENT, buffer: 64 } );
-
-		}
-
-	}
-
-	return indexes;
+	if ( ! stub ) stub = createGeoJSONVectorSource( createStubCity(), { maxZoom: 16, attribution: 'stub vector tiles', url: 'stub://{z}/{x}/{y}.pbf' } );
+	return stub;
 
 }
 
 // The MVT bytes of a tile, or null when no layer covers it.
 export function stubVectorTile( z, x, y ) {
 
-	const key = `${ z }/${ x }/${ y }`;
-	if ( cache.has( key ) ) return cache.get( key );
-
-	const layers = {};
-	let any = false;
-	for ( const [ name, index ] of Object.entries( getIndexes() ) ) {
-
-		const tile = index.getTile( z, x, y );
-		if ( tile && tile.features.length ) {
-
-			layers[ name ] = tile;
-			any = true;
-
-		}
-
-	}
-
-	const bytes = any ? vtpbf.fromGeojsonVt( layers, { version: 2, extent: EXTENT } ) : null;
-	cache.set( key, bytes );
-	return bytes;
+	return getStub().tile( z, x, y );
 
 }
 
-function toDataUrl( bytes ) {
+export function createStubVectorSource() {
 
-	let binary = '';
-	for ( let i = 0; i < bytes.length; i ++ ) binary += String.fromCharCode( bytes[ i ] );
-	return `data:application/x-protobuf;base64,${ btoa( binary ) }`;
-
-}
-
-const EMPTY_TILE = 'data:application/x-protobuf;base64,';
-
-export function createStubVectorSource( options = {} ) {
-
-	const source = new VectorTileSource( {
-		url: 'stub://{z}/{x}/{y}.pbf',
-		minZoom: 0,
-		maxZoom: 16,
-		attribution: 'stub vector tiles',
-		...options,
-	} );
-
-	source.tileUrl = ( x, y, z ) => {
-
-		const bytes = stubVectorTile( z, x, y );
-		return bytes ? toDataUrl( bytes ) : EMPTY_TILE;
-
-	};
-
-	return source;
+	return getStub().source;
 
 }

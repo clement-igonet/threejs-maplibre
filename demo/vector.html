@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>threejs-maplibre - vector tiles</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<style>
+			body { margin: 0; background: #10161a; overflow: hidden; }
+			#info, #version { position: absolute; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; pointer-events: none; background: rgba(16, 22, 26, 0.6); padding: 2px 6px; border-radius: 3px; }
+			#info { top: 8px; }
+			#version { bottom: 8px; }
+		</style>
+	</head>
+	<body>
+		<div id="info">threejs-maplibre M2 - vector tiles</div>
+		<div id="version"></div>
+		<script type="module">
+
+			import { Color, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
+			import { AttributionControl, MapControls, VectorTileMap } from '../src/index.js';
+			import { loadVectorData } from './vector-data.js';
+
+			// ?data=louvre|stub|openfreemap and ?style=<url> pick the data (vector-data.js)
+			// ?mode=globe|planar, ?lat=&lon=&alt=&heading=&pitch=
+			const params = new URLSearchParams( location.search );
+			const data = params.get( 'data' ) ?? 'louvre';
+			const mode = params.get( 'mode' ) === 'planar' ? 'planar' : 'globe';
+			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
+
+			const { source, style, sourceId, view } = await loadVectorData( params );
+			for ( const warning of style.warnings ) console.warn( `style: ${ warning }` );
+
+			const renderer = new WebGLRenderer( { antialias: true } );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.outputColorSpace = SRGBColorSpace;
+			document.body.appendChild( renderer.domElement );
+
+			const scene = new Scene();
+			const background = style.backgroundLayer;
+			if ( background ) {
+
+				const [ r, g, b ] = background.get( 'background-color', 14 ).rgb;
+				scene.background = new Color().setRGB( r, g, b, SRGBColorSpace );
+
+			}
+
+			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1e8 );
+			const controls = new MapControls( camera, renderer.domElement, { mode } );
+			controls.minAltitude = 20;
+			controls.setView( { lat: num( 'lat', view.lat ), lon: num( 'lon', view.lon ), distance: num( 'alt', 900 ), heading: num( 'heading', 20 ), pitch: num( 'pitch', 50 ) } );
+
+			const map = new VectorTileMap( source, style, { mode, sourceId } );
+			scene.add( map );
+
+			// lighting for the extrusions: sky/ground ambient plus a sun over the view
+			scene.add( new HemisphereLight( 0xffffff, 0x8a8478, 1.0 ) );
+			const sun = new DirectionalLight( 0xffffff, 2.0 );
+			scene.add( sun, sun.target );
+
+			const attribution = new AttributionControl( document.body );
+			attribution.addSource( source );
+
+			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
+			const info = document.getElementById( 'info' );
+			const _target = new Vector3();
+			const _up = new Vector3();
+			const _back = new Vector3();
+			const _right = new Vector3();
+			let last = performance.now();
+			let stableFrames = 0;
+
+			renderer.setAnimationLoop( () => {
+
+				const now = performance.now();
+				const delta = now - last;
+				last = now;
+
+				controls.update();
+
+				// the sun stands high over the view center, behind the camera's right
+				// shoulder: roofs bright, the walls facing the viewer lit, the side
+				// walls in shade, whatever the heading
+				controls.getTarget( _target, _up );
+				_back.subVectors( camera.position, _target ).projectOnPlane( _up ).normalize();
+				_right.crossVectors( _back, _up ).normalize();
+				sun.target.position.copy( _target );
+				sun.position.copy( _target ).addScaledVector( _up, 3000 ).addScaledVector( _back, 1200 ).addScaledVector( _right, 1800 );
+
+				map.update( camera, renderer, delta );
+				renderer.render( scene, camera );
+
+				window.__CONTROLS = controls;
+				const s = map.stats;
+				const build = s.built ? ( s.buildMs / s.built ).toFixed( 1 ) : '-';
+				info.textContent = `threejs-maplibre M2 - ${ data } ${ mode } | zoom ${ map.zoom.toFixed( 2 ) } | heading ${ Math.round( controls.heading ) }° | pitch ${ Math.round( controls.pitch ) }° | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | built ${ s.built } (${ build } ms avg) | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles }`;
+
+				stableFrames = ( s.loading === 0 && s.rendered > 0 && s.rendered >= s.selected ) ? stableFrames + 1 : 0;
+				window.__SHOT_READY = stableFrames > 30;
+
+			} );
+
+			window.addEventListener( 'resize', () => {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			} );
+
+		</script>
+	</body>
+</html>

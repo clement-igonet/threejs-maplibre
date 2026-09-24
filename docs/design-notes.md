@@ -205,3 +205,85 @@ and is reported once per layer in `style.warnings`. Each property's
 value is a material constant, a per-frame uniform or baked per vertex, which
 is the same split MapLibre makes between paint uniforms and data-driven
 attributes.
+
+### Geometry and rendering
+
+The Worker that decodes a tile also builds its geometry (`buildTile`): one
+block per style layer with something to draw, as flat attribute arrays that
+transfer to the main thread and become `BufferAttribute`s there within the
+per-frame budget the raster map already uses for texture uploads. Every layer
+is built for every tile carrying its data, evaluated at the tile's zoom
+clamped into the layer's zoom range; whether a block is drawn is decided per
+frame from the map zoom (MapLibre's convention, a 512 px tile at integer
+zoom, derived from the ground distance under the view center). One view
+mixes tiles of several zooms, so a layer can not be tied to the tile zoom
+the way MapLibre does it: a far z13 tile must still carry the extrusions a
+minzoom 14 layer shows once the map is past 14.
+
+What the style evaluates from the feature (`source` and `composite` kinds) is
+baked per vertex; what it evaluates from zoom alone (`camera` kind) or from
+nothing is a per-frame uniform, with the baked value set to 1 so the shader
+computes `baked * uniform`. A zoom-dependent line width is a uniform update,
+not a rebuild. A composite value is frozen at the tile's zoom, the one
+known limitation of the scheme.
+
+Tile coordinates are projected relative to the tile center (`TileProjection`)
+so Float32 attributes keep street-level precision on the globe, where ECEF
+coordinates are millions of meters; the tile object carries the offset. Both
+modes expose the same `project` and `up` functions, so the builders never
+branch on the mode.
+
+Polygons are clipped to the tile square, grouped into exterior plus holes by
+their MVT winding and triangulated with three.js's own Earcut (`fill`), or
+extruded along the local up vector with flat-shaded sides (`fill-extrusion`,
+lit by a `MeshLambertMaterial`). Lines are triangle strips extruded in the
+vertex shader by a screen-space half width (`VectorLineMaterial`): each
+vertex carries its tangent direction and side, the width in pixels is
+converted to local units at the vertex's depth, edges are antialiased in the
+fragment shader and lines thinner than a pixel are drawn one pixel wide and
+faded, as MapLibre does. Joins are miter up to `line-miter-limit`, then
+bevel; caps are butt. A run cut by the tile edge is extruded along that edge
+so the neighbour's half meets it without a notch. `line-gap-width` builds two
+strips, `line-offset` shifts them, `fill-outline-color` adds a line block to
+a fill layer.
+
+Draw order follows the style: meshes render in layer order, extrusions
+opaque with depth, fills and lines without depth writes so coplanar layers
+stack instead of fighting. Fills and lines drawn with an image pattern
+(`fill-pattern`, `line-pattern`) are skipped rather than painted in the
+default black; Liberty's `road_area_pattern` is the visible case.
+
+Measured on the shared VM (software rendering, so frame times are not
+meaningful there): the Louvre extract at z15 costs 70 to 95 draw calls and
+85 k triangles, with tiles built in 33 to 60 ms each; OpenFreeMap's Liberty
+style over Paris at z14.6, about a hundred layers, costs ~940 draw calls and
+1.7 M triangles, with z14 tiles (1 MB, 17 k features) built in ~400 ms. Draw
+calls are one per tile per layer as in MapLibre; folding a layer's tiles into
+one `BatchedMesh` is the next step, together with a benchmark against
+maplibre-gl-js on the same view.
+
+### Objects on the map
+
+`MapAnchor` is a `Group` placed by latitude, longitude and height whose
+children live in a local frame in meters, x east, y up, -z north, on the
+globe as on the plane, so a three.js object built the usual way (y up, facing
+-z) stands level and faces north wherever it is put; a heading turns it
+clockwise from north. The objects demo places a 34 m dish antenna and a
+marker pin over the Louvre this way, with `?model=` loading a glTF instead,
+as MapLibre's "Add a 3D model" example does through a custom layer. Here the
+object is an ordinary scene member: it shares the depth buffer with the
+buildings, takes the scene's lights and shadows, and can be picked or
+animated like anything else in three.js.
+
+### Distribution
+
+`npm run build` produces two files with Vite in library mode: an ES module
+that keeps `three` as an import, for bundlers and import maps, and a
+standalone UMD script that bundles three.js under the global
+`threejsMaplibre` (`threejsMaplibre.THREE` exposes it), for a page with no
+build step. The tile Worker is inlined in both as a Blob URL, so one file
+works from any origin or CDN; the sources swap the Worker factory only in
+the library build (a Vite alias on `createWorker.js`). Earcut is bundled from
+`three/src/extras/Earcut.js` even in the module build, since import maps
+only know the bare `three` specifier. The package's `exports` point at the
+module build and keep `./src/*` open for a bundler that prefers sources.

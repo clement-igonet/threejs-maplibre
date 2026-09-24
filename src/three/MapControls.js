@@ -14,7 +14,7 @@
 //   sliding vertically together tilt the view instead
 
 import { Vector3 } from 'three';
-import { latLonToEcef, WGS84_RADIUS } from '../math/Ellipsoid.js';
+import { latLonToEcef, localFrame, WGS84_RADIUS } from '../math/Ellipsoid.js';
 import { latitudeToNormalized, longitudeToNormalized, metersToNormalized, normalizedToLatitude, normalizedToLongitude, normalizedToMeters } from '../math/WebMercator.js';
 
 const DEG2RAD = Math.PI / 180;
@@ -26,21 +26,6 @@ const _up = new Vector3();
 const _east = new Vector3();
 const _north = new Vector3();
 const _look = new Vector3();
-
-// geodetic frame at (lat, lon), in the +Y-pole world convention
-function localFrame( lat, lon, up, east, north ) {
-
-	const phi = lat * DEG2RAD;
-	const lambda = lon * DEG2RAD;
-	const cosPhi = Math.cos( phi );
-	const sinPhi = Math.sin( phi );
-	const cosLambda = Math.cos( lambda );
-	const sinLambda = Math.sin( lambda );
-	up.set( cosPhi * cosLambda, sinPhi, - cosPhi * sinLambda );
-	east.set( - sinLambda, 0, - cosLambda );
-	north.set( - sinPhi * cosLambda, cosPhi, sinPhi * sinLambda );
-
-}
 
 export class MapControls {
 
@@ -155,6 +140,26 @@ export class MapControls {
 
 	}
 
+	/** The ground point at the screen center and the local up there, in scene units. */
+	getTarget( target, up = null ) {
+
+		if ( this.mode === 'planar' ) {
+
+			const [ mx, my ] = normalizedToMeters( longitudeToNormalized( this.lon ), latitudeToNormalized( this.lat ) );
+			target.set( mx, 0, - my );
+			if ( up ) up.set( 0, 1, 0 );
+
+		} else {
+
+			latLonToEcef( this.lat, this.lon, 0, target );
+			if ( up ) localFrame( this.lat, this.lon, _east, _north, up );
+
+		}
+
+		return target;
+
+	}
+
 	/** Place the camera from the state. Returns true when the view changed. */
 	update() {
 
@@ -162,19 +167,12 @@ export class MapControls {
 		this._changed = false;
 
 		const camera = this.camera;
+		this.getTarget( _target, _up );
 		if ( this.mode === 'planar' ) {
 
 			// RasterTileMap planar frame: x east, y up, -z north
-			const [ mx, my ] = normalizedToMeters( longitudeToNormalized( this.lon ), latitudeToNormalized( this.lat ) );
-			_target.set( mx, 0, - my );
-			_up.set( 0, 1, 0 );
 			_east.set( 1, 0, 0 );
 			_north.set( 0, 0, - 1 );
-
-		} else {
-
-			latLonToEcef( this.lat, this.lon, 0, _target );
-			localFrame( this.lat, this.lon, _up, _east, _north );
 
 		}
 

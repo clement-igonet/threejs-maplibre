@@ -134,4 +134,25 @@ describe( 'MapControls', () => {
 
 	} );
 
+	it( 'gives the ground point under the view and its up vector in both modes', () => {
+
+		const target = new Vector3(), up = new Vector3();
+
+		const globe = createControls( { ...PARIS, distance: 500, heading: 30, pitch: 40 } ).controls;
+		globe.getTarget( target, up );
+		expect( target.distanceTo( latLonToEcef( PARIS.lat, PARIS.lon, 0, new Vector3() ) ) ).toBeLessThan( 1e-6 );
+		expect( up.length() ).toBeCloseTo( 1, 9 );
+		expect( up.dot( target.clone().normalize() ) ).toBeGreaterThan( 0.99 ); // geodetic up, near the geocentric one
+		expect( globe.camera.position.distanceTo( target ) ).toBeCloseTo( 500, 6 );
+
+		const planar = createControls( { ...PARIS, distance: 500 }, { mode: 'planar' } ).controls;
+		planar.getTarget( target, up );
+		const [ mx, my ] = normalizedToMeters( longitudeToNormalized( PARIS.lon ), latitudeToNormalized( PARIS.lat ) );
+		expect( target.x ).toBeCloseTo( mx, 6 );
+		expect( target.y ).toBe( 0 );
+		expect( target.z ).toBeCloseTo( - my, 6 );
+		expect( up.toArray() ).toEqual( [ 0, 1, 0 ] );
+
+	} );
+
 } );

@@ -25,7 +25,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vite build
+      - run: npm run build
+      - run: npm run build:site
         env:
           BASE_PATH: /threejs-maplibre/
       - uses: actions/upload-pages-artifact@v3

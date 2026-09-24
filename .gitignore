@@ -1,3 +1,5 @@
 node_modules/
 screenshots/
-dist/
+/dist/
+demo/data/louvre.osm.json
+/build/

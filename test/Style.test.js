@@ -82,9 +82,14 @@ describe( 'Style', () => {
 		const layer = new StyleLayer( { id: 'f', type: 'fill' } );
 		expect( layer.has( 'fill-opacity' ) ).toBe( false );
 		expect( layer.get( 'fill-opacity', 10 ) ).toBe( 1 );
-		expect( layer.get( 'fill-color', 10 ) ).toBe( '#000000' );
+		// a default color is a Color like a set one, the builders read .rgb
+		expect( layer.get( 'fill-color', 10 ).rgb ).toEqual( [ 0, 0, 0, 1 ] );
 		expect( layer.kind( 'fill-color' ) ).toBe( 'constant' );
-		expect( new StyleLayer( { id: 'l', type: 'line' } ).get( 'line-join', 10 ) ).toBe( 'miter' );
+		const line = new StyleLayer( { id: 'l', type: 'line' } );
+		expect( line.get( 'line-join', 10 ) ).toBe( 'miter' );
+		expect( line.get( 'line-color', 10 ).rgb ).toEqual( [ 0, 0, 0, 1 ] );
+		expect( line.get( 'line-width', 10 ) ).toBe( 1 );
+		expect( new StyleLayer( { id: 'e', type: 'fill-extrusion' } ).get( 'fill-extrusion-height', 10 ) ).toBe( 0 );
 
 	} );
 
@@ -97,16 +102,21 @@ describe( 'Style', () => {
 				{ id: 'dashed', type: 'line', source: 'osm', 'source-layer': 'transportation', paint: { 'line-color': '#000', 'line-dasharray': [ 2, 1 ], 'line-blur': 1 } },
 				{ id: 'dots', type: 'circle', source: 'osm', 'source-layer': 'poi', paint: { 'circle-radius': 3 } },
 				{ id: 'copy', ref: 'dashed', paint: { 'line-color': '#fff' } },
+				{ id: 'plaza', type: 'fill', source: 'osm', 'source-layer': 'transportation', paint: { 'fill-pattern': 'pedestrian_polygon', 'fill-opacity': 0.5 } },
 			],
 		} );
 		expect( style.warnings ).toEqual( [
 			'source "hills": type "raster-dem" is not supported',
 			'layer "dashed": ignored line-dasharray, line-blur',
 			'layer "dots": type "circle" is not rendered',
+			'layer "plaza": fill-pattern is not supported, layer not drawn',
 		] );
-		expect( style.layers.length ).toBe( 3 );
+		expect( style.layers.length ).toBe( 4 );
+		expect( style.layers[ 3 ].patterned ).toBe( true );
+		expect( style.layers[ 0 ].patterned ).toBe( false );
 		expect( style.layers[ 0 ].ignored ).toEqual( [ 'line-dasharray', 'line-blur' ] );
-		expect( style.layersForSource( 'osm' ).map( l => l.id ) ).toEqual( [ 'dashed', 'copy' ] );
+		// the patterned layer is still listed (the builder skips it by its flag)
+		expect( style.layersForSource( 'osm' ).map( l => l.id ) ).toEqual( [ 'dashed', 'copy', 'plaza' ] );
 		// ref layers inherit source, source-layer and filter, not paint
 		expect( style.layers[ 2 ].sourceLayer ).toBe( 'transportation' );
 		expect( style.layers[ 2 ].ignored ).toEqual( [] );
@@ -121,6 +131,24 @@ describe( 'Style', () => {
 		const style = await Style.load( 'https://example.com/style.json' );
 		expect( style.name ).toBe( 'stub' );
 		expect( fetch ).toHaveBeenCalledWith( 'https://example.com/style.json' );
+
+	} );
+
+} );
+
+describe( 'demo styles', () => {
+
+	it( 'parse without errors', async () => {
+
+		const { LOUVRE_STYLE } = await import( '../demo/louvre-style.js' );
+		const { STUB_STYLE } = await import( '../demo/stub-style.js' );
+		for ( const json of [ LOUVRE_STYLE, STUB_STYLE ] ) {
+
+			const style = new Style( json );
+			expect( style.layers.length ).toBe( json.layers.length );
+			expect( style.warnings.filter( w => ! w.includes( 'symbol' ) ) ).toEqual( [] );
+
+		}
 
 	} );
 

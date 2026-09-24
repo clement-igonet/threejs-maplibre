@@ -9,11 +9,16 @@
 		</style>
 	</head>
 	<body>
-		<h1>threejs-maplibre - M1 tile foundations</h1>
+		<h1>threejs-maplibre demos</h1>
 		<ul>
 			<li><a href="./globe.html">Globe</a>: OSM raster tiles on the WGS84 ellipsoid</li>
 			<li><a href="./planar.html">Planar</a>: flat Web Mercator map, same tile tree</li>
+			<li><a href="./vector.html">Vector</a>: the Louvre from an OSM extract, styled by a MapLibre style (fills, lines, extrusions)</li>
+			<li><a href="./objects.html">Objects</a>: three.js objects placed by latitude and longitude, a 34 m antenna and a marker pin over the Louvre (<code>?model=&lt;glTF url&gt;</code> loads a model instead of the built-in antenna)</li>
+			<li><a href="./standalone.html">Standalone</a>: OpenFreeMap's Liberty style over Paris from one <code>&lt;script&gt;</code>, the built library and nothing else (needs <code>npm run build</code> first)</li>
 		</ul>
-		<p>Append <code>?tiles=stub</code> to either demo for the offline deterministic tile source (used by CI screenshots).</p>
+		<p>Append <code>?tiles=stub</code> to the raster demos for the offline deterministic tile source (used by CI screenshots).
+		The vector and objects demos take <code>?data=louvre|stub|openfreemap</code>, <code>?mode=globe|planar</code> and <code>?style=&lt;url&gt;</code>;
+		every page takes <code>?lat=&amp;lon=&amp;alt=&amp;heading=&amp;pitch=</code>.</p>
 	</body>
 </html>

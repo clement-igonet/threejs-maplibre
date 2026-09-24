@@ -1,21 +1,27 @@
-import { decodeVectorTile } from './decodeVectorTile.js';
+import { createVectorTileHandler } from './vectorTileWorker.js';
+import { createVectorTileWorker } from './createWorker.js';
 
 // Loads MVT tiles: the fetch runs on the main thread (abortable, like
 // ImageTileLoader), the buffer is transferred to a small pool of Workers for
-// decoding, and the decoded layers come back transferred. Without Workers
-// (Node, tests) decoding runs inline. load() resolves to the decoded tile
-// ({ layers }); abort( key ) cancels an in-flight fetch (the promise rejects
-// with an AbortError); a tile already being decoded finishes and is dropped.
+// decoding, and the result comes back transferred. Without Workers (Node,
+// tests) the same handler runs inline. load( key, url ) resolves to the
+// decoded tile ({ layers }); after configure( { style, sourceId, mode } ),
+// load( key, url, { x, y, z } ) resolves to the built
+// geometry blocks instead (see build/buildTile.js). abort( key ) cancels an
+// in-flight fetch (the promise rejects with an AbortError); a tile already
+// in a Worker finishes and is dropped.
 
 export class VectorTileLoader {
 
-	constructor( { workers = 2, createWorker = defaultCreateWorker } = {} ) {
+	constructor( { workers = 2, createWorker = createVectorTileWorker } = {} ) {
 
 		this._controllers = new Map();
 		this._workers = [];
 		this._pending = new Map();
 		this._nextId = 1;
 		this._nextWorker = 0;
+		this._config = null;
+		this._inline = createVectorTileHandler();
 
 		for ( let i = 0; i < workers; i ++ ) {
 
@@ -34,7 +40,18 @@ export class VectorTileLoader {
 
 	}
 
-	async load( key, url ) {
+	// Sends the style to the Workers; tiles loaded with a { x, y, z } are
+	// built against it.
+	configure( { style, sourceId, mode = 'globe' } ) {
+
+		const styleJSON = style.json ?? style;
+		this._config = { type: 'init', style: styleJSON, sourceId, mode };
+		for ( const worker of this._workers ) worker.postMessage( this._config );
+		if ( this._workers.length === 0 ) this._inline( this._config, () => {} );
+
+	}
+
+	async load( key, url, tile = null ) {
 
 		const controller = new AbortController();
 		this._controllers.set( key, controller );
@@ -49,7 +66,10 @@ export class VectorTileLoader {
 			}
 
 			const buffer = await response.arrayBuffer();
-			return await this._decode( buffer );
+			const message = tile && this._config
+				? { type: 'build', buffer, x: tile.x, y: tile.y, z: tile.z }
+				: { buffer };
+			return await this._request( message );
 
 		} finally {
 
@@ -88,18 +108,25 @@ export class VectorTileLoader {
 
 	}
 
-	_decode( buffer ) {
-
-		if ( this._workers.length === 0 ) return Promise.resolve( decodeVectorTile( buffer ) );
+	_request( message ) {
 
 		const id = this._nextId ++;
-		const worker = this._workers[ this._nextWorker ];
-		this._nextWorker = ( this._nextWorker + 1 ) % this._workers.length;
+		message.id = id;
 
 		return new Promise( ( resolve, reject ) => {
 
 			this._pending.set( id, { resolve, reject } );
-			worker.postMessage( { id, buffer }, [ buffer ] );
+
+			if ( this._workers.length === 0 ) {
+
+				this._inline( message, reply => this._onMessage( reply ) );
+				return;
+
+			}
+
+			const worker = this._workers[ this._nextWorker ];
+			this._nextWorker = ( this._nextWorker + 1 ) % this._workers.length;
+			worker.postMessage( message, [ message.buffer ] );
 
 		} );
 
@@ -111,15 +138,8 @@ export class VectorTileLoader {
 		if ( ! pending ) return;
 		this._pending.delete( data.id );
 		if ( data.error ) pending.reject( new Error( data.error ) );
-		else pending.resolve( data.tile );
+		else pending.resolve( data.built ?? data.tile );
 
 	}
-
-}
-
-function defaultCreateWorker() {
-
-	if ( typeof Worker === 'undefined' ) return null;
-	return new Worker( new URL( './vectorTileWorker.js', import.meta.url ), { type: 'module' } );
 
 }

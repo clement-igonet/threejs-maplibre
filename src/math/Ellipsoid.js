@@ -46,3 +46,48 @@ export function geocentricHeight( point ) {
 	return length - surface;
 
 }
+
+// First intersection of the ray (origin, unit direction) with the ellipsoid
+// surface, written into target; null when the ray misses. Solved on the unit
+// sphere the ellipsoid scales to, since the ray parameter survives scaling.
+export function rayEllipsoidIntersection( origin, direction, target ) {
+
+	const a = WGS84_RADIUS;
+	const b = WGS84_RADIUS_POLAR;
+	const ox = origin.x / a, oy = origin.y / b, oz = origin.z / a;
+	const dx = direction.x / a, dy = direction.y / b, dz = direction.z / a;
+
+	const A = dx * dx + dy * dy + dz * dz;
+	const B = 2 * ( ox * dx + oy * dy + oz * dz );
+	const C = ox * ox + oy * oy + oz * oz - 1;
+	const disc = B * B - 4 * A * C;
+	if ( disc < 0 ) return null;
+
+	const root = Math.sqrt( disc );
+	let t = ( - B - root ) / ( 2 * A );
+	if ( t < 0 ) t = ( - B + root ) / ( 2 * A ); // inside: the exit point
+	if ( t < 0 ) return null;
+
+	target.x = origin.x + t * direction.x;
+	target.y = origin.y + t * direction.y;
+	target.z = origin.z + t * direction.z;
+	return target;
+
+}
+
+// The east, north and up unit vectors at (lat, lon), in the +Y-pole world
+// convention of latLonToEcef: what "level" and "north" mean for something
+// standing on the globe there.
+export function localFrame( lat, lon, east, north, up ) {
+
+	const phi = lat * DEG2RAD;
+	const lambda = lon * DEG2RAD;
+	const cosPhi = Math.cos( phi );
+	const sinPhi = Math.sin( phi );
+	const cosLambda = Math.cos( lambda );
+	const sinLambda = Math.sin( lambda );
+	east.set( - sinLambda, 0, - cosLambda );
+	north.set( - sinPhi * cosLambda, cosPhi, sinPhi * sinLambda );
+	up.set( cosPhi * cosLambda, sinPhi, - cosPhi * sinLambda );
+
+}

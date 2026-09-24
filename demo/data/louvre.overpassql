@@ -1,0 +1,21 @@
+[out:json][timeout:180][bbox:48.8555,2.3250,48.8660,2.3460];
+(
+  way["building"];
+  relation["building"];
+  way["building:part"];
+  relation["building:part"];
+  way["highway"];
+  way["waterway"];
+  way["natural"="water"];
+  relation["natural"="water"];
+  way["leisure"];
+  relation["leisure"];
+  way["landuse"];
+  node["place"];
+  node["tourism"];
+  node["amenity"];
+  node["natural"="tree"];
+);
+out body;
+>;
+out skel qt;

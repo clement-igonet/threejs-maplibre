@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>threejs-maplibre - 3D objects on the map</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<style>
+			body { margin: 0; background: #10161a; overflow: hidden; }
+			#info, #version { position: absolute; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; pointer-events: none; background: rgba(16, 22, 26, 0.6); padding: 2px 6px; border-radius: 3px; }
+			#info { top: 8px; }
+			#version { bottom: 8px; }
+		</style>
+	</head>
+	<body>
+		<div id="info">threejs-maplibre M2 - 3D objects</div>
+		<div id="version"></div>
+		<script type="module">
+
+			import { Color, ConeGeometry, CylinderGeometry, DirectionalLight, DoubleSide, Group, HemisphereLight, LatheGeometry, Mesh, MeshStandardMaterial, PerspectiveCamera, Scene, SphereGeometry, SRGBColorSpace, Vector2, Vector3, WebGLRenderer } from 'three';
+			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+			import { AttributionControl, MapAnchor, MapControls, VectorTileMap } from '../src/index.js';
+			import { loadVectorData } from './vector-data.js';
+
+			// three.js objects placed on the map by geographic location, the way
+			// MapLibre's "Add a 3D model" example puts a 34 m antenna on a map:
+			// here the antenna is built from three.js primitives so the page
+			// works offline, ?model=<url of a glTF> loads a model instead
+			// (e.g. the example's https://maplibre.org/maplibre-gl-js/docs/assets/34M_17/34M_17.gltf,
+			// meters, y up), ?scale= sizes it. A marker pin floats over the
+			// pyramid. ?data=, ?style=, ?mode=, ?lat=&lon=&alt=&heading=&pitch=
+			// as in the vector demo.
+			const params = new URLSearchParams( location.search );
+			const data = params.get( 'data' ) ?? 'louvre';
+			const mode = params.get( 'mode' ) === 'planar' ? 'planar' : 'globe';
+			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
+
+			const ANTENNA = { lat: 48.8613, lon: 2.3323 }; // a lawn of the jardin du Carrousel
+			const PYRAMID = { lat: 48.86107, lon: 2.33590 };
+
+			const { source, style, sourceId, view } = await loadVectorData( params );
+			for ( const warning of style.warnings ) console.warn( `style: ${ warning }` );
+
+			const renderer = new WebGLRenderer( { antialias: true } );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.outputColorSpace = SRGBColorSpace;
+			document.body.appendChild( renderer.domElement );
+
+			const scene = new Scene();
+			const background = style.backgroundLayer;
+			if ( background ) {
+
+				const [ r, g, b ] = background.get( 'background-color', 14 ).rgb;
+				scene.background = new Color().setRGB( r, g, b, SRGBColorSpace );
+
+			}
+
+			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1e8 );
+			const controls = new MapControls( camera, renderer.domElement, { mode } );
+			controls.minAltitude = 20;
+			controls.setView( { lat: num( 'lat', 48.8615 ), lon: num( 'lon', 2.3342 ), distance: num( 'alt', 520 ), heading: num( 'heading', 70 ), pitch: num( 'pitch', 60 ) } );
+
+			const map = new VectorTileMap( source, style, { mode, sourceId } );
+			scene.add( map );
+
+			scene.add( new HemisphereLight( 0xffffff, 0x8a8478, 1.0 ) );
+			const sun = new DirectionalLight( 0xffffff, 2.0 );
+			scene.add( sun, sun.target );
+
+			// --- the objects ---------------------------------------------------
+
+			// A 34 m dish antenna: pedestal, tower, and a parabolic dish turned by
+			// a mount so it can slew. Local frame: x east, y up, -z north, meters.
+			function createAntenna() {
+
+				const white = new MeshStandardMaterial( { color: 0xe6e6e2, roughness: 0.6, metalness: 0.1 } );
+				const grey = new MeshStandardMaterial( { color: 0x8f959a, roughness: 0.5, metalness: 0.4 } );
+				const antenna = new Group();
+
+				const pedestal = new Mesh( new CylinderGeometry( 4, 5.5, 12, 24 ), grey );
+				pedestal.position.y = 6;
+				const tower = new Mesh( new CylinderGeometry( 1.6, 2.6, 10, 16 ), white );
+				tower.position.y = 17;
+				antenna.add( pedestal, tower );
+
+				// the mount turns about the vertical, the dish tilts about its axle
+				const mount = new Group();
+				mount.position.y = 22;
+				const dish = new Group();
+				dish.rotation.x = - 0.9; // tilted up, facing -z (north) when the mount is at rest
+				mount.add( dish );
+				antenna.add( mount );
+
+				// a paraboloid 17 m in radius, 6 m deep, opening toward local +y of the dish
+				const profile = [];
+				for ( let i = 0; i <= 24; i ++ ) {
+
+					const r = 17 * i / 24;
+					profile.push( new Vector2( r, r * r / 48 ) );
+
+				}
+
+				const reflector = new Mesh( new LatheGeometry( profile, 48 ), new MeshStandardMaterial( { color: 0xf0f0ec, roughness: 0.4, metalness: 0.2, side: DoubleSide } ) );
+				const feed = new Mesh( new CylinderGeometry( 0.4, 0.4, 12, 8 ), grey );
+				feed.position.y = 6;
+				const feedHorn = new Mesh( new ConeGeometry( 1.2, 2, 12 ), grey );
+				feedHorn.position.y = 12;
+				feedHorn.rotation.x = Math.PI;
+				const axle = new Mesh( new CylinderGeometry( 1, 1, 12, 12 ), grey );
+				axle.rotation.z = Math.PI / 2;
+				dish.add( reflector, feed, feedHorn, axle );
+
+				antenna.mount = mount;
+				return antenna;
+
+			}
+
+			// A marker pin: a cone pointing down to the ground and a ball on top.
+			function createPin( color ) {
+
+				const material = new MeshStandardMaterial( { color, roughness: 0.4 } );
+				const pin = new Group();
+				const cone = new Mesh( new ConeGeometry( 6, 24, 24 ), material );
+				cone.position.y = 12;
+				const ball = new Mesh( new SphereGeometry( 9, 24, 16 ), material );
+				ball.position.y = 28;
+				pin.add( cone, ball );
+				return pin;
+
+			}
+
+			const antennaAnchor = new MapAnchor( { mode } ).setLocation( ANTENNA.lat, ANTENNA.lon, 0, num( 'objectHeading', 0 ) );
+			let antenna = null;
+			if ( params.has( 'model' ) ) {
+
+				const gltf = await new GLTFLoader().loadAsync( params.get( 'model' ) );
+				gltf.scene.scale.setScalar( num( 'scale', 1 ) );
+				antennaAnchor.add( gltf.scene );
+
+			} else {
+
+				antenna = createAntenna();
+				antennaAnchor.add( antenna );
+
+			}
+
+			const pinAnchor = new MapAnchor( { mode } ).setLocation( PYRAMID.lat, PYRAMID.lon, 30 );
+			const pin = createPin( 0xd63a2f );
+			pinAnchor.add( pin );
+
+			scene.add( antennaAnchor, pinAnchor );
+
+			// --- frame loop ------------------------------------------------------
+
+			const attribution = new AttributionControl( document.body );
+			attribution.addSource( source );
+
+			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
+			const info = document.getElementById( 'info' );
+			const _target = new Vector3();
+			const _up = new Vector3();
+			const _back = new Vector3();
+			const _right = new Vector3();
+			const start = performance.now();
+			let last = start;
+			let stableFrames = 0;
+
+			renderer.setAnimationLoop( () => {
+
+				const now = performance.now();
+				const delta = now - last;
+				last = now;
+				const t = ( now - start ) / 1000;
+
+				controls.update();
+
+				controls.getTarget( _target, _up );
+				_back.subVectors( camera.position, _target ).projectOnPlane( _up ).normalize();
+				_right.crossVectors( _back, _up ).normalize();
+				sun.target.position.copy( _target );
+				sun.position.copy( _target ).addScaledVector( _up, 3000 ).addScaledVector( _back, 1200 ).addScaledVector( _right, 1800 );
+
+				// the dish slews slowly, the pin bobs: objects live in the scene like any other
+				if ( antenna ) antenna.mount.rotation.y = 0.4 * Math.sin( t * 0.25 );
+				pin.position.y = 3 * Math.sin( t * 2 );
+
+				map.update( camera, renderer, delta );
+				renderer.render( scene, camera );
+
+				window.__CONTROLS = controls;
+				const s = map.stats;
+				info.textContent = `threejs-maplibre M2 - objects on ${ data } ${ mode } | zoom ${ map.zoom.toFixed( 2 ) } | heading ${ Math.round( controls.heading ) }° | pitch ${ Math.round( controls.pitch ) }° | rendered ${ s.rendered } | loading ${ s.loading } | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles }`;
+
+				stableFrames = ( s.loading === 0 && s.rendered > 0 && s.rendered >= s.selected ) ? stableFrames + 1 : 0;
+				window.__SHOT_READY = stableFrames > 30;
+
+			} );
+
+			window.addEventListener( 'resize', () => {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			} );
+
+		</script>
+	</body>
+</html>
