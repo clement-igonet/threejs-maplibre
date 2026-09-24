@@ -95,6 +95,74 @@ describe( 'RasterTileMap selection', () => {
 
 	} );
 
+	it( 'culls tiles beyond the horizon, whatever the far plane', () => {
+
+		const map = new RasterTileMap( createStubSource(), { mode: 'globe' } );
+		const surface = latLonToEcef( 48.8566, 2.3522, 0, new Vector3() );
+		const eye = latLonToEcef( 48.8566, 2.3522, 4000, new Vector3() );
+		// the far plane at 1e8 m reaches through the planet: without a horizon
+		// test the frustum picks up tiles on the far side of the globe
+		map.update( createCamera( eye, surface ), rendererStub );
+
+		const down = eye.clone().normalize();
+		for ( const record of map._records.values() ) {
+
+			if ( record.lastUsed !== map._frame ) continue;
+			// every tile in use touches the 10 degrees around the point below the camera
+			const angle = Math.acos( record.cone.direction.dot( down ) ) - record.cone.halfAngle;
+			expect( angle, record.key ).toBeLessThan( 10 * Math.PI / 180 );
+
+		}
+
+		expect( map.stats.culled ).toBeGreaterThan( 0 );
+		map.dispose();
+
+	} );
+
+	it( 'keeps large tiles outside a pitched view out of the selection', () => {
+
+		const map = new RasterTileMap( createStubSource(), { mode: 'globe' } );
+		const eye = latLonToEcef( 48.8566, 2.3522, 1000, new Vector3() );
+		// looking north-north-east at 50 degrees of pitch: the frustum continues
+		// underground, where an axis-aligned box around a big curved tile would
+		// meet it a few hundred kilometers away
+		const target = latLonToEcef( 48.8666, 2.3572, 0, new Vector3() );
+		map.update( createCamera( eye, target ), rendererStub );
+
+		const down = eye.clone().normalize();
+		for ( const record of map._records.values() ) {
+
+			if ( record.lastUsed !== map._frame ) continue;
+			const angle = Math.acos( record.cone.direction.dot( down ) ) - record.cone.halfAngle;
+			expect( angle, record.key ).toBeLessThan( 1 * Math.PI / 180 );
+
+		}
+
+		map.dispose();
+
+	} );
+
+	it( 'requests ancestors for backfill only near the leaves', () => {
+
+		const surface = latLonToEcef( 48.8566, 2.3522, 0, new Vector3() );
+		const eye = latLonToEcef( 48.8566, 2.3522, 500, new Vector3() );
+		const loading = map => [ ...map._records.values() ].filter( r => r.state === 'loading' ).map( r => r.key );
+
+		const map = new RasterTileMap( createStubSource(), { mode: 'globe' } );
+		map.update( createCamera( eye, surface ), rendererStub );
+		const withBackfill = loading( map );
+		expect( withBackfill ).not.toContain( '0/0/0' );
+		expect( withBackfill.some( key => key.startsWith( `${ maxSelectedZoom( map ) - 3 }/` ) ) ).toBe( true );
+		map.dispose();
+
+		const leavesOnly = new RasterTileMap( createStubSource(), { mode: 'globe', backfillLevels: 0 } );
+		leavesOnly.update( createCamera( eye, surface ), rendererStub );
+		expect( loading( leavesOnly ).length ).toBeLessThan( withBackfill.length );
+		expect( loading( leavesOnly ).length ).toBe( leavesOnly.stats.selected );
+		leavesOnly.dispose();
+
+	} );
+
 	it( 'selects planar tiles the same way', () => {
 
 		const map = new RasterTileMap( createStubSource(), { mode: 'planar' } );
@@ -165,22 +233,24 @@ describe( 'RasterTileMap selection', () => {
 		expect( map.stats.rendered ).toBe( 0 ); // nothing was uploaded before the walk
 
 		let frames = 1;
-		while ( uploads.length < 5 && frames < 10 ) {
+		while ( uploads.length < 3 && frames < 10 ) {
 
 			map.update( camera, slowRenderer );
 			frames ++;
 
 		}
 
-		expect( uploads.length ).toBe( 5 ); // the four z1 tiles (their boxes all meet the frustum) and the root behind them
-		expect( frames ).toBe( 5 );
+		// the two northern z1 tiles (Paris sits 2 degrees from their shared edge,
+		// the southern ones are past the horizon) and the root behind them
+		expect( uploads.length ).toBe( 3 );
+		expect( frames ).toBe( 3 );
 		expect( map.stats.rendered ).toBeGreaterThan( 0 );
 
 		// a fast renderer takes everything in one frame
 		const fastMap = new RasterTileMap( createStubSource( { maxZoom: 1 } ), { mode: 'globe' } );
 		for ( const key of [ '0/0/0', '1/0/0', '1/1/0', '1/0/1', '1/1/1' ] ) fastMap._cache.set( key, fakeTexture() );
 		fastMap.update( camera, rendererStub );
-		expect( fastMap.stats.uploaded ).toBe( 5 );
+		expect( fastMap.stats.uploaded ).toBe( 3 );
 
 		map.dispose();
 		fastMap.dispose();

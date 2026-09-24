@@ -28,10 +28,13 @@ export class VectorTileMap extends TileTree {
 		workers = 2,
 		createWorker,
 		fadeDuration = 0, // vector tiles pop in, as in MapLibre
+		// geometry has no texels to blur: a tile serves until its 512 texels
+		// span more than 2 px each, the zoom MapLibre would fetch it at
+		maxScreenTexel = 2,
 		...options
 	} = {} ) {
 
-		super( source, { fadeDuration, ...options } );
+		super( source, { fadeDuration, maxScreenTexel, ...options } );
 
 		this.style = style;
 		this.sourceId = sourceId ?? Object.keys( style.sources )[ 0 ] ?? 'vector';
