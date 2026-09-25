@@ -33,18 +33,35 @@ two libraries.
 
 ### How LOD works
 
-`RasterTileMap.update()` runs two walks per frame:
+`TileTree.update()` (shared by the raster and vector maps) runs two walks
+per frame:
 
 1. **Selection**: from the root tiles, a tile splits while one of its texels
-   projects to more than `maxScreenTexel` pixels (default 1.4), computed from
-   the tile's latitude-corrected ground texel size and its bounding-box
-   distance to the camera; capped at the source's `maxZoom`. Frustum culling
-   prunes whole subtrees.
-2. **Replace refinement**: a selected tile draws once its texture is loaded
+   projects to more than `maxScreenTexel` pixels (1.4 for raster, 2 for
+   vector, where there is no texel to blur and 2 matches the zoom MapLibre
+   fetches a tile at), computed from the tile's latitude-corrected ground
+   texel size and its bounding-box distance to the camera; capped at the
+   source's `maxZoom`. Culling prunes whole subtrees.
+2. **Replace refinement**: a selected tile draws once its content is loaded
    and fully faded in; until all children of an inner node cover their area,
    the nearest ready ancestor keeps drawing beneath them (`polygonOffset` and
    `renderOrder` resolve the coplanar overlap), so refinement never opens
-   holes.
+   holes. Ancestors are requested for that only within `backfillLevels`
+   (default 4) of the leaves: at street level the z0..z10 chain covers
+   nothing visible and was a third of the requests.
+
+Culling on a globe needs more than a box against frustum planes
+(`TileBounds.js`). The frustum continues underground past the horizon, an
+axis-aligned box around a large curved tile reaches deep into the planet and
+meets it there, and a plane-only test accepts boxes that sit past a frustum
+edge. So a tile gets an oriented box in its own east/north/up frame, grown
+by `contentHeight` (default 1000 m) for buildings, the view is the frustum
+cut at the horizon distance for that height, and the two are tested with all
+separating axes (exact for convex shapes). A per-tile bounding cone against
+the visible cap of the sphere rejects the far side of the planet before the
+box test. Before this, a street-level view over Paris requested 5 to 20x the
+tiles MapLibre did; after, the two engines request within a few tiles of
+each other (see the vector benchmark under M2).
 
 Decoded textures reach the GPU through a per-frame time budget
 (`uploadBudgetMs`, default 2 ms, at least one upload per frame): the walk
@@ -253,14 +270,116 @@ stack instead of fighting. Fills and lines drawn with an image pattern
 (`fill-pattern`, `line-pattern`) are skipped rather than painted in the
 default black; Liberty's `road_area_pattern` is the visible case.
 
-Measured on the shared VM (software rendering, so frame times are not
-meaningful there): the Louvre extract at z15 costs 70 to 95 draw calls and
-85 k triangles, with tiles built in 33 to 60 ms each; OpenFreeMap's Liberty
-style over Paris at z14.6, about a hundred layers, costs ~940 draw calls and
-1.7 M triangles, with z14 tiles (1 MB, 17 k features) built in ~400 ms. Draw
-calls are one per tile per layer as in MapLibre; folding a layer's tiles into
-one `BatchedMesh` is the next step, together with a benchmark against
-maplibre-gl-js on the same view.
+Draw calls are one per tile per layer as in MapLibre; folding a layer's
+tiles into one `BatchedMesh` is the next step. What a view costs today is in
+the benchmark below.
+
+### Measured against maplibre-gl-js
+
+`npm run bench:vector` (or `compose run --rm bench-vector`, env `BENCH_DATA`
+louvre or openfreemap, `BENCH_MODE` globe or planar) loads the same style
+and the same tiles in this engine and in maplibre-gl-js 5.24.0, in headless
+Chrome, and drives both through three poses (district z13 nadir, louvre
+z14.6 pitched 50 degrees, street z16.5 pitched 62 degrees) and a 240-frame
+fly from district to street. Draw calls and triangles are counted the same
+way for both, by wrapping the `WebGL2RenderingContext` draw functions; tile
+requests are counted at each engine's tile URL hook (MapLibre fetches from a
+worker, so a `bench://` protocol handler stands in for its network). Zoom is
+converted to camera distance with MapLibre's field of view so the two views
+cover the same ground. Full output is in `bench/vector-results-*.json`; the
+tables are from runs on 2026-09-24, SwiftShader on 2 CPUs of a shared VM,
+800x500 viewport. Timings there vary by +-30 % between runs, so read the
+ratios, not the milliseconds.
+
+Louvre extract (own Overpass export, z13 to z15), globe:
+
+| pose | metric | threejs-maplibre | maplibre-gl-js |
+|---|---|---|---|
+| district | tiles requested / draw calls / triangles | 9 / 32 / 62 490 | 10 / 65 / 26 011 |
+| | time to stable / heap | 4.1 s / 84 MB | 3.4 s / 78 MB |
+| louvre | tiles requested / draw calls / triangles | 17 / 71 / 91 737 | 0 / 75 / 76 846 |
+| | time to stable / heap | 5.4 s / 116 MB | 2.8 s / 86 MB |
+| street | tiles requested / draw calls / triangles | 6 / 56 / 44 871 | 4 / 110 / 53 025 |
+| | time to stable / heap | 3.3 s / 135 MB | 1.9 s / 79 MB |
+| fly district to street | tiles requested | 8 | 15 |
+| | mean / p95 / max frame | 128 / 244 / 347 ms | 147 / 283 / 469 ms |
+| | settle after fly / draw calls / heap | 1.8 s / 56 / 106 MB | 2.4 s / 110 / 88 MB |
+
+Same data, planar:
+
+| pose | metric | threejs-maplibre | maplibre-gl-js |
+|---|---|---|---|
+| district | tiles requested / draw calls / triangles | 6 / 17 / 48 674 | 10 / 64 / 26 010 |
+| | time to stable / heap | 3.6 s / 78 MB | 2.6 s / 77 MB |
+| louvre | tiles requested / draw calls / triangles | 17 / 71 / 88 219 | 0 / 74 / 76 845 |
+| | time to stable / heap | 5.0 s / 116 MB | 2.9 s / 83 MB |
+| street | tiles requested / draw calls / triangles | 7 / 56 / 44 750 | 4 / 110 / 53 025 |
+| | time to stable / heap | 2.3 s / 118 MB | 4.4 s / 76 MB |
+| fly district to street | tiles requested | 3 | 15 |
+| | mean / p95 / max frame | 116 / 211 / 435 ms | 146 / 290 / 523 ms |
+| | settle after fly / draw calls / heap | 1.5 s / 56 / 105 MB | 2.0 s / 110 / 102 MB |
+
+OpenFreeMap's Liberty style, live planet tiles (z14 max, 1 MB and 17 k
+features per tile over Paris), about a hundred layers, globe:
+
+| pose | metric | threejs-maplibre | maplibre-gl-js |
+|---|---|---|---|
+| district | tiles requested / draw calls / triangles | 9 / 144 / 349 999 | 10 / 191 / 205 120 |
+| | time to stable / heap | 8.9 s / 63 MB | 10.5 s / 34 MB |
+| louvre | tiles requested / draw calls / triangles | 6 / 162 / 820 963 | 0 / 323 / 1 519 775 |
+| | time to stable / heap | 20.2 s / 142 MB | 21.6 s / 30 MB |
+| street | tiles requested / draw calls / triangles | 0 / 117 / 518 281 | 1 / 218 / 961 640 |
+| | time to stable / heap | 8.1 s / 142 MB | 17.2 s / 39 MB |
+| fly district to street | tiles requested | 1 | 8 |
+| | mean / p95 / max frame | 398 / 783 / 1200 ms | 564 / 1014 / 1903 ms |
+| | settle after fly / draw calls / heap | 4.5 s / 117 / 155 MB | 10.0 s / 218 / 46 MB |
+
+Reading it:
+
+- **Tile requests are on par.** MapLibre's 0 at the louvre pose is a cache
+  effect: it fetched the tiles it needs there at the district pose (it loads
+  the integer zoom, this engine picks z13 there and z14 later). Getting
+  there took three changes to the shared quadtree (horizon cone, oriented
+  boxes against a horizon-cut view volume, `backfillLevels`, see M1); before
+  them the engine requested 49 / 58 / 79 tiles at the three Louvre poses.
+- **Draw calls are half of MapLibre's** at street level on both datasets
+  (56 vs 110, 117 vs 218) with one mesh per tile per layer, before any
+  batching. MapLibre draws every antialiased fill layer twice per tile (the
+  fill, then its outline as `GL_LINES`), the background once per tile, and
+  two stencil mask passes per tile each time the source changes; here a
+  fill is one draw and an outline exists only when the style gives it a
+  color.
+- **Triangles are 1.7 to 2.4x MapLibre's at district**, which is not the
+  meshes: `fill-outline-color` is tessellated into a line strip here (two
+  triangles per segment, so an outline costs about as much as the fill it
+  wraps), where MapLibre draws outlines with `GL_LINES`. Drawing outlines as
+  `LineSegments` is the cheap fix and would bring district under MapLibre's
+  count. At street level on the Louvre extract, where outlines are a small
+  share, this engine already draws fewer triangles (44 k vs 53 k). On
+  Liberty over the globe MapLibre draws about twice the triangles at the
+  louvre and street poses; part of that is its globe subdivision (fills and
+  lines are cut to follow the curvature), part is that it served those poses
+  from the tiles it had, so the two are not like for like there.
+- **Time to stable is 1.5 to 2x MapLibre's on a direct jump on the Louvre
+  extract**, and it is worker time: `stats.buildMs` puts one Louvre tile at
+  100 to 200 ms to decode, style and triangulate on this VM, and the poses
+  wait on 6 to 17 of them through 2 CPUs. Where the build spends it is not
+  profiled yet (the expressions are MapLibre's own compiled ones, so the
+  suspects are the clipping and Earcut per feature and the per-layer block
+  assembly); a per-stage timing in the worker is the next measurement. On
+  Liberty, where a tile is 1 MB and the network is in the loop, the two
+  engines settle in the same time at district and louvre and this engine
+  twice as fast at street, and the settle after the fly is 4.5 s against
+  10 s.
+- **Memory**: the main-thread heap is 1.3 to 1.7x MapLibre's at street
+  level on the Louvre extract and 3 to 4x on Liberty (142 vs 39 MB); neither
+  number includes the workers, where MapLibre keeps its decoded tiles. Not
+  profiled yet; the first suspect is the CPU copy of every attribute that
+  `BufferAttribute` keeps after upload, and the batching PR will measure
+  what dropping it saves.
+- **Frame times** are the software rasterizer's, as in the raster benchmark;
+  the ordering (this engine 15 to 30 % faster mean and p95 on the fly) is
+  consistent across runs, the absolute values are not.
 
 ### Objects on the map
 
