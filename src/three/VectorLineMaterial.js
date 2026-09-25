@@ -1,4 +1,5 @@
 import { Color, DoubleSide, ShaderMaterial, Vector3 } from 'three';
+import { EXTRUDE_SCALE, PROPS_SCALE } from '../build/quantize.js';
 
 // Screen-space line material for the strips built by build/buildLines.js.
 // Each vertex holds its position on the line, the tangent direction to
@@ -10,9 +11,9 @@ import { Color, DoubleSide, ShaderMaterial, Vector3 } from 'three';
 // one pixel wide and faded, as MapLibre does.
 
 const vertexShader = /* glsl */`
-attribute vec3 extrude;
+attribute vec3 extrude;    // normalized Int16, x EXTRUDE_SCALE
 attribute vec2 lineSide;   // side (-1, 1), gap strip (-1, 0, 1)
-attribute vec3 lineProps;  // baked width, gap, offset
+attribute vec3 lineProps;  // baked width, gap, offset, normalized Int16
 attribute vec4 lineColor;
 
 uniform float pixelScale;  // local units per pixel at unit depth
@@ -30,7 +31,7 @@ void main() {
 	// drawn from a BatchedMesh: the instance matrix places the tile
 	#include <batching_vertex>
 	vec4 localPosition = vec4( position, 1.0 );
-	vec4 localExtrude = vec4( extrude, 0.0 );
+	vec4 localExtrude = vec4( extrude * ${ EXTRUDE_SCALE.toFixed( 1 ) }, 0.0 );
 	#ifdef USE_BATCHING
 		localPosition = batchingMatrix * localPosition;
 		localExtrude = batchingMatrix * localExtrude;
@@ -39,7 +40,7 @@ void main() {
 	vec4 mvPosition = modelViewMatrix * localPosition;
 	vec3 mvExtrude = ( modelViewMatrix * localExtrude ).xyz;
 
-	vec3 props = lineProps * propScale;
+	vec3 props = lineProps * ${ PROPS_SCALE.toFixed( 1 ) } * propScale;
 	float width = max( props.x, 1.0 );
 	vCover = props.x / width;
 	float halfWidth = 0.5 * width;

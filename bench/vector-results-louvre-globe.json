@@ -27,8 +27,8 @@
 					],
 					"drawCalls": 9,
 					"triangles": 62490,
-					"timeToStableMs": 3323,
-					"heapMB": 76,
+					"timeToStableMs": 3782,
+					"heapMB": 79,
 					"timedOut": false,
 					"stats": {
 						"selected": 4,
@@ -39,9 +39,9 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 9,
-						"buildMs": 1562.3999977111816,
-						"batchBytes": 8435136,
-						"geometryBytes": 6835700
+						"buildMs": 1844.900001525879,
+						"batchBytes": 10880096,
+						"geometryBytes": 8833856
 					}
 				},
 				{
@@ -68,8 +68,8 @@
 					],
 					"drawCalls": 9,
 					"triangles": 91922,
-					"timeToStableMs": 9287,
-					"heapMB": 121,
+					"timeToStableMs": 7588,
+					"heapMB": 139,
 					"timedOut": false,
 					"stats": {
 						"selected": 13,
@@ -80,9 +80,9 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 26,
-						"buildMs": 4797.099998474121,
-						"batchBytes": 33504680,
-						"geometryBytes": 26110128
+						"buildMs": 4148.400001525879,
+						"batchBytes": 29453896,
+						"geometryBytes": 22456332
 					}
 				},
 				{
@@ -98,8 +98,8 @@
 					],
 					"drawCalls": 9,
 					"triangles": 44878,
-					"timeToStableMs": 3292,
-					"heapMB": 132,
+					"timeToStableMs": 3202,
+					"heapMB": 97,
 					"timedOut": false,
 					"stats": {
 						"selected": 7,
@@ -110,20 +110,20 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 32,
-						"buildMs": 5193,
-						"batchBytes": 40870172,
-						"geometryBytes": 30538256
+						"buildMs": 4382.300006866455,
+						"batchBytes": 29675080,
+						"geometryBytes": 25462052
 					}
 				}
 			],
 			"fly": {
 				"frames": 240,
-				"meanFrameMs": 148.74,
-				"p95FrameMs": 297.2,
-				"maxFrameMs": 732.7,
-				"framesOver16Ms": 236,
-				"framesOver50Ms": 213,
-				"settleMs": 1392,
+				"meanFrameMs": 131.5,
+				"p95FrameMs": 248.8,
+				"maxFrameMs": 544.2,
+				"framesOver16Ms": 240,
+				"framesOver50Ms": 232,
+				"settleMs": 2380,
 				"requestsTotal": 8,
 				"requested": [
 					"14/8297/5637",
@@ -137,7 +137,7 @@
 				],
 				"timedOut": false,
 				"drawCallsAfter": 9,
-				"heapMB": 115
+				"heapMB": 102
 			}
 		},
 		"maplibre": {
@@ -163,10 +163,10 @@
 						"13/4148/2818",
 						"13/4148/2817"
 					],
-					"drawCalls": 64,
-					"triangles": 26010,
-					"timeToStableMs": 2506,
-					"heapMB": 54,
+					"drawCalls": 65,
+					"triangles": 26011,
+					"timeToStableMs": 2803,
+					"heapMB": 57,
 					"timedOut": false,
 					"stats": {}
 				},
@@ -174,9 +174,9 @@
 					"name": "louvre",
 					"requests": 0,
 					"requested": [],
-					"drawCalls": 74,
-					"triangles": 76845,
-					"timeToStableMs": 3006,
+					"drawCalls": 75,
+					"triangles": 76846,
+					"timeToStableMs": 2881,
 					"heapMB": 52,
 					"timedOut": false,
 					"stats": {}
@@ -192,7 +192,7 @@
 					],
 					"drawCalls": 110,
 					"triangles": 53025,
-					"timeToStableMs": 2420,
+					"timeToStableMs": 2610,
 					"heapMB": 59,
 					"timedOut": false,
 					"stats": {}
@@ -200,12 +200,12 @@
 			],
 			"fly": {
 				"frames": 240,
-				"meanFrameMs": 123.66,
-				"p95FrameMs": 250.3,
-				"maxFrameMs": 482.9,
+				"meanFrameMs": 145.23,
+				"p95FrameMs": 302,
+				"maxFrameMs": 401.7,
 				"framesOver16Ms": 240,
-				"framesOver50Ms": 220,
-				"settleMs": 1405,
+				"framesOver50Ms": 238,
+				"settleMs": 2795,
 				"requestsTotal": 15,
 				"requested": [
 					"15/16596/11272",
@@ -226,7 +226,7 @@
 				],
 				"timedOut": false,
 				"drawCallsAfter": 110,
-				"heapMB": 67
+				"heapMB": 69
 			}
 		}
 	}

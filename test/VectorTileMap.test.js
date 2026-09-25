@@ -30,6 +30,15 @@ function cityCamera( altitude ) {
 
 }
 
+// what the tiles in a batch hold, holes left by dropped ones aside
+function usedVertices( batch ) {
+
+	let vertices = 0;
+	for ( const info of batch._geometryInfo ) if ( info.active ) vertices += info.reservedVertexCount;
+	return vertices;
+
+}
+
 // runs frames until every selected tile is built and drawn, or gives up
 async function settle( map, camera, frames = 40 ) {
 
@@ -184,21 +193,23 @@ describe( 'VectorTileMap', () => {
 		// a block the size of the whole starting buffer forces a resize
 		const n = vertices0;
 		const index = Number( key.split( ':' )[ 0 ] );
-		const bigTile = () => ( { center: new Vector3(), blocks: [ { id: 'big', index, type: 'fill-extrusion', positions: new Float32Array( 3 * n ), colors: new Uint8Array( 4 * n ), normals: new Float32Array( 3 * n ), indices: new Uint32Array( 3 * n ) } ] } );
+		const bigTile = () => ( { center: new Vector3(), blocks: [ { id: 'big', index, type: 'fill-extrusion', positions: new Float32Array( 3 * n ), colors: new Uint8Array( 4 * n ), indices: new Uint32Array( 3 * n ) } ] } );
 
 		const built = bigTile();
 		map._upload( built );
-		expect( batch._maxVertexCount ).toBeGreaterThan( vertices0 );
+		const grown = batch._maxVertexCount;
+		expect( grown ).toBeGreaterThan( vertices0 );
 		expect( batch._maxIndexCount ).toBeGreaterThanOrEqual( 3 * n );
 		// the Worker's arrays are gone once the batch holds them
 		expect( built.blocks[ 0 ].positions ).toBeUndefined();
 
-		// dropping it and uploading again fits without growing further
+		// dropping it gives the buffers back, and the next tile still fits
 		map._disposeContent( built );
-		const grown = batch._maxVertexCount;
+		expect( batch._maxVertexCount ).toBeLessThan( grown );
+		expect( batch._maxVertexCount ).toBeGreaterThanOrEqual( usedVertices( batch ) );
 		const again = bigTile();
 		map._upload( again );
-		expect( batch._maxVertexCount ).toBe( grown );
+		expect( batch._maxVertexCount ).toBeGreaterThanOrEqual( n );
 
 		// instances grow the same way, and dropped ones free their slot
 		const objects = [];

@@ -4,6 +4,7 @@ import { createTileProjection } from '../src/build/TileProjection.js';
 import { appendExtrusion, appendFill } from '../src/build/buildPolygons.js';
 import { appendLine } from '../src/build/buildLines.js';
 import { buildTile, builtTileTransferables } from '../src/build/buildTile.js';
+import { EXTRUDE_SCALE, PROPS_SCALE } from '../src/build/quantize.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { stubVectorTile } from '../demo/stub-vector-tiles.js';
@@ -20,7 +21,7 @@ const square = ( x0, y0, x1, y1 ) => [ x0, y0, x1, y0, x1, y1, x0, y1, x0, y0 ];
 
 function newOut() {
 
-	return { positions: [], colors: [], indices: [], normals: [], extrudes: [], sides: [], props: [], vertexCount: 0 };
+	return { positions: [], colors: [], indices: [], extrudes: [], sides: [], props: [], vertexCount: 0 };
 
 }
 
@@ -145,33 +146,32 @@ describe( 'buildPolygons', () => {
 
 	} );
 
-	it( 'extrudes walls with outward normals and a roof at the height', () => {
+	it( 'extrudes walls wound outward and a roof at the height', () => {
 
 		const out = newOut();
 		const triangles = appendExtrusion( out, [ ring ], projection, [ 255, 255, 255, 255 ], 0, 30 );
 		expect( triangles ).toBe( 2 + 4 * 2 );
-		expect( out.normals.length ).toBe( out.positions.length );
 
-		// roof vertices at 30 m with an up normal
-		for ( let v = 0; v < 4; v ++ ) {
+		// roof vertices at 30 m, wound facing up
+		for ( let v = 0; v < 4; v ++ ) expect( out.positions[ 3 * v + 1 ] ).toBeCloseTo( 30, 6 );
+		for ( let i = 0; i < 6; i += 3 ) {
 
-			expect( out.positions[ 3 * v + 1 ] ).toBeCloseTo( 30, 6 );
-			expect( out.normals[ 3 * v + 1 ] ).toBeCloseTo( 1, 6 );
+			const n = triangleNormal( out.positions, out.indices[ i ], out.indices[ i + 1 ], out.indices[ i + 2 ] );
+			expect( n[ 1 ] ).toBeCloseTo( 1, 6 );
 
 		}
 
-		// each wall's stored normal matches its triangle winding and points
-		// away from the footprint center
+		// no normals are stored: the flat-shaded material takes them from the
+		// winding, so each wall has to be wound away from the footprint center
+		expect( out.normals ).toBeUndefined();
 		const center = projection.project( 1500, 1500, 0, [ 0, 0, 0 ] );
 		for ( let wall = 0; wall < 4; wall ++ ) {
 
 			const base = 4 + 4 * wall;
-			const stored = out.normals.slice( 3 * base, 3 * base + 3 );
 			const i = 6 + 6 * wall;
 			const wound = triangleNormal( out.positions, out.indices[ i ], out.indices[ i + 1 ], out.indices[ i + 2 ] );
-			for ( let k = 0; k < 3; k ++ ) expect( wound[ k ] ).toBeCloseTo( stored[ k ], 6 );
 			const p = out.positions.slice( 3 * base, 3 * base + 3 );
-			const outward = ( p[ 0 ] - center[ 0 ] ) * stored[ 0 ] + ( p[ 2 ] - center[ 2 ] ) * stored[ 2 ];
+			const outward = ( p[ 0 ] - center[ 0 ] ) * wound[ 0 ] + ( p[ 2 ] - center[ 2 ] ) * wound[ 2 ];
 			expect( outward ).toBeGreaterThan( 0 );
 
 		}
@@ -259,11 +259,20 @@ describe( 'buildTile', () => {
 
 		expect( Object.keys( byId ).sort() ).toEqual( [ 'building-3d', 'park', 'road-major', 'road-residential', 'water' ] );
 		expect( byId[ 'building-3d' ].type ).toBe( 'fill-extrusion' );
-		expect( byId[ 'building-3d' ].normals.length ).toBe( byId[ 'building-3d' ].positions.length );
+		expect( byId[ 'building-3d' ].normals ).toBeUndefined(); // flat shaded from the winding
 		expect( byId[ 'road-major' ].type ).toBe( 'line' );
 		expect( byId[ 'road-major' ].extrudes.length ).toBe( byId[ 'road-major' ].positions.length );
 		expect( byId[ 'road-major' ].sides.length / 2 ).toBe( byId[ 'road-major' ].vertices );
 		expect( byId.park.colors.length / 4 ).toBe( byId.park.vertices );
+
+		// a line vertex is quantized: a direction and a baked width do not
+		// need a float each (EXTRUDE_SCALE, PROPS_SCALE)
+		const road = byId[ 'road-major' ];
+		expect( road.extrudes ).toBeInstanceOf( Int16Array );
+		expect( road.sides ).toBeInstanceOf( Int8Array );
+		expect( road.props ).toBeInstanceOf( Int16Array );
+		expect( Math.hypot( ...[ 0, 1, 2 ].map( i => road.extrudes[ i ] / 32767 * EXTRUDE_SCALE ) ) ).toBeCloseTo( 1, 2 );
+		expect( road.props[ 0 ] / 32767 * PROPS_SCALE ).toBeCloseTo( 1, 2 ); // camera-kind width, baked to 1
 
 		for ( const block of built.blocks ) {
 
@@ -318,7 +327,7 @@ describe( 'buildTile', () => {
 		expect( coarse.blocks.find( b => b.id === 'building-3d' ) ).toBeDefined(); // minzoom 13
 		// the residential road width is a zoom interpolation from 1 px at z12:
 		// a uniform, so the baked value stays 1 whatever the tile zoom
-		expect( coarse.blocks.find( b => b.id === 'road-residential' ).props[ 0 ] ).toBe( 1 );
+		expect( coarse.blocks.find( b => b.id === 'road-residential' ).props[ 0 ] / 32767 * PROPS_SCALE ).toBeCloseTo( 1, 2 );
 
 	} );
 

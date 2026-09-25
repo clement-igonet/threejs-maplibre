@@ -1,6 +1,7 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
+import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
 
 // Turns a decoded tile into one geometry block per style layer: attribute
 // arrays ready to become BufferAttributes on the main thread. Runs in the
@@ -53,7 +54,7 @@ function newBlock( layer, index, type ) {
 
 	return {
 		id: layer.id, index, type,
-		positions: [], colors: [], indices: [], normals: [], extrudes: [], sides: [], props: [],
+		positions: [], colors: [], indices: [], extrudes: [], sides: [], props: [],
 		vertexCount: 0, features: 0, triangles: 0,
 	};
 }
@@ -74,12 +75,13 @@ function finishBlock( block ) {
 		indices: block.vertexCount > 65535 ? new Uint32Array( block.indices ) : new Uint16Array( block.indices ),
 	};
 
-	if ( block.type === 'fill-extrusion' ) out.normals = new Float32Array( block.normals );
+	// a line vertex is the one this builds most of, so its attributes are
+	// quantized: a direction and two side flags need nothing like a float each
 	if ( block.type === 'line' ) {
 
-		out.extrudes = new Float32Array( block.extrudes );
-		out.sides = new Float32Array( block.sides );
-		out.props = new Float32Array( block.props );
+		out.extrudes = quantize( block.extrudes, EXTRUDE_SCALE );
+		out.sides = new Int8Array( block.sides );
+		out.props = quantize( block.props, PROPS_SCALE );
 
 	}
 
@@ -223,7 +225,7 @@ export function builtTileTransferables( built ) {
 	const list = [];
 	for ( const block of built.blocks ) {
 
-		for ( const key of [ 'positions', 'colors', 'indices', 'normals', 'extrudes', 'sides', 'props' ] ) {
+		for ( const key of [ 'positions', 'colors', 'indices', 'extrudes', 'sides', 'props' ] ) {
 
 			if ( block[ key ] ) list.push( block[ key ].buffer );
 

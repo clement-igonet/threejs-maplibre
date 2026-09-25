@@ -22,6 +22,22 @@ const MIN_VERTICES = 1 << 12;
 const MIN_INDICES = 1 << 14;
 const GROWTH = 1.5;
 
+// What the tiles in a batch hold, holes left by deleted tiles aside.
+function usage( batch ) {
+
+	let vertices = 0, indices = 0;
+	for ( const info of batch._geometryInfo ) {
+
+		if ( ! info.active ) continue;
+		vertices += info.reservedVertexCount;
+		indices += info.reservedIndexCount;
+
+	}
+
+	return { vertices, indices };
+
+}
+
 // Vector tiles styled by a MapLibre style, on the shared quadtree. The
 // content of a tile is the set of geometry blocks the Worker built for it
 // (one per style layer with something to draw). Each layer owns one
@@ -125,15 +141,15 @@ export class VectorTileMap extends TileTree {
 
 			if ( block.type === 'line' ) {
 
-				_geometry.setAttribute( 'extrude', new BufferAttribute( block.extrudes, 3 ) );
+				// quantized in the Worker: see EXTRUDE_SCALE and PROPS_SCALE
+				_geometry.setAttribute( 'extrude', new BufferAttribute( block.extrudes, 3, true ) );
 				_geometry.setAttribute( 'lineSide', new BufferAttribute( block.sides, 2 ) );
-				_geometry.setAttribute( 'lineProps', new BufferAttribute( block.props, 3 ) );
+				_geometry.setAttribute( 'lineProps', new BufferAttribute( block.props, 3, true ) );
 				_geometry.setAttribute( 'lineColor', new BufferAttribute( block.colors, 4, true ) );
 
 			} else {
 
 				_geometry.setAttribute( 'color', new BufferAttribute( block.colors, 4, true ) );
-				if ( block.normals ) _geometry.setAttribute( 'normal', new BufferAttribute( block.normals, 3 ) );
 
 			}
 
@@ -160,26 +176,45 @@ export class VectorTileMap extends TileTree {
 
 		if ( batch.unusedVertexCount >= vertices && batch.unusedIndexCount >= indices ) return;
 
-		let usedVertices = 0, usedIndices = 0;
-		for ( const info of batch._geometryInfo ) {
-
-			if ( ! info.active ) continue;
-			usedVertices += info.reservedVertexCount;
-			usedIndices += info.reservedIndexCount;
-
-		}
-
+		const used = usage( batch );
 		let maxVertices = batch._maxVertexCount, maxIndices = batch._maxIndexCount;
-		while ( maxVertices - usedVertices < vertices ) maxVertices = Math.ceil( maxVertices * GROWTH );
-		while ( maxIndices - usedIndices < indices ) maxIndices = Math.ceil( maxIndices * GROWTH );
+		while ( maxVertices - used.vertices < vertices ) maxVertices = Math.ceil( maxVertices * GROWTH );
+		while ( maxIndices - used.indices < indices ) maxIndices = Math.ceil( maxIndices * GROWTH );
 		if ( maxVertices !== batch._maxVertexCount || maxIndices !== batch._maxIndexCount ) batch.setGeometrySize( maxVertices, maxIndices );
 		batch.optimize();
 
 	}
 
+	// Gives the buffers back once the tiles that were in them are gone: a
+	// view that leaves a dense city behind should not keep its batches.
+	_shrink( batch ) {
+
+		if ( batch._maxVertexCount <= MIN_VERTICES && batch._maxIndexCount <= MIN_INDICES ) return;
+
+		const used = usage( batch );
+		if ( 2 * used.vertices > batch._maxVertexCount || 2 * used.indices > batch._maxIndexCount ) return;
+
+		batch.optimize();
+		batch.setGeometrySize(
+			Math.max( MIN_VERTICES, Math.ceil( GROWTH * used.vertices ) ),
+			Math.max( MIN_INDICES, Math.ceil( GROWTH * used.indices ) ),
+		);
+
+	}
+
 	_disposeContent( built ) {
 
-		if ( built.slots ) for ( const { entry, geometryId } of built.slots ) entry.batch.deleteGeometry( geometryId );
+		if ( ! built.slots ) return;
+
+		const touched = new Set();
+		for ( const { entry, geometryId } of built.slots ) {
+
+			entry.batch.deleteGeometry( geometryId );
+			touched.add( entry.batch );
+
+		}
+
+		for ( const batch of touched ) this._shrink( batch );
 		built.slots = null;
 		built.uploaded = false;
 
@@ -254,7 +289,9 @@ export class VectorTileMap extends TileTree {
 
 		} else if ( block.type === 'fill-extrusion' ) {
 
-			material = new MeshLambertMaterial( { vertexColors: true } );
+			// flat faces shaded from the derivatives of the view position:
+			// no normal attribute to build, transfer or keep
+			material = new MeshLambertMaterial( { vertexColors: true, flatShading: true } );
 
 		} else {
 

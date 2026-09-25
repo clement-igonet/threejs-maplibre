@@ -24,8 +24,8 @@
 					],
 					"drawCalls": 9,
 					"triangles": 48674,
-					"timeToStableMs": 2830,
-					"heapMB": 83,
+					"timeToStableMs": 2872,
+					"heapMB": 56,
 					"timedOut": false,
 					"stats": {
 						"selected": 2,
@@ -36,9 +36,9 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 6,
-						"buildMs": 1103.7999954223633,
-						"batchBytes": 14641048,
-						"geometryBytes": 11596896
+						"buildMs": 1501.400001525879,
+						"batchBytes": 5338638,
+						"geometryBytes": 3754956
 					}
 				},
 				{
@@ -65,8 +65,8 @@
 					],
 					"drawCalls": 9,
 					"triangles": 88388,
-					"timeToStableMs": 3702,
-					"heapMB": 180,
+					"timeToStableMs": 6481,
+					"heapMB": 86,
 					"timedOut": false,
 					"stats": {
 						"selected": 12,
@@ -77,9 +77,9 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 23,
-						"buildMs": 2428,
-						"batchBytes": 39595016,
-						"geometryBytes": 35966662
+						"buildMs": 4093.199993133545,
+						"batchBytes": 26597756,
+						"geometryBytes": 20977102
 					}
 				},
 				{
@@ -96,8 +96,8 @@
 					],
 					"drawCalls": 9,
 					"triangles": 44757,
-					"timeToStableMs": 2095,
-					"heapMB": 185,
+					"timeToStableMs": 3010,
+					"heapMB": 108,
 					"timedOut": false,
 					"stats": {
 						"selected": 7,
@@ -108,20 +108,20 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 30,
-						"buildMs": 2730.2000045776367,
-						"batchBytes": 56248780,
-						"geometryBytes": 41471094
+						"buildMs": 4606.799991607666,
+						"batchBytes": 29097540,
+						"geometryBytes": 24848490
 					}
 				}
 			],
 			"fly": {
 				"frames": 240,
-				"meanFrameMs": 78.35,
-				"p95FrameMs": 100.6,
-				"maxFrameMs": 671.6,
-				"framesOver16Ms": 240,
-				"framesOver50Ms": 192,
-				"settleMs": 1058,
+				"meanFrameMs": 111.17,
+				"p95FrameMs": 206.1,
+				"maxFrameMs": 356.2,
+				"framesOver16Ms": 236,
+				"framesOver50Ms": 215,
+				"settleMs": 1714,
 				"requestsTotal": 3,
 				"requested": [
 					"16/33194/22546",
@@ -130,7 +130,7 @@
 				],
 				"timedOut": false,
 				"drawCallsAfter": 9,
-				"heapMB": 129
+				"heapMB": 99
 			}
 		},
 		"maplibre": {
@@ -158,8 +158,8 @@
 					],
 					"drawCalls": 64,
 					"triangles": 26010,
-					"timeToStableMs": 1810,
-					"heapMB": 56,
+					"timeToStableMs": 3176,
+					"heapMB": 54,
 					"timedOut": false,
 					"stats": {}
 				},
@@ -169,7 +169,7 @@
 					"requested": [],
 					"drawCalls": 74,
 					"triangles": 76845,
-					"timeToStableMs": 2120,
+					"timeToStableMs": 3105,
 					"heapMB": 52,
 					"timedOut": false,
 					"stats": {}
@@ -185,7 +185,7 @@
 					],
 					"drawCalls": 110,
 					"triangles": 53025,
-					"timeToStableMs": 1625,
+					"timeToStableMs": 2782,
 					"heapMB": 58,
 					"timedOut": false,
 					"stats": {}
@@ -193,12 +193,12 @@
 			],
 			"fly": {
 				"frames": 240,
-				"meanFrameMs": 99.56,
-				"p95FrameMs": 191.4,
-				"maxFrameMs": 704.1,
+				"meanFrameMs": 151.22,
+				"p95FrameMs": 301.3,
+				"maxFrameMs": 1341.7,
 				"framesOver16Ms": 240,
-				"framesOver50Ms": 215,
-				"settleMs": 2757,
+				"framesOver50Ms": 225,
+				"settleMs": 2208,
 				"requestsTotal": 15,
 				"requested": [
 					"15/16596/11272",
