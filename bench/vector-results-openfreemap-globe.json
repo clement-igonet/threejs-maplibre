@@ -1,0 +1,192 @@
+{
+	"date": "2026-09-24",
+	"data": "openfreemap",
+	"mode": "globe",
+	"results": {
+		"native": {
+			"engine": "threejs-maplibre 0.1.0 (globe)",
+			"data": "openfreemap",
+			"viewport": [
+				800,
+				500
+			],
+			"poses": [
+				{
+					"name": "district",
+					"requests": 9,
+					"requested": [
+						"13/4148/2817",
+						"13/4149/2817",
+						"12/2074/1408",
+						"13/4148/2818",
+						"13/4149/2818",
+						"12/2074/1409",
+						"11/1037/704",
+						"10/518/352",
+						"9/259/176"
+					],
+					"drawCalls": 144,
+					"triangles": 349999,
+					"timeToStableMs": 8905,
+					"heapMB": 63,
+					"timedOut": false,
+					"stats": {
+						"selected": 4,
+						"rendered": 4,
+						"loading": 0,
+						"culled": 51,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0,
+						"built": 9,
+						"buildMs": 3023.199993133545
+					}
+				},
+				{
+					"name": "louvre",
+					"requests": 6,
+					"requested": [
+						"14/8297/5635",
+						"14/8298/5635",
+						"14/8299/5635",
+						"14/8297/5636",
+						"14/8298/5636",
+						"14/8299/5636"
+					],
+					"drawCalls": 162,
+					"triangles": 820963,
+					"timeToStableMs": 20183,
+					"heapMB": 142,
+					"timedOut": false,
+					"stats": {
+						"selected": 6,
+						"rendered": 6,
+						"loading": 0,
+						"culled": 67,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0,
+						"built": 15,
+						"buildMs": 11182.099990844727
+					}
+				},
+				{
+					"name": "street",
+					"requests": 0,
+					"requested": [],
+					"drawCalls": 117,
+					"triangles": 518281,
+					"timeToStableMs": 8111,
+					"heapMB": 142,
+					"timedOut": false,
+					"stats": {
+						"selected": 4,
+						"rendered": 4,
+						"loading": 0,
+						"culled": 69,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0,
+						"built": 15,
+						"buildMs": 11182.099990844727
+					}
+				}
+			],
+			"fly": {
+				"frames": 240,
+				"meanFrameMs": 397.59,
+				"p95FrameMs": 782.5,
+				"maxFrameMs": 1200.4,
+				"framesOver16Ms": 240,
+				"framesOver50Ms": 240,
+				"settleMs": 4479,
+				"requestsTotal": 1,
+				"requested": [
+					"14/8297/5637"
+				],
+				"timedOut": false,
+				"drawCallsAfter": 117,
+				"heapMB": 155
+			}
+		},
+		"maplibre": {
+			"engine": "maplibre-gl-js 5.24.0 (globe)",
+			"data": "openfreemap",
+			"viewport": [
+				800,
+				500
+			],
+			"poses": [
+				{
+					"name": "district",
+					"requests": 10,
+					"requested": [
+						"14/8298/5636",
+						"14/8298/5635",
+						"14/8297/5636",
+						"14/8299/5636",
+						"14/8297/5635",
+						"14/8299/5635",
+						"13/4149/2818",
+						"13/4149/2817",
+						"13/4148/2818",
+						"13/4148/2817"
+					],
+					"drawCalls": 191,
+					"triangles": 205120,
+					"timeToStableMs": 10488,
+					"heapMB": 34,
+					"timedOut": false,
+					"stats": {}
+				},
+				{
+					"name": "louvre",
+					"requests": 0,
+					"requested": [],
+					"drawCalls": 323,
+					"triangles": 1519775,
+					"timeToStableMs": 21599,
+					"heapMB": 30,
+					"timedOut": false,
+					"stats": {}
+				},
+				{
+					"name": "street",
+					"requests": 1,
+					"requested": [
+						"14/8298/5636"
+					],
+					"drawCalls": 218,
+					"triangles": 961640,
+					"timeToStableMs": 17201,
+					"heapMB": 39,
+					"timedOut": false,
+					"stats": {}
+				}
+			],
+			"fly": {
+				"frames": 240,
+				"meanFrameMs": 564.05,
+				"p95FrameMs": 1014.4,
+				"maxFrameMs": 1903.1,
+				"framesOver16Ms": 240,
+				"framesOver50Ms": 240,
+				"settleMs": 10020,
+				"requestsTotal": 8,
+				"requested": [
+					"14/8298/5636",
+					"14/8298/5635",
+					"14/8297/5636",
+					"14/8297/5635",
+					"14/8298/5636",
+					"14/8298/5635",
+					"14/8297/5636",
+					"14/8297/5635"
+				],
+				"timedOut": false,
+				"drawCallsAfter": 218,
+				"heapMB": 46
+			}
+		}
+	}
+}

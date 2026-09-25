@@ -7,7 +7,9 @@ import { STUB_STYLE } from './stub-style.js';
 // The vector data behind the demo pages, from the URL parameters:
 //   ?data=louvre (default, offline extract) | stub (synthetic city) | openfreemap (live planet tiles)
 //   ?style=<url> replaces the style (openfreemap defaults to its Liberty style)
-// Resolves to { source, style, sourceId, view: { lat, lon } }.
+// Resolves to { source, style, sourceId, view: { lat, lon } }, plus the
+// extract's tile( z, x, y ) cutter for the Louvre (the bench feeds it to
+// maplibre-gl-js too).
 
 export const LOUVRE = { lat: 48.8606, lon: 2.3376 };
 export const STUB = { lat: 48.8566, lon: 2.3522 };
@@ -35,11 +37,11 @@ export async function loadVectorData( params ) {
 
 	const response = await fetch( new URL( './data/louvre.json', import.meta.url ) );
 	const { meta, layers } = await response.json();
-	const { source } = createGeoJSONVectorSource( layers, {
+	const { source, tile } = createGeoJSONVectorSource( layers, {
 		maxZoom: 16,
 		attribution: `<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (${ meta.osm_base.slice( 0, 10 ) })`,
 	} );
 	const style = params.has( 'style' ) ? await Style.load( params.get( 'style' ) ) : new Style( LOUVRE_STYLE );
-	return { source, style, view: LOUVRE };
+	return { source, style, view: LOUVRE, tile };
 
 }

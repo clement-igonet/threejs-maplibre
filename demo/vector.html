@@ -91,6 +91,7 @@
 				renderer.render( scene, camera );
 
 				window.__CONTROLS = controls;
+				window.__MAP = map;
 				const s = map.stats;
 				const build = s.built ? ( s.buildMs / s.built ).toFixed( 1 ) : '-';
 				info.textContent = `threejs-maplibre M2 - ${ data } ${ mode } | zoom ${ map.zoom.toFixed( 2 ) } | heading ${ Math.round( controls.heading ) }° | pitch ${ Math.round( controls.pitch ) }° | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | built ${ s.built } (${ build } ms avg) | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles }`;

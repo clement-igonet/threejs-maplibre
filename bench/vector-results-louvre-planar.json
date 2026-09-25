@@ -1,0 +1,220 @@
+{
+	"date": "2026-09-24",
+	"data": "louvre",
+	"mode": "planar",
+	"results": {
+		"native": {
+			"engine": "threejs-maplibre 0.1.0 (planar)",
+			"data": "louvre",
+			"viewport": [
+				800,
+				500
+			],
+			"poses": [
+				{
+					"name": "district",
+					"requests": 6,
+					"requested": [
+						"12/2074/1408",
+						"12/2074/1409",
+						"11/1037/704",
+						"10/518/352",
+						"9/259/176",
+						"8/129/88"
+					],
+					"drawCalls": 17,
+					"triangles": 48674,
+					"timeToStableMs": 3645,
+					"heapMB": 78,
+					"timedOut": false,
+					"stats": {
+						"selected": 2,
+						"rendered": 2,
+						"loading": 0,
+						"culled": 35,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0,
+						"built": 6,
+						"buildMs": 2305.799991607666
+					}
+				},
+				{
+					"name": "louvre",
+					"requests": 17,
+					"requested": [
+						"13/4148/2817",
+						"13/4149/2817",
+						"15/16595/11272",
+						"15/16595/11273",
+						"14/8297/5636",
+						"13/4148/2818",
+						"15/16596/11272",
+						"15/16597/11272",
+						"16/33192/22546",
+						"16/33193/22546",
+						"16/33192/22547",
+						"16/33193/22547",
+						"15/16596/11273",
+						"15/16597/11273",
+						"14/8298/5636",
+						"14/8299/5636",
+						"13/4149/2818"
+					],
+					"drawCalls": 71,
+					"triangles": 88219,
+					"timeToStableMs": 4994,
+					"heapMB": 116,
+					"timedOut": false,
+					"stats": {
+						"selected": 12,
+						"rendered": 12,
+						"loading": 0,
+						"culled": 46,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0,
+						"built": 23,
+						"buildMs": 4596.400005340576
+					}
+				},
+				{
+					"name": "street",
+					"requests": 7,
+					"requested": [
+						"14/8297/5635",
+						"15/16596/11271",
+						"14/8298/5635",
+						"16/33192/22544",
+						"16/33193/22544",
+						"16/33192/22545",
+						"16/33193/22545"
+					],
+					"drawCalls": 56,
+					"triangles": 44750,
+					"timeToStableMs": 2260,
+					"heapMB": 118,
+					"timedOut": false,
+					"stats": {
+						"selected": 7,
+						"rendered": 7,
+						"loading": 0,
+						"culled": 60,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0,
+						"built": 30,
+						"buildMs": 5274.5
+					}
+				}
+			],
+			"fly": {
+				"frames": 240,
+				"meanFrameMs": 116.01,
+				"p95FrameMs": 210.6,
+				"maxFrameMs": 435,
+				"framesOver16Ms": 238,
+				"framesOver50Ms": 220,
+				"settleMs": 1505,
+				"requestsTotal": 3,
+				"requested": [
+					"16/33194/22546",
+					"16/33194/22544",
+					"16/33194/22545"
+				],
+				"timedOut": false,
+				"drawCallsAfter": 56,
+				"heapMB": 105
+			}
+		},
+		"maplibre": {
+			"engine": "maplibre-gl-js 5.24.0 (planar)",
+			"data": "louvre",
+			"viewport": [
+				800,
+				500
+			],
+			"poses": [
+				{
+					"name": "district",
+					"requests": 10,
+					"requested": [
+						"14/8298/5636",
+						"14/8298/5635",
+						"14/8297/5636",
+						"14/8299/5636",
+						"14/8297/5635",
+						"14/8299/5635",
+						"13/4149/2818",
+						"13/4149/2817",
+						"13/4148/2818",
+						"13/4148/2817"
+					],
+					"drawCalls": 64,
+					"triangles": 26010,
+					"timeToStableMs": 2593,
+					"heapMB": 77,
+					"timedOut": false,
+					"stats": {}
+				},
+				{
+					"name": "louvre",
+					"requests": 0,
+					"requested": [],
+					"drawCalls": 74,
+					"triangles": 76845,
+					"timeToStableMs": 2903,
+					"heapMB": 83,
+					"timedOut": false,
+					"stats": {}
+				},
+				{
+					"name": "street",
+					"requests": 4,
+					"requested": [
+						"16/33193/22545",
+						"16/33193/22544",
+						"16/33192/22545",
+						"16/33192/22544"
+					],
+					"drawCalls": 110,
+					"triangles": 53025,
+					"timeToStableMs": 4436,
+					"heapMB": 76,
+					"timedOut": false,
+					"stats": {}
+				}
+			],
+			"fly": {
+				"frames": 240,
+				"meanFrameMs": 146.1,
+				"p95FrameMs": 290,
+				"maxFrameMs": 523.2,
+				"framesOver16Ms": 240,
+				"framesOver50Ms": 234,
+				"settleMs": 2038,
+				"requestsTotal": 15,
+				"requested": [
+					"15/16596/11272",
+					"15/16597/11272",
+					"15/16596/11273",
+					"15/16596/11271",
+					"15/16595/11272",
+					"15/16597/11271",
+					"15/16595/11271",
+					"16/33193/22545",
+					"16/33194/22545",
+					"16/33194/22544",
+					"16/33193/22543",
+					"16/33192/22543",
+					"16/33191/22544",
+					"16/33193/22542",
+					"16/33191/22543"
+				],
+				"timedOut": false,
+				"drawCallsAfter": 110,
+				"heapMB": 102
+			}
+		}
+	}
+}

@@ -5,7 +5,9 @@
 #   compose up preview      -> the built site (library + demos, as deployed) on http://localhost:4173/
 #   compose run --rm test   -> unit tests
 #   compose run --rm screenshot -> deterministic demo screenshots in ./screenshots
-#   compose run --rm bench  -> engine benchmark vs 3d-tiles-renderer, table on stdout + bench/results.json
+#   compose run --rm bench  -> raster engine benchmark vs 3d-tiles-renderer, table on stdout + bench/results.json
+#   compose run --rm bench-vector -> vector engine benchmark vs maplibre-gl-js, table on stdout + bench/vector-results-<data>-<mode>.json
+#                              (BENCH_DATA=openfreemap for the live Liberty style, BENCH_MODE=planar for the flat map)
 services:
   build:
     image: docker.io/library/node:22-bookworm
@@ -68,3 +70,16 @@ services:
       - PUPPETEER_SKIP_DOWNLOAD=1
       - PUPPETEER_CACHE_DIR=/home/pptruser/.cache/puppeteer
     command: bash -lc "[ -d node_modules ] || npm install --no-audit --no-fund; npm run bench"
+
+  bench-vector:
+    image: ghcr.io/puppeteer/puppeteer:latest
+    user: root
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - PUPPETEER_SKIP_DOWNLOAD=1
+      - PUPPETEER_CACHE_DIR=/home/pptruser/.cache/puppeteer
+      - BENCH_DATA
+      - BENCH_MODE
+    command: bash -lc "[ -d node_modules ] || npm install --no-audit --no-fund; npm run bench:vector"

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>threejs-maplibre - vector benchmark</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<style>
+			body { margin: 0; background: #10161a; overflow: hidden; }
+			#map { position: absolute; inset: 0; }
+			#info { position: absolute; top: 8px; left: 8px; z-index: 10; color: #cdd6dd; font: 12px/1.5 monospace; white-space: pre; pointer-events: none; background: rgba(16, 22, 26, 0.6); padding: 2px 6px; }
+		</style>
+	</head>
+	<body>
+		<div id="map"></div>
+		<div id="info">benchmark</div>
+		<script type="module">
+
+			// Head-to-head of this engine and maplibre-gl-js on the same tiles,
+			// the same style and the same views: the Louvre extract cut to MVT in
+			// the page (offline, deterministic) or OpenFreeMap's Liberty style
+			// (?data=openfreemap, live). Per pose: tiles requested, draw calls and
+			// triangles of a stable frame (counted on the WebGL context, so the
+			// same for both engines), time to a stable frame, JS heap; then a
+			// scripted fly from city to street level with the frame interval
+			// distribution, and the settle time after it. Results land in
+			// window.__BENCH for scripts/bench-vector.mjs.
+			//
+			//   ?engine=native     VectorTileMap (this library)
+			//   ?engine=maplibre   maplibre-gl-js
+			//
+			// Symbol layers are removed from the style for both engines: this
+			// engine does not draw them yet, so the comparison is on geometry.
+			// Poses are (lat, lon, zoom, pitch, heading) in MapLibre terms; the
+			// three.js camera gets MapLibre's field of view and the distance that
+			// puts the same ground meters under a pixel at the view center.
+
+			import { HemisphereLight, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
+			import { MapControls, Style, VectorTileMap, WGS84_RADIUS } from '../src/index.js';
+			import { loadVectorData } from '../demo/vector-data.js';
+
+			const params = new URLSearchParams( location.search );
+			const engine = params.get( 'engine' ) || 'native';
+			const data = params.get( 'data' ) ?? 'louvre';
+			const mode = params.get( 'mode' ) === 'planar' ? 'planar' : 'globe';
+
+			// --- engine-neutral counters ----------------------------------------
+
+			// draw calls and triangles since the last frame tick, whichever engine
+			// issues them
+			const draws = { calls: 0, triangles: 0 };
+			for ( const proto of [ WebGL2RenderingContext.prototype, WebGLRenderingContext.prototype ] ) {
+
+				for ( const name of [ 'drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced' ] ) {
+
+					const original = proto[ name ];
+					if ( ! original ) continue;
+					// drawElements( mode, count, type, offset[, instances ] ), drawArrays( mode, first, count[, instances ] )
+					const elements = name.startsWith( 'drawElements' );
+					proto[ name ] = function ( mode, a, b, c, d ) {
+
+						draws.calls ++;
+						const count = elements ? a : b;
+						const instances = name.endsWith( 'Instanced' ) ? ( elements ? d : c ) : 1;
+						if ( mode === this.TRIANGLES ) draws.triangles += Math.floor( count / 3 ) * instances;
+						else if ( mode === this.TRIANGLE_STRIP || mode === this.TRIANGLE_FAN ) draws.triangles += Math.max( 0, count - 2 ) * instances;
+						return original.apply( this, arguments );
+
+					};
+
+				}
+
+			}
+
+			// tile requests: both engines end up in the extract's tile cutter
+			// (native through source.tileUrl, maplibre through addProtocol)
+			let requests = 0;
+			const requested = []; // z/x/y keys, in request order (per pose in the results)
+			const request = key => {
+
+				requests ++;
+				requested.push( key );
+
+			};
+
+			const { source, style, sourceId, view, tile } = await loadVectorData( params );
+			const styleJSON = structuredClone( style.json );
+			styleJSON.layers = styleJSON.layers.filter( layer => layer.type !== 'symbol' );
+			if ( mode === 'globe' ) styleJSON.projection = { type: 'globe' };
+			const geometryStyle = new Style( styleJSON );
+
+			const width = window.innerWidth;
+			const height = window.innerHeight;
+			const MAPLIBRE_FOV = 0.6435011087932844 * 180 / Math.PI; // MapLibre's default field of view, degrees
+
+			// --- engines -------------------------------------------------------
+
+			let update, isStable, setPose, label, stats;
+
+			if ( engine === 'maplibre' ) {
+
+				const maplibregl = ( await import( 'maplibre-gl' ) ).default;
+				await import( 'maplibre-gl/dist/maplibre-gl.css' );
+				// both engines fetch through one counted path: the extract's tile
+				// cutter, or the live template the native source resolved from the
+				// style's TileJSON (MapLibre fetches in its Workers otherwise, out of
+				// this page's sight)
+				maplibregl.addProtocol( 'bench', async ( { url } ) => {
+
+					const path = url.replace( 'bench://', '' );
+					const [ z, x, y ] = path.replace( /\.pbf$/, '' ).split( '/' ).slice( - 3 ).map( Number );
+					request( `${ z }/${ x }/${ y }` );
+					if ( tile ) {
+
+						const bytes = tile( z, x, y );
+						return { data: bytes ? bytes.buffer.slice( bytes.byteOffset, bytes.byteOffset + bytes.byteLength ) : new ArrayBuffer( 0 ) };
+
+					}
+
+					const response = await fetch( path );
+					if ( ! response.ok && response.status !== 404 ) throw new Error( `HTTP ${ response.status } for ${ path }` );
+					return { data: response.ok ? await response.arrayBuffer() : new ArrayBuffer( 0 ) };
+
+				} );
+				styleJSON.sources[ sourceId ?? Object.keys( styleJSON.sources )[ 0 ] ] = {
+					type: 'vector', tiles: [ 'bench://' + source.url ], minzoom: source.minZoom, maxzoom: source.maxZoom,
+				};
+
+				const map = new maplibregl.Map( {
+					container: 'map',
+					style: styleJSON,
+					center: [ view.lon, view.lat ],
+					zoom: 14,
+					pixelRatio: 1,
+					attributionControl: false,
+					interactive: false,
+					fadeDuration: 0,
+					antialias: false,
+					maxPitch: 85,
+				} );
+				await new Promise( resolve => map.once( 'load', resolve ) );
+				label = `maplibre-gl-js ${ maplibregl.getVersion() } (${ mode })`;
+				// MapLibre only redraws when something changed; ask for a frame
+				// every tick so a stable frame has a cost to count, as here
+				update = () => map.triggerRepaint();
+				isStable = () => map.loaded() && map.areTilesLoaded();
+				setPose = ( { lat, lon, zoom, pitch, heading } ) => map.jumpTo( { center: [ lon, lat ], zoom, pitch, bearing: heading } );
+				stats = () => ( {} );
+
+			} else {
+
+				const renderer = new WebGLRenderer( { antialias: false } );
+				renderer.setPixelRatio( 1 );
+				renderer.setSize( width, height );
+				document.getElementById( 'map' ).appendChild( renderer.domElement );
+				const scene = new Scene();
+				scene.add( new HemisphereLight( 0xffffff, 0x8a8478, 1.0 ) );
+				const camera = new PerspectiveCamera( MAPLIBRE_FOV, width / height, 1, 1e8 );
+				const controls = new MapControls( camera, renderer.domElement, { mode } );
+				controls.minAltitude = 1;
+				const map = new VectorTileMap( source, geometryStyle, { mode, sourceId } );
+				scene.add( map );
+				const nativeTileUrl = source.tileUrl.bind( source );
+				source.tileUrl = ( x, y, z ) => {
+
+					request( `${ z }/${ x }/${ y }` );
+					return nativeTileUrl( x, y, z );
+
+				};
+
+				label = `threejs-maplibre ${ __VERSION__ } (${ mode })`;
+				update = delta => {
+
+					controls.update();
+					map.update( camera, renderer, delta );
+					renderer.render( scene, camera );
+
+				};
+
+				isStable = () => map.stats.loading === 0 && map.stats.rendered > 0 && map.stats.rendered >= map.stats.selected;
+				// the distance along the view ray that puts MapLibre's zoom under the center pixel
+				setPose = ( { lat, lon, zoom, pitch, heading } ) => {
+
+					const mercatorPerPixel = 2 * Math.PI * WGS84_RADIUS / ( 512 * 2 ** zoom );
+					const groundPerPixel = mode === 'planar' ? mercatorPerPixel : mercatorPerPixel * Math.cos( lat * Math.PI / 180 );
+					const distance = groundPerPixel * height / ( 2 * Math.tan( 0.5 * MAPLIBRE_FOV * Math.PI / 180 ) );
+					controls.setView( { lat, lon, distance, heading, pitch } );
+
+				};
+
+				stats = () => ( { ...map.stats } );
+
+			}
+
+			// --- poses -------------------------------------------------------------
+
+			const POSES = [
+				{ name: 'district', ...view, zoom: 13, pitch: 0, heading: 0 },
+				{ name: 'louvre', ...view, zoom: 14.6, pitch: 50, heading: 20 },
+				{ name: 'street', lat: 48.8608, lon: 2.3362, zoom: 16.5, pitch: 62, heading: - 35 },
+			];
+			const FLY = { from: POSES[ 0 ], to: POSES[ 2 ], frames: 240 };
+
+			function lerpPose( a, b, f ) {
+
+				return {
+					lat: a.lat + ( b.lat - a.lat ) * f,
+					lon: a.lon + ( b.lon - a.lon ) * f,
+					zoom: a.zoom + ( b.zoom - a.zoom ) * f,
+					pitch: a.pitch + ( b.pitch - a.pitch ) * f,
+					heading: a.heading + ( b.heading - a.heading ) * f,
+				};
+
+			}
+
+			// --- run -------------------------------------------------------------
+
+			const STABLE_FRAMES = 20;
+			const POSE_TIMEOUT = parseInt( params.get( 'timeout' ) || '120000' );
+			const info = document.getElementById( 'info' );
+			const results = { engine: label, data, viewport: [ width, height ], poses: [], fly: null };
+
+			function snapshot( pose, t0, requests0, timedOut ) {
+
+				const heap = performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null;
+				return {
+					name: pose.name,
+					requests: requests - requests0,
+					requested: requested.slice( requests0 ),
+					drawCalls: lastDraws.calls,
+					triangles: lastDraws.triangles,
+					timeToStableMs: Math.round( performance.now() - t0 ),
+					heapMB: heap === null ? null : Math.round( heap ),
+					timedOut,
+					stats: stats(),
+				};
+
+			}
+
+			let last = performance.now();
+			let lastDraws = { calls: 0, triangles: 0 };
+			let poseIndex = 0;
+			let stable = 0;
+			let t0 = performance.now();
+			let requests0 = 0;
+			let phase = 'poses';
+			let flyFrame = 0;
+			const frameTimes = [];
+
+			setPose( POSES[ 0 ] );
+			window.__COUNTERS = () => ( { requests, draws: lastDraws, ...stats() } );
+
+			function tick() {
+
+				const now = performance.now();
+				const frameMs = now - last;
+				const delta = Math.min( frameMs, 100 ); // what the engines animate with
+				last = now;
+				// what the last frame drew, whichever engine drew it
+				lastDraws = { ...draws };
+				draws.calls = 0;
+				draws.triangles = 0;
+
+				update( delta );
+
+				if ( phase === 'poses' ) {
+
+					const pose = POSES[ poseIndex ];
+					stable = isStable() ? stable + 1 : 0;
+					const timedOut = now - t0 > POSE_TIMEOUT;
+					info.textContent = `${ label }\n${ pose.name }: requests ${ requests - requests0 } calls ${ lastDraws.calls } stable ${ stable }`;
+
+					if ( stable >= STABLE_FRAMES || timedOut ) {
+
+						results.poses.push( snapshot( pose, t0, requests0, timedOut ) );
+						poseIndex ++;
+						if ( poseIndex < POSES.length ) {
+
+							setPose( POSES[ poseIndex ] );
+
+						} else {
+
+							phase = 'fly';
+							setPose( FLY.from );
+
+						}
+
+						stable = 0;
+						t0 = performance.now();
+						requests0 = requests;
+
+					}
+
+				} else if ( phase === 'fly' ) {
+
+					frameTimes.push( frameMs );
+					flyFrame ++;
+					setPose( lerpPose( FLY.from, FLY.to, Math.min( 1, flyFrame / FLY.frames ) ) );
+					info.textContent = `${ label }\nfly ${ flyFrame }/${ FLY.frames }: requests ${ requests - requests0 }`;
+					if ( flyFrame >= FLY.frames ) {
+
+						const sorted = [ ...frameTimes ].sort( ( a, b ) => a - b );
+						results.fly = {
+							frames: FLY.frames,
+							meanFrameMs: + ( frameTimes.reduce( ( a, b ) => a + b, 0 ) / frameTimes.length ).toFixed( 2 ),
+							p95FrameMs: + sorted[ Math.floor( 0.95 * sorted.length ) ].toFixed( 2 ),
+							maxFrameMs: + sorted[ sorted.length - 1 ].toFixed( 2 ),
+							framesOver16Ms: frameTimes.filter( t => t > 16.7 ).length,
+							framesOver50Ms: frameTimes.filter( t => t > 50 ).length,
+						};
+						phase = 'settle';
+						stable = 0;
+						t0 = performance.now();
+
+					}
+
+				} else if ( phase === 'settle' ) {
+
+					stable = isStable() ? stable + 1 : 0;
+					const timedOut = now - t0 > POSE_TIMEOUT;
+					if ( stable >= STABLE_FRAMES || timedOut ) {
+
+						results.fly.settleMs = Math.round( performance.now() - t0 );
+						results.fly.requestsTotal = requests - requests0;
+						results.fly.requested = requested.slice( requests0 );
+						results.fly.timedOut = timedOut;
+						results.fly.drawCallsAfter = lastDraws.calls;
+						const heap = performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null;
+						results.fly.heapMB = heap === null ? null : Math.round( heap );
+						phase = 'done';
+						window.__BENCH = results;
+						info.textContent = `${ label }\ndone`;
+						return;
+
+					}
+
+				}
+
+				requestAnimationFrame( tick );
+
+			}
+
+			requestAnimationFrame( tick );
+
+		</script>
+	</body>
+</html>
