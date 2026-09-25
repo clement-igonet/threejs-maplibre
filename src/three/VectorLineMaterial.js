@@ -23,10 +23,21 @@ varying vec4 vColor;
 varying float vSide;
 varying float vCover;
 
+#include <batching_pars_vertex>
+
 void main() {
 
-	vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
-	vec3 mvExtrude = ( modelViewMatrix * vec4( extrude, 0.0 ) ).xyz;
+	// drawn from a BatchedMesh: the instance matrix places the tile
+	#include <batching_vertex>
+	vec4 localPosition = vec4( position, 1.0 );
+	vec4 localExtrude = vec4( extrude, 0.0 );
+	#ifdef USE_BATCHING
+		localPosition = batchingMatrix * localPosition;
+		localExtrude = batchingMatrix * localExtrude;
+	#endif
+
+	vec4 mvPosition = modelViewMatrix * localPosition;
+	vec3 mvExtrude = ( modelViewMatrix * localExtrude ).xyz;
 
 	vec3 props = lineProps * propScale;
 	float width = max( props.x, 1.0 );

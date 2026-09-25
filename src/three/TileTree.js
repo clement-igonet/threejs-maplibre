@@ -115,6 +115,13 @@ export class TileTree extends Group {
 
 	_setOpacity( record, opacity ) {} // eslint-disable-line no-unused-vars
 
+	// Shows or hides record.object.
+	_setVisible( record, visible ) {
+
+		record.object.visible = visible;
+
+	}
+
 	// Ground size in meters of one "texel" of the tile, for the split test.
 	_texelSize( record ) {
 
@@ -324,7 +331,7 @@ export class TileTree extends Group {
 		// hide objects that were shown last frame but not this one
 		for ( const record of this._shown ) {
 
-			if ( ! shownNow.has( record ) && record.object ) record.object.visible = false;
+			if ( ! shownNow.has( record ) && record.object ) this._setVisible( record, false );
 
 		}
 
@@ -488,8 +495,7 @@ export class TileTree extends Group {
 
 		this._ensureObject( record );
 
-		const object = record.object;
-		object.visible = true;
+		this._setVisible( record, true );
 		shownNow.add( record );
 		this.stats.rendered ++;
 

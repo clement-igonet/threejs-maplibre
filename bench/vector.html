@@ -69,6 +69,54 @@
 
 				}
 
+				// a BatchedMesh draws through WEBGL_multi_draw: one call, many ranges
+				const getExtension = proto.getExtension;
+				proto.getExtension = function ( name ) {
+
+					const ext = getExtension.apply( this, arguments );
+					if ( name !== 'WEBGL_multi_draw' || ! ext || ext.__benchWrapped ) return ext;
+					ext.__benchWrapped = true;
+					const gl = this;
+
+					// counts[ offset .. offset + drawcount ] are the ranges of one call
+					const count = ( mode, counts, offset, drawcount, instanceCounts, instanceOffset ) => {
+
+						for ( let i = 0; i < drawcount; i ++ ) {
+
+							const n = counts[ offset + i ];
+							const instances = instanceCounts ? instanceCounts[ instanceOffset + i ] : 1;
+							if ( mode === gl.TRIANGLES ) draws.triangles += Math.floor( n / 3 ) * instances;
+							else if ( mode === gl.TRIANGLE_STRIP || mode === gl.TRIANGLE_FAN ) draws.triangles += Math.max( 0, n - 2 ) * instances;
+
+						}
+
+					};
+
+					// multiDrawElementsWEBGL( mode, counts, countsOffset, type, offsets, offsetsOffset, drawcount )
+					// multiDrawArraysWEBGL( mode, firsts, firstsOffset, counts, countsOffset, drawcount )
+					// the Instanced variants add ( instanceCounts, instanceCountsOffset ) before drawcount
+					const wrap = ( method, args ) => {
+
+						const original = ext[ method ];
+						if ( ! original ) return;
+						ext[ method ] = function ( ...call ) {
+
+							draws.calls ++;
+							count.apply( null, args( call ) );
+							return original.apply( ext, call );
+
+						};
+
+					};
+
+					wrap( 'multiDrawElementsWEBGL', c => [ c[ 0 ], c[ 1 ], c[ 2 ], c[ 6 ] ] );
+					wrap( 'multiDrawArraysWEBGL', c => [ c[ 0 ], c[ 3 ], c[ 4 ], c[ 5 ] ] );
+					wrap( 'multiDrawElementsInstancedWEBGL', c => [ c[ 0 ], c[ 1 ], c[ 2 ], c[ 8 ], c[ 6 ], c[ 7 ] ] );
+					wrap( 'multiDrawArraysInstancedWEBGL', c => [ c[ 0 ], c[ 3 ], c[ 4 ], c[ 7 ], c[ 5 ], c[ 6 ] ] );
+					return ext;
+
+				};
+
 			}
 
 			// tile requests: both engines end up in the extract's tile cutter
@@ -219,9 +267,17 @@
 			const info = document.getElementById( 'info' );
 			const results = { engine: label, data, viewport: [ width, height ], poses: [], fly: null };
 
+			// what the engine holds, garbage aside: Chrome is launched with
+			// --expose-gc so both engines are measured after a collection
+			function heapMB() {
+
+				if ( typeof gc === 'function' ) gc();
+				return performance.memory ? Math.round( performance.memory.usedJSHeapSize / 1048576 ) : null;
+
+			}
+
 			function snapshot( pose, t0, requests0, timedOut ) {
 
-				const heap = performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null;
 				return {
 					name: pose.name,
 					requests: requests - requests0,
@@ -229,7 +285,7 @@
 					drawCalls: lastDraws.calls,
 					triangles: lastDraws.triangles,
 					timeToStableMs: Math.round( performance.now() - t0 ),
-					heapMB: heap === null ? null : Math.round( heap ),
+					heapMB: heapMB(),
 					timedOut,
 					stats: stats(),
 				};
@@ -324,8 +380,7 @@
 						results.fly.requested = requested.slice( requests0 );
 						results.fly.timedOut = timedOut;
 						results.fly.drawCallsAfter = lastDraws.calls;
-						const heap = performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null;
-						results.fly.heapMB = heap === null ? null : Math.round( heap );
+						results.fly.heapMB = heapMB();
 						phase = 'done';
 						window.__BENCH = results;
 						info.textContent = `${ label }\ndone`;

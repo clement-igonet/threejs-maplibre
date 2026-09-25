@@ -23,10 +23,11 @@ await server.listen();
 
 const browser = await puppeteer.launch( {
 	headless: true,
-	args: [ '--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--enable-precise-memory-info' ],
+	args: [ '--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--enable-precise-memory-info', '--js-flags=--expose-gc' ],
 	defaultViewport: { width: 800, height: 500 },
 	dumpio: !! process.env.BENCH_DEBUG,
 	protocolTimeout: 600000, // a software-rendered frame can hold the main thread for a while
+	timeout: 120000, // a loaded shared machine can be slow to hand Chrome a port
 } );
 
 const results = {};

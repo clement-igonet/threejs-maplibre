@@ -1,5 +1,5 @@
 {
-	"date": "2026-09-24",
+	"date": "2026-09-25",
 	"data": "openfreemap",
 	"mode": "globe",
 	"results": {
@@ -25,10 +25,10 @@
 						"10/518/352",
 						"9/259/176"
 					],
-					"drawCalls": 144,
-					"triangles": 349999,
-					"timeToStableMs": 8905,
-					"heapMB": 63,
+					"drawCalls": 52,
+					"triangles": 352633,
+					"timeToStableMs": 13910,
+					"heapMB": 71,
 					"timedOut": false,
 					"stats": {
 						"selected": 4,
@@ -39,7 +39,9 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 9,
-						"buildMs": 3023.199993133545
+						"buildMs": 8413.700008392334,
+						"batchBytes": 32233346,
+						"geometryBytes": 21577500
 					}
 				},
 				{
@@ -53,10 +55,10 @@
 						"14/8298/5636",
 						"14/8299/5636"
 					],
-					"drawCalls": 162,
-					"triangles": 820963,
-					"timeToStableMs": 20183,
-					"heapMB": 142,
+					"drawCalls": 55,
+					"triangles": 822587,
+					"timeToStableMs": 18289,
+					"heapMB": 280,
 					"timedOut": false,
 					"stats": {
 						"selected": 6,
@@ -65,19 +67,21 @@
 						"culled": 67,
 						"created": 0,
 						"uploaded": 0,
-						"uploadMs": 0,
+						"uploadMs": 0.09999847412109375,
 						"built": 15,
-						"buildMs": 11182.099990844727
+						"buildMs": 14511.900001525879,
+						"batchBytes": 133924148,
+						"geometryBytes": 109254164
 					}
 				},
 				{
 					"name": "street",
 					"requests": 0,
 					"requested": [],
-					"drawCalls": 117,
-					"triangles": 518281,
-					"timeToStableMs": 8111,
-					"heapMB": 142,
+					"drawCalls": 48,
+					"triangles": 519817,
+					"timeToStableMs": 8367,
+					"heapMB": 168,
 					"timedOut": false,
 					"stats": {
 						"selected": 4,
@@ -88,25 +92,27 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 15,
-						"buildMs": 11182.099990844727
+						"buildMs": 14511.900001525879,
+						"batchBytes": 133924148,
+						"geometryBytes": 109254164
 					}
 				}
 			],
 			"fly": {
 				"frames": 240,
-				"meanFrameMs": 397.59,
-				"p95FrameMs": 782.5,
-				"maxFrameMs": 1200.4,
+				"meanFrameMs": 462.05,
+				"p95FrameMs": 894,
+				"maxFrameMs": 1436.3,
 				"framesOver16Ms": 240,
 				"framesOver50Ms": 240,
-				"settleMs": 4479,
+				"settleMs": 8428,
 				"requestsTotal": 1,
 				"requested": [
 					"14/8297/5637"
 				],
 				"timedOut": false,
-				"drawCallsAfter": 117,
-				"heapMB": 155
+				"drawCallsAfter": 48,
+				"heapMB": 181
 			}
 		},
 		"maplibre": {
@@ -134,8 +140,8 @@
 					],
 					"drawCalls": 191,
 					"triangles": 205120,
-					"timeToStableMs": 10488,
-					"heapMB": 34,
+					"timeToStableMs": 10634,
+					"heapMB": 57,
 					"timedOut": false,
 					"stats": {}
 				},
@@ -145,8 +151,8 @@
 					"requested": [],
 					"drawCalls": 323,
 					"triangles": 1519775,
-					"timeToStableMs": 21599,
-					"heapMB": 30,
+					"timeToStableMs": 23182,
+					"heapMB": 28,
 					"timedOut": false,
 					"stats": {}
 				},
@@ -158,20 +164,20 @@
 					],
 					"drawCalls": 218,
 					"triangles": 961640,
-					"timeToStableMs": 17201,
-					"heapMB": 39,
+					"timeToStableMs": 15801,
+					"heapMB": 31,
 					"timedOut": false,
 					"stats": {}
 				}
 			],
 			"fly": {
 				"frames": 240,
-				"meanFrameMs": 564.05,
-				"p95FrameMs": 1014.4,
-				"maxFrameMs": 1903.1,
+				"meanFrameMs": 472.54,
+				"p95FrameMs": 875.6,
+				"maxFrameMs": 1175.7,
 				"framesOver16Ms": 240,
 				"framesOver50Ms": 240,
-				"settleMs": 10020,
+				"settleMs": 10475,
 				"requestsTotal": 8,
 				"requested": [
 					"14/8298/5636",
@@ -185,7 +191,7 @@
 				],
 				"timedOut": false,
 				"drawCallsAfter": 218,
-				"heapMB": 46
+				"heapMB": 45
 			}
 		}
 	}

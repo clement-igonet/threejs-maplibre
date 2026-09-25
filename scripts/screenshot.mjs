@@ -22,6 +22,7 @@ const browser = await puppeteer.launch( {
 	headless: true,
 	args: [ '--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--hide-scrollbars' ],
 	defaultViewport: { width: 800, height: 500 },
+	timeout: 120000, // a loaded shared machine can be slow to hand Chrome a port
 } );
 
 // raster demos on the stub source, then the vector demo on the Louvre
