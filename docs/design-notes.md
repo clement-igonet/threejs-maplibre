@@ -419,6 +419,57 @@ Reading it:
   changed under us. Ranking them needs a quiet machine and a real GPU; what
   this benchmark can say is that the work per frame is in the same range.
 
+### Labels and symbols
+
+Symbol layers are parsed and kept but not drawn yet (`style-subset.md`).
+What they ask for, measured on the z14 OpenFreeMap tile over the Louvre
+(1.1 MB, the densest kind this engine sees) with Liberty's 25 symbol
+layers: at street zoom 2 431 symbols in 12 layers, 30 859 glyphs from 92
+distinct characters, 1 707 of them with an icon and 1 461 placed along a
+line rather than at a point; at district zoom 392 symbols and 7 156 glyphs,
+since the POI layers only switch on past z15. A street view holds several
+such tiles, so a label engine here has to consider a few thousand candidates
+per frame and draw a few hundred quads.
+
+The plan, and what makes it different from drawing a fill:
+
+- **Glyphs come from the style's `glyphs` URL**, the SDF ranges MapLibre
+  serves (256 code points per PBF, one 8-bit signed distance bitmap per
+  glyph). A style already points at a glyph server, and the format covers
+  the scripts a map needs; rendering text with canvas measurements instead
+  would tie the map to the browser's fonts. The ranges a tile needs are
+  fetched once per font stack, decoded in a Worker and packed into an atlas
+  texture. Paris Latin text is 92 distinct characters, so one 256x256 page
+  at 24 px covers a European view; the atlas grows by pages.
+- **Anchors are built in the Worker, placement runs per frame.** A point
+  label's anchor and its glyph quads are tile data and belong with the rest
+  of the block. A line label's glyphs follow the line as it turns on screen,
+  so their angles depend on the camera and have to be recomputed on the main
+  thread, as MapLibre does; the Worker's share is the line, the anchors
+  along it and the shaping.
+- **Collision is a screen-space pass over a uniform grid**, labels taken in
+  layer order then `symbol-sort-key`, each box tested against the boxes
+  already placed in the cells it spans. The prototype behind these numbers
+  (the same real anchors, 800x500, 32 px cells) places 970 candidates in
+  0.09 ms and 7 760 in 0.26 ms, so the pass fits in a frame with room to
+  spare; the cost that matters will be the per-frame line placement, not the
+  collision.
+- **Drawing is one `BatchedMesh` per symbol layer**, like every other layer:
+  a quad per glyph, the anchor in world space and the glyph offset applied
+  in screen space in the vertex shader, the way `VectorLineMaterial` already
+  turns a pixel width into local units. Labels then share the depth buffer
+  with the buildings instead of floating over them in a DOM overlay, which
+  is the point of doing this in three.js: a label can be occluded by a
+  building, or stood up in 3D, and it still costs one draw call per layer.
+- **Fading and cross-tile identity**: a label that wins or loses a collision
+  fades over 300 ms rather than blinking, and a label keeps its identity
+  across a zoom change through its feature id, so the same name does not
+  flicker when the tile under it is replaced.
+
+Deferred until the above works: `text-variable-anchor`, `icon-text-fit`,
+vertical writing for CJK, the RTL shaping plugin, and curved labels beyond
+one angle per glyph.
+
 ### Objects on the map
 
 `MapAnchor` is a `Group` placed by latitude, longitude and height whose

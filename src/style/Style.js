@@ -27,7 +27,7 @@ export const HONOURED_PROPERTIES = {
 		layout: [ 'visibility' ],
 	},
 	// symbol layers are parsed and kept (filter, minzoom, maxzoom, layout,
-	// paint) but not evaluated: the label strategy is decided later in M2
+	// paint) but not evaluated yet; the plan for them is in design-notes.md
 	symbol: { paint: [], layout: [ 'visibility' ] },
 };
 
