@@ -43,8 +43,9 @@ const SHOTS = [
 
 // live shots on OpenFreeMap's Liberty style (SHOT_LIVE=0 skips them): the
 // vector demo, and the standalone page once the library is built. A full
-// city style is ~1000 draw calls, more than software rendering settles in a
-// minute, so these are saved as they stand and do not fail the run.
+// city style is a hundred layers of tiles to fetch and build, more than
+// software rendering settles in a minute, so these are saved as they stand
+// and do not fail the run.
 if ( process.env.SHOT_LIVE !== '0' ) {
 
 	SHOTS.push( { name: 'vector-openfreemap', page: 'vector', query: '&data=openfreemap', live: true } );
