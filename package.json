@@ -30,7 +30,8 @@
 		"bench:vector": "node scripts/bench-vector.mjs",
 		"bench": "node scripts/bench.mjs",
 		"controls-check": "node scripts/controls-check.mjs",
-		"decode-check": "node scripts/decode-check.mjs"
+		"decode-check": "node scripts/decode-check.mjs",
+		"budget": "node scripts/budget.mjs"
 	},
 	"keywords": [
 		"three",

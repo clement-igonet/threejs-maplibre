@@ -111,6 +111,7 @@ Nothing but a container runtime is needed, `docker compose` or `podman compose`:
 | `compose run --rm screenshot` | deterministic demo screenshots in `screenshots/` |
 | `compose run --rm bench` | raster engine benchmark against 3d-tiles-renderer |
 | `compose run --rm bench-vector` | vector engine benchmark against maplibre-gl-js |
+| `compose run --rm budget` | the performance budget CI enforces (`bench/budget.json`) |
 
 ## Milestones
 

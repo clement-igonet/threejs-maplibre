@@ -219,7 +219,12 @@
 				update = delta => {
 
 					controls.update();
+					// the engine's own frame: selection walk, uploads, uniforms.
+					// The render after it is the software rasterizer's, which is
+					// what a headless machine cannot say anything about.
+					const t = performance.now();
 					map.update( camera, renderer, delta );
+					engineMs = performance.now() - t;
 					renderer.render( scene, camera );
 
 				};
@@ -276,10 +281,25 @@
 
 			}
 
+			// mean and 95th percentile of a list, rounded, or null when empty
+			function spread( times ) {
+
+				if ( times.length === 0 ) return { mean: null, p95: null };
+				const sorted = [ ...times ].sort( ( a, b ) => a - b );
+				return {
+					mean: + ( times.reduce( ( a, b ) => a + b, 0 ) / times.length ).toFixed( 2 ),
+					p95: + sorted[ Math.floor( 0.95 * sorted.length ) ].toFixed( 2 ),
+				};
+
+			}
+
 			function snapshot( pose, t0, requests0, timedOut ) {
 
+				const engine = spread( engineTimes );
 				return {
 					name: pose.name,
+					engineMeanMs: engine.mean,
+					engineP95Ms: engine.p95,
 					requests: requests - requests0,
 					requested: requested.slice( requests0 ),
 					drawCalls: lastDraws.calls,
@@ -293,6 +313,8 @@
 			}
 
 			let last = performance.now();
+			let engineMs = null; // null for maplibre-gl, whose frame is not ours to split
+			let engineTimes = [];
 			let lastDraws = { calls: 0, triangles: 0 };
 			let poseIndex = 0;
 			let stable = 0;
@@ -317,6 +339,7 @@
 				draws.triangles = 0;
 
 				update( delta );
+				if ( engineMs !== null ) engineTimes.push( engineMs );
 
 				if ( phase === 'poses' ) {
 
@@ -337,12 +360,14 @@
 
 							phase = 'fly';
 							setPose( FLY.from );
+							engineTimes = [];
 
 						}
 
 						stable = 0;
 						t0 = performance.now();
 						requests0 = requests;
+						engineTimes = [];
 
 					}
 
@@ -355,8 +380,11 @@
 					if ( flyFrame >= FLY.frames ) {
 
 						const sorted = [ ...frameTimes ].sort( ( a, b ) => a - b );
+						const engine = spread( engineTimes );
 						results.fly = {
 							frames: FLY.frames,
+							engineMeanMs: engine.mean,
+							engineP95Ms: engine.p95,
 							meanFrameMs: + ( frameTimes.reduce( ( a, b ) => a + b, 0 ) / frameTimes.length ).toFixed( 2 ),
 							p95FrameMs: + sorted[ Math.floor( 0.95 * sorted.length ) ].toFixed( 2 ),
 							maxFrameMs: + sorted[ sorted.length - 1 ].toFixed( 2 ),
