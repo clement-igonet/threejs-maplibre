@@ -8,7 +8,6 @@ import { clipRing } from './clip.js';
 // triangulates in tile space; the vertices are then projected to local space.
 
 const _v = [ 0, 0, 0 ];
-const _u = [ 0, 0, 0 ];
 
 function signedArea( ring ) {
 
@@ -115,7 +114,9 @@ export function appendFill( out, polygon, projection, rgba, height = 0 ) {
 }
 
 // Appends a roof at "height" and one wall quad per ring edge between "base"
-// and "height", with outward normals. out also carries a normals array.
+// and "height", wound so the outward face is the front one. No normals are
+// stored: the faces are flat, so the material shades them from the
+// derivatives of the view position (flatShading).
 export function appendExtrusion( out, polygon, projection, rgba, base, height ) {
 
 	if ( height <= base ) return 0;
@@ -123,10 +124,7 @@ export function appendExtrusion( out, polygon, projection, rgba, base, height ) 
 	let triangles = 0;
 
 	// roof: flat, lit from above
-	const roofStart = out.vertexCount;
 	triangles += appendFill( out, polygon, projection, rgba, height );
-	projection.up( polygon[ 0 ][ 0 ], polygon[ 0 ][ 1 ], _u );
-	for ( let v = roofStart; v < out.vertexCount; v ++ ) out.normals.push( _u[ 0 ], _u[ 1 ], _u[ 2 ] );
 
 	// walls
 	for ( const ring of polygon ) {
@@ -149,19 +147,9 @@ export function appendExtrusion( out, polygon, projection, rgba, base, height ) 
 			projection.project( bx, by, height, _v );
 			const b1 = [ _v[ 0 ], _v[ 1 ], _v[ 2 ] ];
 
-			// outward normal: up x edge, for clockwise-from-above exteriors
-			projection.up( ax, ay, _u );
-			const ex = b0[ 0 ] - a0[ 0 ], ey = b0[ 1 ] - a0[ 1 ], ez = b0[ 2 ] - a0[ 2 ];
-			let nx = _u[ 1 ] * ez - _u[ 2 ] * ey;
-			let ny = _u[ 2 ] * ex - _u[ 0 ] * ez;
-			let nz = _u[ 0 ] * ey - _u[ 1 ] * ex;
-			const len = Math.hypot( nx, ny, nz ) || 1;
-			nx /= len; ny /= len; nz /= len;
-
 			for ( const p of [ a0, b0, b1, a1 ] ) {
 
 				out.positions.push( p[ 0 ], p[ 1 ], p[ 2 ] );
-				out.normals.push( nx, ny, nz );
 				out.colors.push( rgba[ 0 ], rgba[ 1 ], rgba[ 2 ], rgba[ 3 ] );
 
 			}

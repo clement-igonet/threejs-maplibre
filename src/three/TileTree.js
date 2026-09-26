@@ -1,22 +1,33 @@
-import { Box3, Frustum, Group, Matrix4, Vector3 } from 'three';
+import { Group, Matrix4, Vector3 } from 'three';
 import { LRUTileCache } from '../core/LRUTileCache.js';
-import { normalizedToLatitude, texelSizeMeters } from '../math/WebMercator.js';
+import { localFrame, WGS84_RADIUS_POLAR } from '../math/Ellipsoid.js';
+import { normalizedToLatitude, normalizedToLongitude, texelSizeMeters } from '../math/WebMercator.js';
+import { OrientedBox, ViewVolume } from './TileBounds.js';
 import { createGlobePatch, createPlanarPatch } from './TilePatchGeometry.js';
 
 const DEG2RAD = Math.PI / 180;
+const WORLD_AXES = [ new Vector3( 1, 0, 0 ), new Vector3( 0, 1, 0 ), new Vector3( 0, 0, 1 ) ];
 const _matrix = new Matrix4();
-const _frustum = new Frustum();
+const _view = new ViewVolume();
 const _camLocal = new Vector3();
+const _v = new Vector3();
 
 // The Web Mercator quadtree shared by the raster and vector engines. How a
 // frame decides what to draw:
 // 1. A quadtree walk from the root tiles selects the leaf set: a tile is
 //    split while one of its texels projects to more than "maxScreenTexel"
 //    pixels on screen (screen-space error), down to the source's maxZoom.
+//    Tiles outside the view are culled, and on the globe so are tiles
+//    beyond the horizon: the view volume is the frustum cut at the horizon
+//    (see TileBounds.js for why the usual box-against-planes test is not
+//    enough on a globe) and a tile's bounding cone is checked against the
+//    visible cap, so the far side of the planet is never walked.
 // 2. A second walk renders the selection with replace refinement: a selected
 //    tile draws once its content is loaded, uploaded and faded in; until
 //    every child of an inner node covers its area, the nearest ready ancestor
-//    keeps drawing underneath so refinement never opens holes.
+//    keeps drawing underneath so refinement never opens holes. Ancestors are
+//    requested for that only within "backfillLevels" of the leaves: a z0
+//    tile under a street-level view is a request for nothing useful.
 // 3. Tiles that left the selection keep their content in an LRU cache;
 //    in-flight requests for tiles that left the selection are aborted.
 // 4. Content reaches the GPU through a per-frame time budget: a tile whose
@@ -35,6 +46,8 @@ export class TileTree extends Group {
 		cacheSize = 512,
 		retainFrames = 60, // frames an unused tile keeps its object
 		uploadBudgetMs = 2, // uploads per frame stop once this is spent (at least one)
+		backfillLevels = 4, // ancestors this many levels above a leaf are loaded to draw under it
+		contentHeight = 1000, // meters above the surface that content may reach, for culling
 	} = {} ) {
 
 		super();
@@ -45,6 +58,8 @@ export class TileTree extends Group {
 		this.fadeDuration = fadeDuration;
 		this.retainFrames = retainFrames;
 		this.uploadBudgetMs = uploadBudgetMs;
+		this.backfillLevels = backfillLevels;
+		this.contentHeight = contentHeight;
 
 		this._cache = new LRUTileCache( {
 			capacity: cacheSize,
@@ -100,6 +115,13 @@ export class TileTree extends Group {
 
 	_setOpacity( record, opacity ) {} // eslint-disable-line no-unused-vars
 
+	// Shows or hides record.object.
+	_setVisible( record, visible ) {
+
+		record.object.visible = visible;
+
+	}
+
 	// Ground size in meters of one "texel" of the tile, for the split test.
 	_texelSize( record ) {
 
@@ -128,7 +150,8 @@ export class TileTree extends Group {
 				object: null,
 				content: null,
 				opacity: 0,
-				bounds: null,
+				bounds: null, // OrientedBox around the surface and its content
+				cone: null, // globe: { direction, halfAngle } enclosing the tile's surface
 				lastUsed: 0,
 				queued: false,
 			};
@@ -146,9 +169,30 @@ export class TileTree extends Group {
 
 			// sample the patch surface so globe curvature is inside the box
 			const { geometry, center } = this._createPatch( record, this.mode === 'globe' ? 4 : 1 );
-			geometry.boundingBox.translate( center );
-			record.bounds = new Box3().copy( geometry.boundingBox );
+			const position = geometry.getAttribute( 'position' );
+			const points = [];
+			for ( let i = 0; i < position.count; i ++ ) points.push( new Vector3().fromBufferAttribute( position, i ).add( center ) );
 			geometry.dispose();
+
+			if ( this.mode === 'globe' ) {
+
+				// a box in the frame of the tile's center
+				const east = new Vector3(), north = new Vector3(), up = new Vector3();
+				localFrame( record.centerLat, normalizedToLongitude( ( record.x + 0.5 ) / ( 1 << record.z ) ), east, north, up );
+				record.bounds = new OrientedBox().setFromPoints( points, [ east, north, up ], this.contentHeight );
+
+				// and the cone from the planet's center that holds every sample
+				const direction = center.clone().normalize();
+				let halfAngle = 0;
+				for ( const point of points ) halfAngle = Math.max( halfAngle, Math.acos( Math.min( 1, direction.dot( _v.copy( point ).normalize() ) ) ) );
+				record.cone = { direction, halfAngle: halfAngle + 0.01 };
+
+			} else {
+
+				// the plane is y = 0, content stands along +y
+				record.bounds = new OrientedBox().setFromPoints( points, [ WORLD_AXES[ 0 ], WORLD_AXES[ 2 ], WORLD_AXES[ 1 ] ], this.contentHeight );
+
+			}
 
 		}
 
@@ -245,12 +289,21 @@ export class TileTree extends Group {
 		this._frame ++;
 		this.updateWorldMatrix( true, false );
 
-		// camera and frustum in layer-local space
+		// camera and view volume in layer-local space, the volume cut at the
+		// horizon on the globe (content up to contentHeight shows from farther)
 		_matrix.copy( this.matrixWorld ).invert();
 		_camLocal.setFromMatrixPosition( camera.matrixWorld ).applyMatrix4( _matrix );
-		_matrix.multiplyMatrices( camera.matrixWorldInverse, this.matrixWorld );
-		_matrix.premultiply( camera.projectionMatrix );
-		_frustum.setFromProjectionMatrix( _matrix );
+		let far = camera.far;
+		if ( this.mode === 'globe' ) {
+
+			const R = WGS84_RADIUS_POLAR;
+			const d2 = _camLocal.lengthSq();
+			const horizon = Math.sqrt( Math.max( 0, d2 - R * R ) ) + Math.sqrt( ( R + this.contentHeight ) ** 2 - R * R );
+			far = Math.min( far, Math.max( horizon, 2 * camera.near ) );
+
+		}
+
+		_view.setFromCamera( camera, far, _matrix );
 
 		const screenHeight = renderer.domElement.height;
 		const sseScale = screenHeight / ( 2 * Math.tan( 0.5 * camera.fov * DEG2RAD ) );
@@ -278,7 +331,7 @@ export class TileTree extends Group {
 		// hide objects that were shown last frame but not this one
 		for ( const record of this._shown ) {
 
-			if ( ! shownNow.has( record ) && record.object ) record.object.visible = false;
+			if ( ! shownNow.has( record ) && record.object ) this._setVisible( record, false );
 
 		}
 
@@ -335,14 +388,15 @@ export class TileTree extends Group {
 
 		const record = this._getRecord( x, y, z );
 
-		if ( ! _frustum.intersectsBox( this._getBounds( record ) ) ) {
+		const bounds = this._getBounds( record );
+		if ( ! _view.intersectsBox( bounds ) || this._beyondHorizon( record ) ) {
 
 			this.stats.culled ++;
 			return null;
 
 		}
 
-		const distance = Math.max( this._getBounds( record ).distanceToPoint( _camLocal ), 1 );
+		const distance = Math.max( bounds.distanceToPoint( _camLocal ), 1 );
 		const errPx = this._texelSize( record ) * sseScale / distance;
 
 		if ( errPx > this.maxScreenTexel && z < this.source.maxZoom ) {
@@ -361,12 +415,33 @@ export class TileTree extends Group {
 
 			// all children culled: this tile is out of view too
 			if ( children.length === 0 ) return null;
-			return { record, children };
+			// levels down to the nearest leaf: how coarse this tile is as a backfill
+			let depth = Infinity;
+			for ( const child of children ) depth = Math.min( depth, child.depth + 1 );
+			return { record, children, depth };
 
 		}
 
 		this.stats.selected ++;
-		return { record, children: null };
+		return { record, children: null, depth: 0 };
+
+	}
+
+	// globe: true when the tile's whole surface is past the horizon seen from
+	// the camera (the visible cap is acos( R / distance ) wide, plus what
+	// content standing contentHeight above the sphere adds)
+	_beyondHorizon( record ) {
+
+		if ( this.mode !== 'globe' ) return false;
+
+		const R = WGS84_RADIUS_POLAR;
+		const distance = _camLocal.length();
+		if ( distance <= R ) return false;
+
+		const cone = ( this._getBounds( record ), record.cone );
+		const cosAngle = cone.direction.dot( _camLocal ) / distance;
+		const angle = Math.acos( Math.max( - 1, Math.min( 1, cosAngle ) ) );
+		return angle - cone.halfAngle > Math.acos( R / distance ) + Math.acos( R / ( R + this.contentHeight ) );
 
 	}
 
@@ -389,7 +464,9 @@ export class TileTree extends Group {
 			// covered only matters where something will be looked at
 			if ( covered ) return true;
 
-			// backfill: keep this tile under not-yet-ready children
+			// backfill: keep this tile under not-yet-ready children, unless
+			// it is too coarse for that to be worth a request
+			if ( node.depth > this.backfillLevels ) return false;
 			return this._draw( record, shownNow, deltaMs );
 
 		}
@@ -418,8 +495,7 @@ export class TileTree extends Group {
 
 		this._ensureObject( record );
 
-		const object = record.object;
-		object.visible = true;
+		this._setVisible( record, true );
 		shownNow.add( record );
 		this.stats.rendered ++;
 

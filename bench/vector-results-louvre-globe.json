@@ -1,0 +1,233 @@
+{
+	"date": "2026-09-25",
+	"data": "louvre",
+	"mode": "globe",
+	"results": {
+		"native": {
+			"engine": "threejs-maplibre 0.1.0 (globe)",
+			"data": "louvre",
+			"viewport": [
+				800,
+				500
+			],
+			"poses": [
+				{
+					"name": "district",
+					"requests": 9,
+					"requested": [
+						"13/4148/2817",
+						"13/4149/2817",
+						"12/2074/1408",
+						"13/4148/2818",
+						"13/4149/2818",
+						"12/2074/1409",
+						"11/1037/704",
+						"10/518/352",
+						"9/259/176"
+					],
+					"drawCalls": 9,
+					"triangles": 62490,
+					"timeToStableMs": 3782,
+					"heapMB": 79,
+					"timedOut": false,
+					"stats": {
+						"selected": 4,
+						"rendered": 4,
+						"loading": 0,
+						"culled": 51,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0,
+						"built": 9,
+						"buildMs": 1844.900001525879,
+						"batchBytes": 10880096,
+						"geometryBytes": 8833856
+					}
+				},
+				{
+					"name": "louvre",
+					"requests": 17,
+					"requested": [
+						"14/8297/5635",
+						"14/8298/5635",
+						"14/8299/5635",
+						"15/16595/11272",
+						"16/33191/22546",
+						"15/16595/11273",
+						"14/8297/5636",
+						"15/16596/11272",
+						"15/16597/11272",
+						"16/33192/22546",
+						"16/33193/22546",
+						"16/33192/22547",
+						"16/33193/22547",
+						"15/16596/11273",
+						"15/16597/11273",
+						"14/8298/5636",
+						"14/8299/5636"
+					],
+					"drawCalls": 9,
+					"triangles": 91922,
+					"timeToStableMs": 7588,
+					"heapMB": 139,
+					"timedOut": false,
+					"stats": {
+						"selected": 13,
+						"rendered": 13,
+						"loading": 0,
+						"culled": 72,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0,
+						"built": 26,
+						"buildMs": 4148.400001525879,
+						"batchBytes": 29453896,
+						"geometryBytes": 22456332
+					}
+				},
+				{
+					"name": "street",
+					"requests": 6,
+					"requested": [
+						"15/16595/11271",
+						"15/16596/11271",
+						"16/33192/22544",
+						"16/33193/22544",
+						"16/33192/22545",
+						"16/33193/22545"
+					],
+					"drawCalls": 9,
+					"triangles": 44878,
+					"timeToStableMs": 3202,
+					"heapMB": 97,
+					"timedOut": false,
+					"stats": {
+						"selected": 7,
+						"rendered": 7,
+						"loading": 0,
+						"culled": 81,
+						"created": 0,
+						"uploaded": 0,
+						"uploadMs": 0,
+						"built": 32,
+						"buildMs": 4382.300006866455,
+						"batchBytes": 29675080,
+						"geometryBytes": 25462052
+					}
+				}
+			],
+			"fly": {
+				"frames": 240,
+				"meanFrameMs": 131.5,
+				"p95FrameMs": 248.8,
+				"maxFrameMs": 544.2,
+				"framesOver16Ms": 240,
+				"framesOver50Ms": 232,
+				"settleMs": 2380,
+				"requestsTotal": 8,
+				"requested": [
+					"14/8297/5637",
+					"16/33194/22546",
+					"16/33195/22546",
+					"16/33194/22544",
+					"16/33195/22544",
+					"16/33194/22545",
+					"16/33195/22545",
+					"15/16597/11271"
+				],
+				"timedOut": false,
+				"drawCallsAfter": 9,
+				"heapMB": 102
+			}
+		},
+		"maplibre": {
+			"engine": "maplibre-gl-js 5.24.0 (globe)",
+			"data": "louvre",
+			"viewport": [
+				800,
+				500
+			],
+			"poses": [
+				{
+					"name": "district",
+					"requests": 10,
+					"requested": [
+						"14/8298/5636",
+						"14/8298/5635",
+						"14/8297/5636",
+						"14/8299/5636",
+						"14/8297/5635",
+						"14/8299/5635",
+						"13/4149/2818",
+						"13/4149/2817",
+						"13/4148/2818",
+						"13/4148/2817"
+					],
+					"drawCalls": 65,
+					"triangles": 26011,
+					"timeToStableMs": 2803,
+					"heapMB": 57,
+					"timedOut": false,
+					"stats": {}
+				},
+				{
+					"name": "louvre",
+					"requests": 0,
+					"requested": [],
+					"drawCalls": 75,
+					"triangles": 76846,
+					"timeToStableMs": 2881,
+					"heapMB": 52,
+					"timedOut": false,
+					"stats": {}
+				},
+				{
+					"name": "street",
+					"requests": 4,
+					"requested": [
+						"16/33193/22545",
+						"16/33193/22544",
+						"16/33192/22545",
+						"16/33192/22544"
+					],
+					"drawCalls": 110,
+					"triangles": 53025,
+					"timeToStableMs": 2610,
+					"heapMB": 59,
+					"timedOut": false,
+					"stats": {}
+				}
+			],
+			"fly": {
+				"frames": 240,
+				"meanFrameMs": 145.23,
+				"p95FrameMs": 302,
+				"maxFrameMs": 401.7,
+				"framesOver16Ms": 240,
+				"framesOver50Ms": 238,
+				"settleMs": 2795,
+				"requestsTotal": 15,
+				"requested": [
+					"15/16596/11272",
+					"15/16597/11272",
+					"15/16596/11273",
+					"15/16596/11271",
+					"15/16595/11272",
+					"15/16597/11271",
+					"15/16595/11271",
+					"16/33193/22545",
+					"16/33194/22545",
+					"16/33194/22544",
+					"16/33193/22543",
+					"16/33192/22543",
+					"16/33191/22544",
+					"16/33193/22542",
+					"16/33191/22543"
+				],
+				"timedOut": false,
+				"drawCallsAfter": 110,
+				"heapMB": 69
+			}
+		}
+	}
+}

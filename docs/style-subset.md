@@ -29,7 +29,7 @@ are dereferenced.
 | `fill` | `fill-color`, `fill-opacity`, `fill-outline-color` | | rendered |
 | `line` | `line-color`, `line-width`, `line-opacity`, `line-gap-width`, `line-offset` | `line-cap`, `line-join`, `line-miter-limit` | rendered |
 | `fill-extrusion` | `fill-extrusion-color`, `fill-extrusion-opacity`, `fill-extrusion-height`, `fill-extrusion-base` | | rendered |
-| `symbol` | | | parsed and kept, not rendered (M2 label decision pending) |
+| `symbol` | | | parsed and kept, not rendered yet (the plan is in `design-notes.md`, "Labels and symbols"; built after M3) |
 | `circle`, `heatmap`, `raster`, `hillshade`, `color-relief` | | | not rendered (warning) |
 
 Properties not in the table (`*-translate`, `line-dasharray`, `line-blur`,

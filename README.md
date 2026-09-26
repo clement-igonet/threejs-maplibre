@@ -109,7 +109,8 @@ Nothing but a container runtime is needed, `docker compose` or `podman compose`:
 | `compose up preview` | the built site, library and demos as deployed, on http://localhost:4173/ |
 | `compose run --rm test` | unit tests (vitest) |
 | `compose run --rm screenshot` | deterministic demo screenshots in `screenshots/` |
-| `compose run --rm bench` | engine benchmark against 3d-tiles-renderer |
+| `compose run --rm bench` | raster engine benchmark against 3d-tiles-renderer |
+| `compose run --rm bench-vector` | vector engine benchmark against maplibre-gl-js |
 
 ## Milestones
 

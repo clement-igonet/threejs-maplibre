@@ -27,6 +27,7 @@
 		"prepack": "npm run build",
 		"test": "vitest run",
 		"screenshot": "node scripts/screenshot.mjs",
+		"bench:vector": "node scripts/bench-vector.mjs",
 		"bench": "node scripts/bench.mjs",
 		"controls-check": "node scripts/controls-check.mjs",
 		"decode-check": "node scripts/decode-check.mjs"
@@ -58,6 +59,7 @@
 	"devDependencies": {
 		"3d-tiles-renderer": "^0.5.3",
 		"geojson-vt": "^4.0.2",
+		"maplibre-gl": "^5.24.0",
 		"osmtogeojson": "^3.0.0-beta.5",
 		"puppeteer": "^24.0.0",
 		"three": "^0.180.0",
