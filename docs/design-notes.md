@@ -484,6 +484,14 @@ Deferred until the above works: `text-variable-anchor`, `icon-text-fit`,
 vertical writing for CJK, the RTL shaping plugin, and curved labels beyond
 one angle per glyph.
 
+The strategy is settled here; the engine is built after M3. The bridge
+decides something this design depends on: with maplibre-gl and three.js
+sharing a camera, a map can keep MapLibre's own symbol layers drawn over
+the scene, and that is worth knowing before writing a second label engine.
+Either way the work above is the same shape, so nothing here is wasted, and
+a style's labels are the last thing missing from a view that already has
+its roads, water and buildings.
+
 ### Objects on the map
 
 `MapAnchor` is a `Group` placed by latitude, longitude and height whose
