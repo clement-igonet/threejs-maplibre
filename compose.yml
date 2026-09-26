@@ -8,6 +8,8 @@
 #   compose run --rm bench  -> raster engine benchmark vs 3d-tiles-renderer, table on stdout + bench/results.json
 #   compose run --rm bench-vector -> vector engine benchmark vs maplibre-gl-js, table on stdout + bench/vector-results-<data>-<mode>.json
 #                              (BENCH_DATA=openfreemap for the live Liberty style, BENCH_MODE=planar for the flat map)
+#   compose run --rm budget -> the CI performance budget on the Louvre extract, fails when a number is over bench/budget.json
+#                              (BUDGET_UPDATE=1 records this run as the new ceilings)
 services:
   build:
     image: docker.io/library/node:22-bookworm
@@ -83,3 +85,16 @@ services:
       - BENCH_DATA
       - BENCH_MODE
     command: bash -lc "[ -d node_modules ] || npm install --no-audit --no-fund; npm run bench:vector"
+
+  budget:
+    image: ghcr.io/puppeteer/puppeteer:latest
+    user: root
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - PUPPETEER_SKIP_DOWNLOAD=1
+      - PUPPETEER_CACHE_DIR=/home/pptruser/.cache/puppeteer
+      - BENCH_MODE
+      - BUDGET_UPDATE
+    command: bash -lc "[ -d node_modules ] || npm install --no-audit --no-fund; npm run budget"

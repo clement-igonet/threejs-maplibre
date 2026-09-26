@@ -172,16 +172,25 @@ export class VectorTileMap extends TileTree {
 
 	// Makes room for a block at the end of the batch: repacks what deleted
 	// tiles left behind, and grows the buffers when that is not enough.
+	// Both walk the whole batch, so neither runs when the space is already
+	// there: this is the frame a tile lands on, and tiles land in bursts.
 	_reserve( batch, vertices, indices ) {
 
 		if ( batch.unusedVertexCount >= vertices && batch.unusedIndexCount >= indices ) return;
 
 		const used = usage( batch );
+		// holes to reclaim, from tiles that were deleted rather than repacked
+		if ( batch._nextVertexStart > used.vertices || batch._nextIndexStart > used.indices ) {
+
+			batch.optimize();
+			if ( batch.unusedVertexCount >= vertices && batch.unusedIndexCount >= indices ) return;
+
+		}
+
 		let maxVertices = batch._maxVertexCount, maxIndices = batch._maxIndexCount;
 		while ( maxVertices - used.vertices < vertices ) maxVertices = Math.ceil( maxVertices * GROWTH );
 		while ( maxIndices - used.indices < indices ) maxIndices = Math.ceil( maxIndices * GROWTH );
-		if ( maxVertices !== batch._maxVertexCount || maxIndices !== batch._maxIndexCount ) batch.setGeometrySize( maxVertices, maxIndices );
-		batch.optimize();
+		batch.setGeometrySize( maxVertices, maxIndices );
 
 	}
 

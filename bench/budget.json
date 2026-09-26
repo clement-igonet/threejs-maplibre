@@ -1,0 +1,47 @@
+{
+	"note": "Ceilings for scripts/budget.mjs, on the committed Louvre extract so every machine sees the same tiles. The counts are exact: a change to one is a change to the engine. fly.engineP95Ms is the engine's own CPU per frame with the view moving and every tile already there, and is allowed 4x its recorded value, since a CI runner is not the machine this was recorded on. Rerun with BUDGET_UPDATE=1 to record a deliberate change.",
+	"louvre-globe": {
+		"district": {
+			"requests": 9,
+			"drawCalls": 9,
+			"triangles": 62490
+		},
+		"louvre": {
+			"requests": 17,
+			"drawCalls": 9,
+			"triangles": 91922
+		},
+		"street": {
+			"requests": 6,
+			"drawCalls": 9,
+			"triangles": 44878
+		},
+		"fly": {
+			"requests": 8,
+			"drawCalls": 9,
+			"engineP95Ms": 1.1
+		}
+	},
+	"louvre-planar": {
+		"district": {
+			"requests": 6,
+			"drawCalls": 9,
+			"triangles": 48674
+		},
+		"louvre": {
+			"requests": 17,
+			"drawCalls": 9,
+			"triangles": 88388
+		},
+		"street": {
+			"requests": 7,
+			"drawCalls": 9,
+			"triangles": 44757
+		},
+		"fly": {
+			"requests": 3,
+			"drawCalls": 9,
+			"engineP95Ms": 0.8
+		}
+	}
+}

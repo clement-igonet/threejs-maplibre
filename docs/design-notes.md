@@ -433,6 +433,35 @@ Reading it:
   what this benchmark can say is that the work per frame is in the same
   range.
 
+### The budget CI enforces
+
+`npm run budget` (or `compose run --rm budget`) drives the same three poses
+and fly on the committed Louvre extract, this engine only, and fails when a
+number is over its ceiling in `bench/budget.json`. It runs on every pull
+request.
+
+What it enforces is what a machine without a GPU can answer for: the tiles a
+view asks for, the draw calls and the triangles it hands the GPU, and the
+engine's own CPU per frame once the view is still and every tile has landed.
+That last one is the 60 fps target, stated the only way CI can state it: at
+16.7 ms a frame the engine has to leave the frame to the GPU, and it takes
+1.1 ms on the fly today, so it does. The counts are exact numbers with a
+little headroom (a slower machine can take an extra frame to settle and ask
+for one more ancestor on the way); the draw calls are the tight one, since a
+layer is one call and a regression there is what this guards.
+
+Two things are printed and not enforced. Frame times, because a software
+rasterizer's are not the target machine's. And the engine's CPU while tiles
+are landing, which is 3 to 30 ms at the p95 of a pose and moves by a factor
+of three between runs of the same build: one frame in twenty carries a tile
+upload (4 to 5 ms of copying into the batches, measured in Node) or the
+collector, and a ceiling over that would either be too loose to mean
+anything or too tight to stay green. Smoothing that burst is real work,
+listed with the rest under the benchmark above.
+
+`BUDGET_UPDATE=1` records the run as the new ceilings, for a change that is
+meant to move a number.
+
 ### Labels and symbols
 
 Symbol layers are parsed and kept but not drawn yet (`style-subset.md`).
