@@ -38,6 +38,8 @@ const SHOTS = [
 	{ name: 'vector-louvre-top', page: 'vector', query: '&data=louvre&alt=1400&heading=0&pitch=0' },
 	{ name: 'vector-louvre-close', page: 'vector', query: '&data=louvre&lat=48.8608&lon=2.3362&alt=420&heading=-35&pitch=62' },
 	{ name: 'vector-stub', page: 'vector', query: '&data=stub&alt=1200&heading=30&pitch=55' },
+	// a view that stops before the horizon does, hazed so the edge is air
+	{ name: 'vector-louvre-haze', page: 'vector', query: '&data=louvre&lat=48.8608&lon=2.3362&alt=120&heading=-35&pitch=80&maxPitch=85&viewDistance=600' },
 	{ name: 'objects', query: '' },
 	{ name: 'objects-planar', page: 'objects', query: '&mode=planar' },
 	{ name: 'objects-close', page: 'objects', query: '&lat=48.8613&lon=2.3333&alt=230&heading=80&pitch=65&objectHeading=250' },

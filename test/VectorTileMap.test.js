@@ -223,6 +223,34 @@ describe( 'VectorTileMap', () => {
 
 	} );
 
+	it( 'stops at the view distance, and asks for nothing past it', async () => {
+
+		// 20 km up, so a 5 km view reaches nothing: the distance is to the
+		// tile's content box, which stands contentHeight above the surface
+		const near = createMap( { viewDistance: 5000 } );
+		near.update( cityCamera( 20000 ), rendererStub );
+		expect( near.stats.selected ).toBe( 0 );
+		expect( near.stats.culled ).toBeGreaterThan( 0 );
+		// the walk still descends through the big boxes of the coarse levels,
+		// but nothing out there is ever asked for
+		expect( near.stats.loading ).toBe( 0 );
+		expect( [ ...near._records.values() ].every( r => r.state === 'empty' ) ).toBe( true );
+		near.dispose();
+
+		// the same view without one selects what is under it
+		const far = createMap();
+		far.update( cityCamera( 20000 ), rendererStub );
+		expect( far.stats.selected ).toBeGreaterThan( 0 );
+		far.dispose();
+
+		// and a distance past the ground keeps all of it
+		const enough = createMap( { viewDistance: 100000 } );
+		enough.update( cityCamera( 20000 ), rendererStub );
+		expect( enough.stats.selected ).toBe( far.stats.selected );
+		enough.dispose();
+
+	} );
+
 	it( 'reports what the batches reserve and what the tiles in them occupy', async () => {
 
 		const map = createMap();

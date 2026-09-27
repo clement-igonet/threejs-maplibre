@@ -20,22 +20,33 @@ export function chromeExecutablePath() {
 
 	if ( process.env.PUPPETEER_EXECUTABLE_PATH ) return process.env.PUPPETEER_EXECUTABLE_PATH;
 
-	const cache = process.env.PUPPETEER_CACHE_DIR || `${ process.env.HOME }/.cache/puppeteer`;
-	const installs = `${ cache }/chrome`;
-	if ( ! existsSync( installs ) ) return undefined; // let puppeteer look where it wants
+	// the configured cache, this user's, and the one the puppeteer image
+	// builds into, which is not this user's when the container runs as root
+	const caches = [
+		process.env.PUPPETEER_CACHE_DIR,
+		process.env.HOME ? `${ process.env.HOME }/.cache/puppeteer` : null,
+		'/home/pptruser/.cache/puppeteer',
+	];
 
-	// newest version first, so a cache with several is not a lottery
-	for ( const version of readdirSync( installs ).sort().reverse() ) {
+	for ( const cache of caches ) {
 
-		for ( const binary of BINARIES ) {
+		const installs = cache ? `${ cache }/chrome` : null;
+		if ( ! installs || ! existsSync( installs ) ) continue;
 
-			const path = `${ installs }/${ version }/${ binary }`;
-			if ( existsSync( path ) ) return path;
+		// newest version first, so a cache with several is not a lottery
+		for ( const version of readdirSync( installs ).sort().reverse() ) {
+
+			for ( const binary of BINARIES ) {
+
+				const path = `${ installs }/${ version }/${ binary }`;
+				if ( existsSync( path ) ) return path;
+
+			}
 
 		}
 
 	}
 
-	return undefined;
+	return undefined; // let puppeteer look where it wants
 
 }

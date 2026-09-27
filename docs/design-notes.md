@@ -465,6 +465,44 @@ listed with the rest under the benchmark above.
 `BUDGET_UPDATE=1` records the run as the new ceilings, for a change that is
 meant to move a number.
 
+### How far the map goes
+
+The camera here is free: street level, inside a building, a tunnel, a
+cockpit, a satellite. Tilt it towards the horizon and the quadtree does what
+it is asked, which is to cover the view, and the view reaches the edge of the
+world. That is right for a map and wrong for a walk down a street, where
+everything past the next junction is a few pixels of grey that still cost a
+request, a build and a draw.
+
+`viewDistance` (meters, `TileTree`, `Infinity` by default) cuts the
+selection walk: a tile whose content box is further than that from the
+camera is culled, so it is never requested, never built and never drawn. The
+distance is to the box, which stands `contentHeight` above the surface, so
+the tile under a camera is always in range however high it flies.
+
+Cutting leaves an edge, so `createFog( style, { viewDistance } )` returns a
+`three.Fog` that fades the last 40 % of the range into the colour the style
+says the horizon has. MapLibre keeps the sky as a root property of the style
+document rather than a layer, so `sky.fog-color` is the value it blends the
+ground into, with `sky.horizon-color` and then the background layer as
+fallbacks. `VectorLineMaterial` gained the fog chunks, since a
+`ShaderMaterial` gets none of what the built-in materials get for free.
+
+Measured on Liberty over Paris, tilted 67 degrees at 700 m, 1200x800:
+
+| | tiles built | tiles drawn | draw calls | triangles |
+|---|---|---|---|---|
+| no view distance | 13 | 6 | 55 | 919 300 |
+| `viewDistance` 2 km | 9 | 3 | 49 | 453 130 |
+| `viewDistance` 500 m | 5 | 1 | 39 | 155 082 |
+| street level, pitch 85, 300 m | 5 | 1 | 39 | 155 082 |
+
+And the case that says whether the default is right: a camera 36 000 km up,
+where the whole disc is in frame, still selects 4 tiles and draws 4 calls
+with 20 319 triangles, because the horizon at that altitude is 40 000 km
+away and the default cuts nothing. One number covers a room and a
+geostationary orbit.
+
 ### Labels and symbols
 
 Symbol layers are parsed and kept but not drawn yet (`style-subset.md`).

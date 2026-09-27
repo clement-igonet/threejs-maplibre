@@ -17,11 +17,12 @@
 		<script type="module">
 
 			import { Color, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
-			import { AttributionControl, MAPLIBRE_FOV, MapControls, VectorTileMap } from '../src/index.js';
+			import { AttributionControl, MAPLIBRE_FOV, MapControls, VectorTileMap, createFog } from '../src/index.js';
 			import { loadVectorData } from './vector-data.js';
 
 			// ?data=louvre|stub|openfreemap and ?style=<url> pick the data (vector-data.js)
 			// ?mode=globe|planar, ?lat=&lon=&alt=&heading=&pitch=&fov=&maxPitch=
+			// ?viewDistance=<meters> stops the map there and hazes the edge
 			const params = new URLSearchParams( location.search );
 			const data = params.get( 'data' ) ?? 'louvre';
 			const mode = params.get( 'mode' ) === 'planar' ? 'planar' : 'globe';
@@ -54,8 +55,20 @@
 			controls.maxPitch = num( 'maxPitch', controls.maxPitch ); // where this controller's model ends, 85
 			controls.setView( { lat: num( 'lat', view.lat ), lon: num( 'lon', view.lon ), distance: num( 'alt', 900 ), heading: num( 'heading', 20 ), pitch: num( 'pitch', 50 ) } );
 
-			const map = new VectorTileMap( source, style, { mode, sourceId } );
+			const viewDistance = num( 'viewDistance', Infinity );
+			const map = new VectorTileMap( source, style, { mode, sourceId, viewDistance } );
 			scene.add( map );
+
+			// a view that stops before the horizon ends in air, not in a hole:
+			// the haze and what is behind it are the same colour
+			if ( Number.isFinite( viewDistance ) ) {
+
+				scene.fog = createFog( style, { viewDistance } );
+				scene.background = scene.fog.color;
+				camera.far = Math.min( camera.far, 2 * viewDistance );
+				camera.updateProjectionMatrix();
+
+			}
 
 			// lighting for the extrusions: sky/ground ambient plus a sun over the view
 			scene.add( new HemisphereLight( 0xffffff, 0x8a8478, 1.0 ) );

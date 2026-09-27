@@ -217,6 +217,15 @@ export class Style {
 
 	}
 
+	// MapLibre keeps the sky as a root property of the document, not a layer:
+	// fog-color is what it blends the ground into towards the horizon, which
+	// is the colour a view distance should end in (see three/createFog.js).
+	get sky() {
+
+		return this.json.sky ?? null;
+
+	}
+
 	get backgroundLayer() {
 
 		return this.layers.find( layer => layer.type === 'background' ) ?? null;
