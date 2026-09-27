@@ -3,11 +3,12 @@
 // of wall time per tile. Exits 1 if a run fails or decodes no features.
 import { createServer } from 'vite';
 import puppeteer from 'puppeteer';
+import { chromeExecutablePath } from './chrome.mjs';
 
 const root = new URL( '..', import.meta.url ).pathname;
 const server = await createServer( { root, server: { host: '127.0.0.1', port: 5196, strictPort: true }, logLevel: 'warn' } );
 await server.listen();
-const browser = await puppeteer.launch( { headless: true, args: [ '--no-sandbox', '--disable-dev-shm-usage' ] } );
+const browser = await puppeteer.launch( { executablePath: chromeExecutablePath(), headless: true, args: [ '--no-sandbox', '--disable-dev-shm-usage' ] } );
 
 let failed = false;
 const rows = [];

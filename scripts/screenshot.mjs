@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync } from 'fs';
 import { createServer, preview } from 'vite';
 import puppeteer from 'puppeteer';
+import { chromeExecutablePath } from './chrome.mjs';
 
 const root = new URL( '..', import.meta.url ).pathname;
 mkdirSync( `${ root }/screenshots`, { recursive: true } );
@@ -19,6 +20,7 @@ const base = server.resolvedUrls.local[ 0 ];
 console.log( 'vite serving', base );
 
 const browser = await puppeteer.launch( {
+	executablePath: chromeExecutablePath(),
 	headless: true,
 	args: [ '--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--hide-scrollbars' ],
 	defaultViewport: { width: 800, height: 500 },

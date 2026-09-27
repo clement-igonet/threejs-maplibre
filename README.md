@@ -130,6 +130,32 @@ Nothing but a container runtime is needed, `docker compose` or `podman compose`:
 - OpenEarthView (2016-2018): OSM tiles projected on a three.js globe; [three.js PR #12586](https://github.com/mrdoob/three.js/pull/12586)
 - Upstream three.js example proposal for an OSM raster-tile globe (in preparation)
 
+## How this is built
+
+This engine is written with heavy AI assistance (Claude Code), under review,
+and the working rules are in the repository rather than in anyone's head:
+every pull request carries evidence, every claim about performance carries a
+measurement, and a change that regresses one fails CI.
+
+What that means in practice, and what a reader can run:
+
+- `compose run --rm bench-vector` drives this engine and maplibre-gl-js
+  through the same tiles, the same style and the same camera poses, and
+  reports tiles requested, draw calls, triangles, time to stable and heap.
+  The tables and the reading of them are in
+  [design-notes.md](docs/design-notes.md#measured-against-maplibre-gl-js),
+  including the things that did not work.
+- `compose run --rm budget` replays those views against the ceilings in
+  [bench/budget.json](bench/budget.json). CI runs it on every pull request,
+  so a change that fetches more tiles or issues more draw calls than the
+  recorded number turns the build red.
+- `compose run --rm test` runs the unit tests, and
+  `compose run --rm screenshot` renders the demos to `screenshots/`, which is
+  how a visual change is checked before it is claimed.
+
+Provenance is not an argument for or against code. These are the numbers to
+argue with.
+
 ## Funding
 
 A grant application to the [NLnet Foundation](https://nlnet.nl/) covers M1-M6.

@@ -5,6 +5,7 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { createServer } from 'vite';
 import puppeteer from 'puppeteer';
+import { chromeExecutablePath } from './chrome.mjs';
 
 const root = new URL( '..', import.meta.url ).pathname;
 const RUNS = [
@@ -18,6 +19,7 @@ const server = await createServer( { root, server: { host: '127.0.0.1', port: 51
 await server.listen();
 
 const browser = await puppeteer.launch( {
+	executablePath: chromeExecutablePath(),
 	headless: true,
 	args: [ '--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--enable-precise-memory-info' ],
 	defaultViewport: { width: 800, height: 500 },

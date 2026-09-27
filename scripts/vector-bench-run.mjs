@@ -3,6 +3,7 @@
 // benchmark (bench-vector.mjs) and the CI budget (budget.mjs).
 import { createServer } from 'vite';
 import puppeteer from 'puppeteer';
+import { chromeExecutablePath } from './chrome.mjs';
 
 const root = new URL( '..', import.meta.url ).pathname;
 
@@ -16,6 +17,7 @@ export async function runVectorBench( { data, mode, runs, port = 5197, onRun } )
 	await server.listen();
 
 	const browser = await puppeteer.launch( {
+		executablePath: chromeExecutablePath(),
 		headless: true,
 		args: [ '--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--enable-precise-memory-info', '--js-flags=--expose-gc' ],
 		defaultViewport: { width: 800, height: 500 },

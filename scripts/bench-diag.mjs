@@ -2,6 +2,7 @@
 // 2 s. Usage: node scripts/bench-diag.mjs 'engine=plugin&only=street' [seconds]
 import { createServer } from 'vite';
 import puppeteer from 'puppeteer';
+import { chromeExecutablePath } from './chrome.mjs';
 
 const root = new URL( '..', import.meta.url ).pathname;
 const query = process.argv[ 2 ] || 'engine=plugin&only=street';
@@ -10,6 +11,7 @@ const seconds = parseInt( process.argv[ 3 ] || '120' );
 const server = await createServer( { root, server: { host: '127.0.0.1', port: 5197, strictPort: true }, logLevel: 'warn' } );
 await server.listen();
 const browser = await puppeteer.launch( {
+	executablePath: chromeExecutablePath(),
 	headless: true,
 	args: [ '--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--enable-precise-memory-info' ],
 	defaultViewport: { width: 800, height: 500 },
