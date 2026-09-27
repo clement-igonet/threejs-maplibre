@@ -55,7 +55,9 @@ export class StyleLayer {
 
 		}
 
-		this._filter = json.filter === undefined ? null : featureFilter( json.filter ).filter;
+		// the reference implementation takes the key the value came from, for
+		// its error messages
+		this._filter = json.filter === undefined ? null : featureFilter( json.filter, `layers.${ this.id }.filter` ).filter;
 		// a fill or line drawn with an image pattern shows the pattern, not its
 		// color: without pattern support the layer is left out rather than
 		// painted in the default black
@@ -80,7 +82,7 @@ export class StyleLayer {
 
 				}
 
-				this._properties.set( name, normalizePropertyExpression( values[ name ], table[ name ] ) );
+				this._properties.set( name, normalizePropertyExpression( values[ name ], `layers.${ this.id }.${ group }.${ name }`, table[ name ] ) );
 
 			}
 
@@ -120,7 +122,7 @@ export class StyleLayer {
 			// the spec default, compiled like a set value so a color is a Color
 			const table = spec[ `paint_${ this.type }` ]?.[ name ] || spec[ `layout_${ this.type }` ]?.[ name ];
 			if ( ! table || table.default === undefined ) return undefined;
-			expression = normalizePropertyExpression( table.default, table );
+			expression = normalizePropertyExpression( table.default, `${ name }.default`, table );
 			this._defaults.set( name, expression );
 
 		}

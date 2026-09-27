@@ -51,7 +51,7 @@
 			const camera = new PerspectiveCamera( num( 'fov', MAPLIBRE_FOV ), window.innerWidth / window.innerHeight, 1, 1e8 );
 			const controls = new MapControls( camera, renderer.domElement, { mode } );
 			controls.minAltitude = 20;
-			controls.maxPitch = num( 'maxPitch', controls.maxPitch ); // MapLibre's 60 by default
+			controls.maxPitch = num( 'maxPitch', controls.maxPitch ); // where this controller's model ends, 85
 			controls.setView( { lat: num( 'lat', view.lat ), lon: num( 'lon', view.lon ), distance: num( 'alt', 900 ), heading: num( 'heading', 20 ), pitch: num( 'pitch', 50 ) } );
 
 			const map = new VectorTileMap( source, style, { mode, sourceId } );
