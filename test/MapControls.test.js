@@ -101,7 +101,14 @@ describe( 'MapControls', () => {
 		const { controls, camera } = createControls( { ...PARIS, distance: 2000, heading: 0, pitch: 0 } );
 		controls.rotateBy( 400, 120 );
 		expect( controls.heading ).toBeCloseTo( 40, 6 );
+		expect( controls.pitch ).toBe( 60 ); // MapLibre's default ceiling
+
+		// raised the way MapLibre's maxPitch option raises it
+		controls.maxPitch = 85;
+		controls.rotateBy( 0, 120 );
 		expect( controls.pitch ).toBe( 85 );
+		controls.maxPitch = 60;
+		controls.setView( { pitch: 0 } );
 
 		controls.setView( { pitch: 60, distance: 10 } );
 		controls.update();

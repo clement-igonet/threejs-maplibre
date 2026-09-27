@@ -56,7 +56,10 @@ export class MapControls {
 
 		this.minAltitude = 100; // of the camera, approximated as distance * cos(pitch)
 		this.maxDistance = 10 * WGS84_RADIUS;
-		this.maxPitch = 85;
+		// MapLibre's own default: a map does not tilt past 60 degrees unless
+		// asked, which is what keeps the horizon, and the tiles out there,
+		// out of the view. Raise it as MapLibre's maxPitch option does.
+		this.maxPitch = 60;
 		this.zoomFraction = 0.05; // distance change per wheel notch
 		this.rotateDegPerPixel = 0.25;
 		this.pitchDegPerPixel = 0.5;
