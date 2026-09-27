@@ -17,11 +17,11 @@
 		<script type="module">
 
 			import { Color, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
-			import { AttributionControl, MapControls, VectorTileMap } from '../src/index.js';
+			import { AttributionControl, MAPLIBRE_FOV, MapControls, VectorTileMap } from '../src/index.js';
 			import { loadVectorData } from './vector-data.js';
 
 			// ?data=louvre|stub|openfreemap and ?style=<url> pick the data (vector-data.js)
-			// ?mode=globe|planar, ?lat=&lon=&alt=&heading=&pitch=
+			// ?mode=globe|planar, ?lat=&lon=&alt=&heading=&pitch=&fov=
 			const params = new URLSearchParams( location.search );
 			const data = params.get( 'data' ) ?? 'louvre';
 			const mode = params.get( 'mode' ) === 'planar' ? 'planar' : 'globe';
@@ -45,7 +45,10 @@
 
 			}
 
-			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1e8 );
+			// MapLibre's field of view by default, so this view holds what a
+			// MapLibre map at the same zoom holds; a wider one reaches further
+			// towards the horizon and asks for the tiles out there
+			const camera = new PerspectiveCamera( num( 'fov', MAPLIBRE_FOV ), window.innerWidth / window.innerHeight, 1, 1e8 );
 			const controls = new MapControls( camera, renderer.domElement, { mode } );
 			controls.minAltitude = 20;
 			controls.setView( { lat: num( 'lat', view.lat ), lon: num( 'lon', view.lon ), distance: num( 'alt', 900 ), heading: num( 'heading', 20 ), pitch: num( 'pitch', 50 ) } );

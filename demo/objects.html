@@ -18,7 +18,7 @@
 
 			import { Color, ConeGeometry, CylinderGeometry, DirectionalLight, DoubleSide, Group, HemisphereLight, LatheGeometry, Mesh, MeshStandardMaterial, PerspectiveCamera, Scene, SphereGeometry, SRGBColorSpace, Vector2, Vector3, WebGLRenderer } from 'three';
 			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-			import { AttributionControl, MapAnchor, MapControls, VectorTileMap } from '../src/index.js';
+			import { AttributionControl, MAPLIBRE_FOV, MapAnchor, MapControls, VectorTileMap } from '../src/index.js';
 			import { loadVectorData } from './vector-data.js';
 
 			// three.js objects placed on the map by geographic location, the way
@@ -55,7 +55,8 @@
 
 			}
 
-			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1e8 );
+			// MapLibre's field of view by default, ?fov= for another
+			const camera = new PerspectiveCamera( num( 'fov', MAPLIBRE_FOV ), window.innerWidth / window.innerHeight, 1, 1e8 );
 			const controls = new MapControls( camera, renderer.domElement, { mode } );
 			controls.minAltitude = 20;
 			controls.setView( { lat: num( 'lat', 48.8615 ), lon: num( 'lon', 2.3342 ), distance: num( 'alt', 520 ), heading: num( 'heading', 70 ), pitch: num( 'pitch', 60 ) } );

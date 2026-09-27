@@ -17,10 +17,11 @@
 		<script type="module">
 
 			import { PerspectiveCamera, Scene, WebGLRenderer } from 'three';
-			import { AttributionControl, MapControls, RasterTileMap, createOSMSource } from '../src/index.js';
+			import { AttributionControl, MAPLIBRE_FOV, MapControls, RasterTileMap, createOSMSource } from '../src/index.js';
 			import { createStubSource } from './stub-tiles.js';
 
 			const params = new URLSearchParams( location.search );
+			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
 			const source = params.get( 'tiles' ) === 'stub' ? createStubSource() : createOSMSource();
 
 			const renderer = new WebGLRenderer( { antialias: true } );
@@ -29,14 +30,14 @@
 			document.body.appendChild( renderer.domElement );
 
 			const scene = new Scene();
-			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1e8 );
+			// MapLibre's field of view by default, ?fov= for another
+			const camera = new PerspectiveCamera( num( 'fov', MAPLIBRE_FOV ), window.innerWidth / window.innerHeight, 1, 1e8 );
 
 			// the same controls as the globe, on the Web Mercator plane
 			const controls = new MapControls( camera, renderer.domElement, { mode: 'planar' } );
 			controls.minAltitude = 50;
 
 			// ?lat=&lon=&alt=&heading=&pitch=; default is Paris at neighborhood scale, slightly tilted
-			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
 			controls.setView( { lat: num( 'lat', 48.8566 ), lon: num( 'lon', 2.3522 ), distance: num( 'alt', 4500 ), heading: num( 'heading', 0 ), pitch: num( 'pitch', 25 ) } );
 
 			const map = new RasterTileMap( source, { mode: 'planar' } );
