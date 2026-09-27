@@ -10,6 +10,7 @@ export { RasterTileMap } from './three/RasterTileMap.js';
 export { AttributionControl } from './three/AttributionControl.js';
 export { createGlobePatch, createPlanarPatch } from './three/TilePatchGeometry.js';
 export { MapControls, MAPLIBRE_FOV } from './three/MapControls.js';
+export { createFog } from './three/createFog.js';
 export { MapAnchor } from './three/MapAnchor.js';
 export { VectorTileSource, loadOpenFreeMapSource, OPENFREEMAP_TILEJSON_URL } from './core/VectorTileSource.js';
 export { VectorTileLoader } from './core/VectorTileLoader.js';

@@ -48,6 +48,16 @@ export class TileTree extends Group {
 		uploadBudgetMs = 2, // uploads per frame stop once this is spent (at least one)
 		backfillLevels = 4, // ancestors this many levels above a leaf are loaded to draw under it
 		contentHeight = 1000, // meters above the surface that content may reach, for culling
+		// How far the map is built at all, in meters from the camera to the
+		// nearest corner of a tile's content box (so a camera under
+		// contentHeight is inside the box of the tile below it, and that one
+		// is always in range). The horizon and the frustum are the only
+		// limits by default, which is what a map wants; a view from inside a
+		// building, a street or a tunnel wants a few hundred meters and
+		// nothing beyond, and then the tiles out there are never requested,
+		// never built and never drawn. Pair it with fog (createFog) so the
+		// edge reads as air rather than as a hole.
+		viewDistance = Infinity,
 	} = {} ) {
 
 		super();
@@ -60,6 +70,7 @@ export class TileTree extends Group {
 		this.uploadBudgetMs = uploadBudgetMs;
 		this.backfillLevels = backfillLevels;
 		this.contentHeight = contentHeight;
+		this.viewDistance = viewDistance;
 
 		this._cache = new LRUTileCache( {
 			capacity: cacheSize,
@@ -397,6 +408,15 @@ export class TileTree extends Group {
 		}
 
 		const distance = Math.max( bounds.distanceToPoint( _camLocal ), 1 );
+		// past the view distance nothing is drawn, so nothing below is
+		// selected either: the children are at least this far away too
+		if ( distance > this.viewDistance ) {
+
+			this.stats.culled ++;
+			return null;
+
+		}
+
 		const errPx = this._texelSize( record ) * sseScale / distance;
 
 		if ( errPx > this.maxScreenTexel && z < this.source.maxZoom ) {

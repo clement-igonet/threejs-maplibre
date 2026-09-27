@@ -1,4 +1,4 @@
-import { Color, DoubleSide, ShaderMaterial, Vector3 } from 'three';
+import { Color, DoubleSide, ShaderMaterial, UniformsLib, UniformsUtils, Vector3 } from 'three';
 import { EXTRUDE_SCALE, PROPS_SCALE } from '../build/quantize.js';
 
 // Screen-space line material for the strips built by build/buildLines.js.
@@ -25,6 +25,7 @@ varying float vSide;
 varying float vCover;
 
 #include <batching_pars_vertex>
+#include <fog_pars_vertex>
 
 void main() {
 
@@ -54,6 +55,9 @@ void main() {
 	vSide = lineSide.x;
 	vColor = vec4( lineColor.rgb * diffuse, lineColor.a );
 
+	// the chunk reads mvPosition, which here is the extruded vertex
+	#include <fog_vertex>
+
 }
 `;
 
@@ -64,6 +68,8 @@ varying vec4 vColor;
 varying float vSide;
 varying float vCover;
 
+#include <fog_pars_fragment>
+
 void main() {
 
 	float d = abs( vSide );
@@ -72,6 +78,7 @@ void main() {
 	gl_FragColor = vec4( vColor.rgb, vColor.a * opacity * vCover * edge );
 
 	#include <colorspace_fragment>
+	#include <fog_fragment>
 
 }
 `;
@@ -81,17 +88,20 @@ export class VectorLineMaterial extends ShaderMaterial {
 	constructor() {
 
 		super( {
-			uniforms: {
+			// scene.fog needs its uniforms here, ShaderMaterial getting none
+			// of what the built-in materials get for free
+			uniforms: UniformsUtils.merge( [ UniformsLib.fog, {
 				pixelScale: { value: 0.001 },
 				propScale: { value: new Vector3( 1, 1, 1 ) },
 				diffuse: { value: new Color( 1, 1, 1 ) },
 				opacity: { value: 1 },
-			},
+			} ] ),
 			vertexShader,
 			fragmentShader,
 			transparent: true,
 			depthWrite: false,
 			side: DoubleSide,
+			fog: true,
 		} );
 
 		this.isVectorLineMaterial = true;
