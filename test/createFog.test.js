@@ -30,6 +30,11 @@ describe( 'createFog', () => {
 		const horizon = new Style( { ...STUB_STYLE, sky: { 'horizon-color': '#00ff00' } } );
 		expect( hex( createFog( horizon, { viewDistance: 500 } ).color ) ).toBe( '#00ff00' );
 
+		// a translucent sky colour keeps its hue: the style spec premultiplies
+		// the components it exposes as r, g and b, and the fog is opaque
+		const translucent = new Style( { ...STUB_STYLE, sky: { 'fog-color': 'rgba(255, 0, 0, 0.5)' } } );
+		expect( hex( createFog( translucent, { viewDistance: 500 } ).color ) ).toBe( '#ff0000' );
+
 		// no sky: the background layer is what fills the frame anyway
 		const background = new Style( STUB_STYLE ).backgroundLayer;
 		expect( background ).not.toBeNull();

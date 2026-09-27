@@ -32,7 +32,13 @@ function fogColor( style ) {
 	const sky = style?.sky ?? null;
 	const value = sky?.[ 'fog-color' ] ?? sky?.[ 'horizon-color' ] ?? null;
 	const parsed = typeof value === 'string' ? SpecColor.parse( value ) : null;
-	if ( parsed ) return new Color().setRGB( parsed.r, parsed.g, parsed.b, SRGBColorSpace );
+	// .rgb, not .r/.g/.b: the style spec premultiplies those by the alpha
+	if ( parsed ) {
+
+		const [ r, g, b ] = parsed.rgb;
+		return new Color().setRGB( r, g, b, SRGBColorSpace );
+
+	}
 
 	const background = style?.backgroundLayer ?? null;
 	if ( background ) {
