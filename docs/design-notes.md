@@ -303,7 +303,7 @@ benchmark below.
 
 `npm run bench:vector` (or `compose run --rm bench-vector`, env `BENCH_DATA`
 louvre or openfreemap, `BENCH_MODE` globe or planar) loads the same style
-and the same tiles in this engine and in maplibre-gl-js 5.24.0, in headless
+and the same tiles in this engine and in maplibre-gl-js 6.11.2, in headless
 Chrome, and drives both through three poses (district z13 nadir, louvre
 z14.6 pitched 50 degrees, street z16.5 pitched 62 degrees) and a 240-frame
 fly from district to street. Draw calls and triangles are counted the same
@@ -316,7 +316,7 @@ collection, so both engines are measured on what they hold rather than on
 what the collector has not got to yet. Zoom is converted to camera distance
 with MapLibre's field of view so the two views cover the same ground. Full
 output is in `bench/vector-results-*.json`; the tables are from runs on
-2026-09-25, SwiftShader on 2 CPUs of a shared VM, 800x500 viewport. Timings
+2026-09-27, SwiftShader on 2 CPUs of a shared VM, 800x500 viewport. Timings
 there vary by +-30 % between runs, so read the ratios, not the
 milliseconds.
 
@@ -324,44 +324,44 @@ Louvre extract (own Overpass export, z13 to z15), globe:
 
 | pose | metric | threejs-maplibre | maplibre-gl-js |
 |---|---|---|---|
-| district | tiles requested / draw calls / triangles | 9 / 9 / 62 490 | 10 / 65 / 26 011 |
-| | time to stable / heap | 3.8 s / 79 MB | 2.8 s / 57 MB |
-| louvre | tiles requested / draw calls / triangles | 17 / 9 / 91 922 | 0 / 75 / 76 846 |
-| | time to stable / heap | 7.6 s / 139 MB | 2.9 s / 52 MB |
-| street | tiles requested / draw calls / triangles | 6 / 9 / 44 878 | 4 / 110 / 53 025 |
-| | time to stable / heap | 3.2 s / 97 MB | 2.6 s / 59 MB |
+| district | tiles requested / draw calls / triangles | 9 / 9 / 62 490 | 10 / 60 / 25 990 |
+| | time to stable / heap | 4.0 s / 103 MB | 3.3 s / 56 MB |
+| louvre | tiles requested / draw calls / triangles | 17 / 9 / 91 922 | 0 / 68 / 76 827 |
+| | time to stable / heap | 6.9 s / 160 MB | 3.1 s / 52 MB |
+| street | tiles requested / draw calls / triangles | 6 / 9 / 44 878 | 7 / 143 / 53 275 |
+| | time to stable / heap | 3.3 s / 104 MB | 2.6 s / 59 MB |
 | fly district to street | tiles requested | 8 | 15 |
-| | mean / p95 / max frame | 131 / 248 / 544 ms | 145 / 302 / 401 ms |
-| | settle after fly / draw calls / heap | 2.4 s / 9 / 102 MB | 2.8 s / 110 / 69 MB |
+| | mean / p95 / max frame | 133 / 302 / 505 ms | 153 / 314 / 585 ms |
+| | settle after fly / draw calls / heap | 1.5 s / 9 / 104 MB | 2.4 s / 143 / 67 MB |
 
 Same data, planar:
 
 | pose | metric | threejs-maplibre | maplibre-gl-js |
 |---|---|---|---|
-| district | tiles requested / draw calls / triangles | 6 / 9 / 48 674 | 10 / 64 / 26 010 |
-| | time to stable / heap | 2.9 s / 56 MB | 3.2 s / 54 MB |
-| louvre | tiles requested / draw calls / triangles | 17 / 9 / 88 388 | 0 / 74 / 76 845 |
-| | time to stable / heap | 6.5 s / 86 MB | 3.1 s / 52 MB |
-| street | tiles requested / draw calls / triangles | 7 / 9 / 44 757 | 4 / 110 / 53 025 |
-| | time to stable / heap | 3.0 s / 108 MB | 2.8 s / 58 MB |
+| district | tiles requested / draw calls / triangles | 6 / 9 / 48 674 | 10 / 60 / 25 990 |
+| | time to stable / heap | 3.4 s / 64 MB | 2.9 s / 52 MB |
+| louvre | tiles requested / draw calls / triangles | 17 / 9 / 88 388 | 0 / 68 / 76 827 |
+| | time to stable / heap | 5.7 s / 84 MB | 2.3 s / 52 MB |
+| street | tiles requested / draw calls / triangles | 7 / 9 / 44 757 | 7 / 143 / 53 275 |
+| | time to stable / heap | 2.5 s / 122 MB | 3.4 s / 58 MB |
 | fly district to street | tiles requested | 3 | 15 |
-| | mean / p95 / max frame | 111 / 206 / 356 ms | 151 / 301 / 1341 ms |
-| | settle after fly / draw calls / heap | 1.7 s / 9 / 99 MB | 2.2 s / 110 / 66 MB |
+| | mean / p95 / max frame | 123 / 242 / 625 ms | 141 / 260 / 494 ms |
+| | settle after fly / draw calls / heap | 1.6 s / 9 / 102 MB | 2.6 s / 143 / 68 MB |
 
 OpenFreeMap's Liberty style, live planet tiles (z14 max, 1 MB and 17 k
 features per tile over Paris), about a hundred layers, globe:
 
 | pose | metric | threejs-maplibre | maplibre-gl-js |
 |---|---|---|---|
-| district | tiles requested / draw calls / triangles | 9 / 52 / 352 633 | 10 / 191 / 205 120 |
-| | time to stable / heap | 14.7 s / 56 MB | 9.1 s / 55 MB |
-| louvre | tiles requested / draw calls / triangles | 6 / 55 / 822 587 | 0 / 323 / 1 519 775 |
-| | time to stable / heap | 21.7 s / 127 MB | 16.9 s / 28 MB |
-| street | tiles requested / draw calls / triangles | 0 / 48 / 519 817 | 1 / 218 / 961 640 |
-| | time to stable / heap | 8.3 s / 127 MB | 14.5 s / 31 MB |
-| fly district to street | tiles requested | 1 | 8 |
-| | mean / p95 / max frame | 435 / 814 / 1170 ms | 502 / 915 / 1353 ms |
-| | settle after fly / draw calls / heap | 8.3 s / 48 / 136 MB | 11.3 s / 218 / 45 MB |
+| district | tiles requested / draw calls / triangles | 9 / 52 / 352 633 | 10 / 187 / 204 532 |
+| | time to stable / heap | 14.6 s / 81 MB | 9.2 s / 30 MB |
+| louvre | tiles requested / draw calls / triangles | 6 / 55 / 822 587 | 0 / 311 / 1 519 628 |
+| | time to stable / heap | 22.0 s / 128 MB | 18.7 s / 28 MB |
+| street | tiles requested / draw calls / triangles | 0 / 48 / 519 817 | 7 / 345 / 714 167 |
+| | time to stable / heap | 7.9 s / 128 MB | 16.0 s / 30 MB |
+| fly district to street | tiles requested | 1 | 15 |
+| | mean / p95 / max frame | 426 / 807 / 1136 ms | 431 / 973 / 1460 ms |
+| | settle after fly / draw calls / heap | 7.7 s / 48 / 137 MB | 6.3 s / 345 / 36 MB |
 
 Reading it:
 
@@ -372,15 +372,17 @@ Reading it:
   boxes against a horizon-cut view volume, `backfillLevels`, see M1); before
   them the engine requested 49 / 58 / 79 tiles at the three Louvre poses.
 - **Draw calls are one per layer, not per tile.** The Louvre style is 9
-  draws at every pose, against MapLibre's 64 to 110; Liberty is 48 to 55
-  against 191 to 323. Two things get there. MapLibre draws every antialiased
+  draws at every pose, against MapLibre's 60 to 143; Liberty is 48 to 55
+  against 187 to 345. Two things get there. MapLibre draws every antialiased
   fill layer twice per tile (the fill, then its outline as `GL_LINES`), the
   background once per tile, and two stencil mask passes per tile each time
   the source changes, where here a fill is one draw and an outline exists
   only when the style gives it a color; that alone had this engine at half
   MapLibre's count with a mesh per tile per layer (32 / 71 / 56 on the
   Louvre globe, 144 / 162 / 117 on Liberty, measured on the same machine
-  before this change). Batching the tiles of a layer into one `BatchedMesh`
+  before this change). MapLibre 6 draws more than 5 did at the steep poses
+  (143 against 110 at street on the Louvre extract, 345 against 218 on
+  Liberty), since it keeps more tiles in view there. Batching the tiles of a layer into one `BatchedMesh`
   took the rest: what is left is one draw per style layer with something in
   view, and it no longer grows as the view widens.
 - **Triangles are 1.7 to 2.4x MapLibre's at district**, which is not the
@@ -394,7 +396,7 @@ Reading it:
   louvre and street poses; part of that is its globe subdivision (fills and
   lines are cut to follow the curvature), part is that it served those poses
   from the tiles it had, so the two are not like for like there.
-- **Time to stable is 1.2 to 2.6x MapLibre's on a direct jump on the Louvre
+- **Time to stable is 1.2 to 2.5x MapLibre's on a direct jump on the Louvre
   extract**, and it is worker time: `stats.buildMs` puts one Louvre tile at
   100 to 200 ms to decode, style and triangulate on this VM, and the
   poses wait on 6 to 17 of them through 2 CPUs. Where the build spends it is
@@ -405,15 +407,16 @@ Reading it:
   its arrays, which the upload budget meters like any other upload; it did
   not move time to stable out of the run-to-run spread, but it is the first
   place to look if it does. On Liberty, where a tile is 1 MB and the network
-  is in the loop, this engine is slower to the district (14.7 s against
-  9.1 s) and louvre poses (21.7 against 16.9) and faster at street (8.3
-  against 14.5), and settles after the fly in 8.3 s against 11.3 s.
-- **Memory is the cost of this design.** The main-thread heap is 1.6 to
-  2.7x MapLibre's on the Louvre extract and 4x on Liberty (127 vs 31 MB at
+  is in the loop, this engine is slower to the district (14.6 s against
+  9.2 s) and louvre poses (22.0 against 18.7) and twice as fast at street
+  (7.9 against 16.0), while MapLibre settles faster after the fly (6.3 s
+  against 7.7 s).
+- **Memory is the cost of this design.** The main-thread heap is 1.8 to
+  3x MapLibre's on the Louvre extract and 4x on Liberty (128 vs 30 MB at
   street); neither number includes the workers, where MapLibre keeps its
   decoded tiles. `stats.batchBytes` and `stats.geometryBytes` say where it
-  goes: at the Louvre street pose the batches reserve 28 MB and the tiles in
-  them occupy 24 MB, on Liberty 106 and 84 MB. Both came down from the first
+  goes: at the Louvre street pose the batches reserve 36 MB and the tiles in
+  them occupy 29 MB, on Liberty 118 and 96 MB. Both came down from the first
   batched version: a built z14 Liberty tile went from 15.6 to 10.8 MB by
   dropping the normals (`flatShading` takes them from the winding) and
   quantizing the line attributes, which took what a Liberty view holds from

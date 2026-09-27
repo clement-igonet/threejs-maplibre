@@ -1,5 +1,5 @@
 {
-	"date": "2026-09-25",
+	"date": "2026-09-27",
 	"data": "louvre",
 	"mode": "planar",
 	"results": {
@@ -13,6 +13,8 @@
 			"poses": [
 				{
 					"name": "district",
+					"engineMeanMs": 10.37,
+					"engineP95Ms": 9.5,
 					"requests": 6,
 					"requested": [
 						"12/2074/1408",
@@ -24,8 +26,8 @@
 					],
 					"drawCalls": 9,
 					"triangles": 48674,
-					"timeToStableMs": 2872,
-					"heapMB": 56,
+					"timeToStableMs": 3392,
+					"heapMB": 64,
 					"timedOut": false,
 					"stats": {
 						"selected": 2,
@@ -36,13 +38,15 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 6,
-						"buildMs": 1501.400001525879,
-						"batchBytes": 5338638,
-						"geometryBytes": 3754956
+						"buildMs": 2090.5000038146973,
+						"batchBytes": 8415212,
+						"geometryBytes": 7020312
 					}
 				},
 				{
 					"name": "louvre",
+					"engineMeanMs": 11.09,
+					"engineP95Ms": 44.6,
 					"requests": 17,
 					"requested": [
 						"13/4148/2817",
@@ -65,8 +69,8 @@
 					],
 					"drawCalls": 9,
 					"triangles": 88388,
-					"timeToStableMs": 6481,
-					"heapMB": 86,
+					"timeToStableMs": 5658,
+					"heapMB": 84,
 					"timedOut": false,
 					"stats": {
 						"selected": 12,
@@ -77,13 +81,15 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 23,
-						"buildMs": 4093.199993133545,
-						"batchBytes": 26597756,
-						"geometryBytes": 20977102
+						"buildMs": 3937.2000007629395,
+						"batchBytes": 27123068,
+						"geometryBytes": 24139270
 					}
 				},
 				{
 					"name": "street",
+					"engineMeanMs": 3.7,
+					"engineP95Ms": 32.3,
 					"requests": 7,
 					"requested": [
 						"14/8297/5635",
@@ -96,8 +102,8 @@
 					],
 					"drawCalls": 9,
 					"triangles": 44757,
-					"timeToStableMs": 3010,
-					"heapMB": 108,
+					"timeToStableMs": 2502,
+					"heapMB": 122,
 					"timedOut": false,
 					"stats": {
 						"selected": 7,
@@ -108,20 +114,22 @@
 						"uploaded": 0,
 						"uploadMs": 0,
 						"built": 30,
-						"buildMs": 4606.799991607666,
-						"batchBytes": 29097540,
-						"geometryBytes": 24848490
+						"buildMs": 4450.800003051758,
+						"batchBytes": 32820600,
+						"geometryBytes": 27136982
 					}
 				}
 			],
 			"fly": {
 				"frames": 240,
-				"meanFrameMs": 111.17,
-				"p95FrameMs": 206.1,
-				"maxFrameMs": 356.2,
-				"framesOver16Ms": 236,
-				"framesOver50Ms": 215,
-				"settleMs": 1714,
+				"engineMeanMs": 0.64,
+				"engineP95Ms": 0.9,
+				"meanFrameMs": 123.3,
+				"p95FrameMs": 242.8,
+				"maxFrameMs": 625.8,
+				"framesOver16Ms": 240,
+				"framesOver50Ms": 223,
+				"settleMs": 1556,
 				"requestsTotal": 3,
 				"requested": [
 					"16/33194/22546",
@@ -130,11 +138,11 @@
 				],
 				"timedOut": false,
 				"drawCallsAfter": 9,
-				"heapMB": 99
+				"heapMB": 102
 			}
 		},
 		"maplibre": {
-			"engine": "maplibre-gl-js 5.24.0 (planar)",
+			"engine": "maplibre-gl-js 6.11.2 (planar)",
 			"data": "louvre",
 			"viewport": [
 				800,
@@ -143,6 +151,8 @@
 			"poses": [
 				{
 					"name": "district",
+					"engineMeanMs": null,
+					"engineP95Ms": null,
 					"requests": 10,
 					"requested": [
 						"14/8298/5636",
@@ -156,36 +166,43 @@
 						"13/4148/2818",
 						"13/4148/2817"
 					],
-					"drawCalls": 64,
-					"triangles": 26010,
-					"timeToStableMs": 3176,
-					"heapMB": 54,
+					"drawCalls": 60,
+					"triangles": 25990,
+					"timeToStableMs": 2864,
+					"heapMB": 52,
 					"timedOut": false,
 					"stats": {}
 				},
 				{
 					"name": "louvre",
+					"engineMeanMs": null,
+					"engineP95Ms": null,
 					"requests": 0,
 					"requested": [],
-					"drawCalls": 74,
-					"triangles": 76845,
-					"timeToStableMs": 3105,
+					"drawCalls": 68,
+					"triangles": 76827,
+					"timeToStableMs": 2299,
 					"heapMB": 52,
 					"timedOut": false,
 					"stats": {}
 				},
 				{
 					"name": "street",
-					"requests": 4,
+					"engineMeanMs": null,
+					"engineP95Ms": null,
+					"requests": 7,
 					"requested": [
-						"16/33193/22545",
 						"16/33193/22544",
 						"16/33192/22545",
-						"16/33192/22544"
+						"16/33192/22544",
+						"16/33193/22545",
+						"16/33193/22545",
+						"16/33193/22545",
+						"16/33193/22545"
 					],
-					"drawCalls": 110,
-					"triangles": 53025,
-					"timeToStableMs": 2782,
+					"drawCalls": 143,
+					"triangles": 53275,
+					"timeToStableMs": 3393,
 					"heapMB": 58,
 					"timedOut": false,
 					"stats": {}
@@ -193,12 +210,14 @@
 			],
 			"fly": {
 				"frames": 240,
-				"meanFrameMs": 151.22,
-				"p95FrameMs": 301.3,
-				"maxFrameMs": 1341.7,
+				"engineMeanMs": null,
+				"engineP95Ms": null,
+				"meanFrameMs": 141.05,
+				"p95FrameMs": 260.6,
+				"maxFrameMs": 494.3,
 				"framesOver16Ms": 240,
-				"framesOver50Ms": 225,
-				"settleMs": 2208,
+				"framesOver50Ms": 237,
+				"settleMs": 2604,
 				"requestsTotal": 15,
 				"requested": [
 					"15/16596/11272",
@@ -218,8 +237,8 @@
 					"16/33191/22543"
 				],
 				"timedOut": false,
-				"drawCallsAfter": 110,
-				"heapMB": 66
+				"drawCallsAfter": 143,
+				"heapMB": 68
 			}
 		}
 	}
