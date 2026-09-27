@@ -5,11 +5,13 @@
 // turns. Prints measurements; exits 1 if any is out of range.
 import { createServer } from 'vite';
 import puppeteer from 'puppeteer';
+import { chromeExecutablePath } from './chrome.mjs';
 
 const root = new URL( '..', import.meta.url ).pathname;
 const server = await createServer( { root, server: { host: '127.0.0.1', port: 5195, strictPort: true }, logLevel: 'warn' } );
 await server.listen();
 const browser = await puppeteer.launch( {
+	executablePath: chromeExecutablePath(),
 	headless: true,
 	args: [ '--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader' ],
 	defaultViewport: { width: 800, height: 500 },
