@@ -22,7 +22,7 @@
 		<script src="../build/threejs-maplibre.js"></script>
 		<script>
 
-			const { THREE, AttributionControl, MapControls, Style, VectorTileMap, VectorTileSource, VERSION } = threejsMaplibre;
+			const { THREE, AttributionControl, MAPLIBRE_FOV, MapControls, Style, VectorTileMap, VectorTileSource, VERSION } = threejsMaplibre;
 
 			const params = new URLSearchParams( location.search );
 			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
@@ -49,7 +49,8 @@
 				sun.position.set( 1, 2, 1 ); // set per frame below
 				scene.add( sun, sun.target );
 
-				const camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1e8 );
+				// MapLibre's field of view by default, ?fov= for another
+				const camera = new THREE.PerspectiveCamera( num( 'fov', MAPLIBRE_FOV ), window.innerWidth / window.innerHeight, 1, 1e8 );
 				const controls = new MapControls( camera, renderer.domElement, { mode } );
 				controls.minAltitude = 20;
 				controls.setView( { lat: num( 'lat', 48.8606 ), lon: num( 'lon', 2.3376 ), distance: num( 'alt', 900 ), heading: num( 'heading', 20 ), pitch: num( 'pitch', 50 ) } );

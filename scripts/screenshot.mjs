@@ -49,6 +49,9 @@ const SHOTS = [
 if ( process.env.SHOT_LIVE !== '0' ) {
 
 	SHOTS.push( { name: 'vector-openfreemap', page: 'vector', query: '&data=openfreemap', live: true } );
+	// past what MapLibre lets a map tilt to by default, which is where the
+	// far field gets expensive: tilted over Paris, horizon in frame
+	SHOTS.push( { name: 'vector-openfreemap-tilted', page: 'vector', query: '&data=openfreemap&lat=48.8606&lon=2.3376&alt=700&heading=19&pitch=67&maxPitch=85', live: true } );
 	if ( existsSync( `${ root }/build/threejs-maplibre.js` ) ) SHOTS.push( { name: 'standalone', query: '', live: true } );
 
 }

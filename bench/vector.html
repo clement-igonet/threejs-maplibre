@@ -205,6 +205,7 @@
 				const camera = new PerspectiveCamera( MAPLIBRE_FOV, width / height, 1, 1e8 );
 				const controls = new MapControls( camera, renderer.domElement, { mode } );
 				controls.minAltitude = 1;
+				controls.maxPitch = 85; // maplibre-gl is raised to the same above
 				const map = new VectorTileMap( source, geometryStyle, { mode, sourceId } );
 				scene.add( map );
 				const nativeTileUrl = source.tileUrl.bind( source );

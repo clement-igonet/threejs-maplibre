@@ -21,6 +21,12 @@ const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
 const MAX_LAT = 85; // Web Mercator edge, and keeps the frame away from the pole
 
+// MapLibre's vertical field of view, in degrees. A camera set to it sees
+// what a MapLibre map at the same zoom sees, which is what makes this
+// engine's zoom, tile selection and screenshots comparable to one. A wider
+// camera reaches further towards the horizon and pulls in tiles for it.
+export const MAPLIBRE_FOV = 0.6435011087932844 * RAD2DEG;
+
 const _target = new Vector3();
 const _up = new Vector3();
 const _east = new Vector3();
@@ -50,6 +56,12 @@ export class MapControls {
 
 		this.minAltitude = 100; // of the camera, approximated as distance * cos(pitch)
 		this.maxDistance = 10 * WGS84_RADIUS;
+		// How far this controller tilts. Its state is a ground point at the
+		// screen center, which stops meaning anything as the view approaches
+		// the horizontal, so 85 is where this model ends, not where the
+		// engine does: nothing in the tile tree clamps a camera, and a free
+		// one (indoor, street level, a flight path) drives the map by being
+		// passed to update() like any other.
 		this.maxPitch = 85;
 		this.zoomFraction = 0.05; // distance change per wheel notch
 		this.rotateDegPerPixel = 0.25;

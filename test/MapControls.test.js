@@ -101,7 +101,15 @@ describe( 'MapControls', () => {
 		const { controls, camera } = createControls( { ...PARIS, distance: 2000, heading: 0, pitch: 0 } );
 		controls.rotateBy( 400, 120 );
 		expect( controls.heading ).toBeCloseTo( 40, 6 );
-		expect( controls.pitch ).toBe( 85 );
+		expect( controls.pitch ).toBe( 85 ); // where this controller's model ends
+
+		// and it is a setting, not a rule: the engine clamps nothing
+		controls.maxPitch = 60;
+		controls.setView( { pitch: 80 } );
+		controls.update();
+		expect( controls.pitch ).toBe( 60 );
+		controls.maxPitch = 85;
+		controls.setView( { pitch: 0 } );
 
 		controls.setView( { pitch: 60, distance: 10 } );
 		controls.update();

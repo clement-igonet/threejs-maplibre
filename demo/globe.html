@@ -17,10 +17,11 @@
 		<script type="module">
 
 			import { PerspectiveCamera, Scene, WebGLRenderer } from 'three';
-			import { AttributionControl, MapControls, RasterTileMap, createOSMSource, geocentricHeight } from '../src/index.js';
+			import { AttributionControl, MAPLIBRE_FOV, MapControls, RasterTileMap, createOSMSource, geocentricHeight } from '../src/index.js';
 			import { createStubSource } from './stub-tiles.js';
 
 			const params = new URLSearchParams( location.search );
+			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
 			const source = params.get( 'tiles' ) === 'stub' ? createStubSource() : createOSMSource();
 
 			const renderer = new WebGLRenderer( { antialias: true } );
@@ -29,15 +30,15 @@
 			document.body.appendChild( renderer.domElement );
 
 			const scene = new Scene();
-			const camera = new PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 10, 1e8 );
+			// MapLibre's field of view by default, ?fov= for another
+			const camera = new PerspectiveCamera( num( 'fov', MAPLIBRE_FOV ), window.innerWidth / window.innerHeight, 10, 1e8 );
 
 			// map-style controls: drag pans, wheel or pinch zooms, right drag
 			// (or two fingers sliding together) tilts and turns
 			const controls = new MapControls( camera, renderer.domElement, { mode: 'globe' } );
 			controls.minAltitude = 200;
 
-			// ?lat=&lon=&alt=&heading=&pitch= starts above a place; default is the whole earth
-			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
+			// ?lat=&lon=&alt=&heading=&pitch=&fov= starts above a place; default is the whole earth
 			if ( params.has( 'lat' ) ) {
 
 				controls.setView( { lat: num( 'lat', 0 ), lon: num( 'lon', 0 ), distance: num( 'alt', 5000 ), heading: num( 'heading', 0 ), pitch: num( 'pitch', 0 ) } );
