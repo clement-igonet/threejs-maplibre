@@ -43,6 +43,10 @@ const SHOTS = [
 	{ name: 'objects', query: '' },
 	{ name: 'objects-planar', page: 'objects', query: '&mode=planar' },
 	{ name: 'objects-close', page: 'objects', query: '&lat=48.8613&lon=2.3333&alt=230&heading=80&pitch=65&objectHeading=250' },
+	// the bridge: the same antenna and pin inside a maplibre-gl map, on its
+	// globe and on its flat map (MapLibre's demo tiles, so these are live)
+	{ name: 'bridge-globe', page: 'bridge', query: '', live: true },
+	{ name: 'bridge-mercator', page: 'bridge', query: '&projection=mercator', live: true },
 ];
 
 // live shots on OpenFreeMap's Liberty style (SHOT_LIVE=0 skips them): the

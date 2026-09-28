@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>threejs-maplibre bridge: a three.js scene inside a MapLibre map</title>
+		<style>
+			html, body { margin: 0; height: 100%; overflow: hidden; }
+			#map { position: absolute; inset: 0; }
+			#info { position: absolute; top: 8px; left: 8px; padding: 6px 10px; font: 13px/1.4 ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; white-space: pre; pointer-events: none; }
+			#version { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; }
+		</style>
+		<link rel="stylesheet" href="../node_modules/maplibre-gl/dist/maplibre-gl.css">
+	</head>
+	<body>
+		<div id="map"></div>
+		<div id="info"></div>
+		<div id="version"></div>
+		<script type="module">
+
+			// The other direction: a three.js scene drawn inside a maplibre-gl
+			// map as a custom layer, with the map's camera. The 34 m antenna and
+			// the pin from demo/objects.html stand on MapLibre's own basemap, on
+			// the globe and on the flat map, and slew like there. MapLibre's "Add
+			// a 3D model" example is the reference this replaces the shader math
+			// of.
+			//
+			//   ?projection=globe|mercator   the map's projection (globe)
+			//   ?model=<glTF url> &scale=    a model instead of the antenna
+			//   ?lng=&lat=&zoom=&pitch=&bearing=
+			//   ?style=<style url>           OpenFreeMap's Liberty style by default
+
+			import { AmbientLight, DirectionalLight, Group, Mesh, MeshStandardMaterial, ConeGeometry, CylinderGeometry, DoubleSide, LatheGeometry, SphereGeometry, Vector2 } from 'three';
+			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+			import { MapLibreLayer } from '../src/index.js';
+
+			const maplibregl = await import( 'maplibre-gl' );
+			maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?url' ) ).default );
+
+			const params = new URLSearchParams( location.search );
+			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
+			const projection = params.get( 'projection' ) === 'mercator' ? 'mercator' : 'globe';
+
+			const ANTENNA = { lng: 2.3323, lat: 48.8613 }; // a lawn of the jardin du Carrousel
+			const PYRAMID = { lng: 2.33590, lat: 48.86107 };
+
+			const map = new maplibregl.Map( {
+				container: 'map',
+				style: params.get( 'style' ) ?? 'https://tiles.openfreemap.org/styles/liberty',
+				center: [ num( 'lng', 2.3342 ), num( 'lat', 48.8615 ) ],
+				zoom: num( 'zoom', 16.2 ),
+				pitch: num( 'pitch', 60 ),
+				bearing: num( 'bearing', 70 ),
+				maxPitch: 85,
+				projection: { type: projection },
+				attributionControl: { compact: false },
+			} );
+			await new Promise( resolve => map.once( 'load', resolve ) );
+			map.setProjection( { type: projection } );
+
+			const layer = new MapLibreLayer( { id: 'antenna', ...ANTENNA } );
+			const scene = layer.scene;
+			scene.add( new AmbientLight( 0xffffff, 0.7 ) );
+			const sun = new DirectionalLight( 0xffffff, 2.2 );
+			sun.position.set( 60, 120, 40 );
+			scene.add( sun );
+
+			// --- the objects, as in demo/objects.html ------------------------------
+
+			function createAntenna() {
+
+				const white = new MeshStandardMaterial( { color: 0xe6e6e2, roughness: 0.6, metalness: 0.1 } );
+				const grey = new MeshStandardMaterial( { color: 0x8f959a, roughness: 0.5, metalness: 0.4 } );
+				const antenna = new Group();
+				const pedestal = new Mesh( new CylinderGeometry( 4, 5.5, 12, 24 ), grey );
+				pedestal.position.y = 6;
+				const tower = new Mesh( new CylinderGeometry( 1.6, 2.6, 10, 16 ), white );
+				tower.position.y = 17;
+				antenna.add( pedestal, tower );
+				const mount = new Group();
+				mount.position.y = 22;
+				const dish = new Group();
+				dish.rotation.x = - 0.9;
+				mount.add( dish );
+				antenna.add( mount );
+				const profile = [];
+				for ( let i = 0; i <= 24; i ++ ) {
+
+					const r = 17 * i / 24;
+					profile.push( new Vector2( r, r * r / 48 ) );
+
+				}
+
+				dish.add( new Mesh( new LatheGeometry( profile, 48 ), new MeshStandardMaterial( { color: 0xf0f0ec, roughness: 0.4, metalness: 0.2, side: DoubleSide } ) ) );
+				const feed = new Mesh( new CylinderGeometry( 0.4, 0.4, 12, 8 ), grey );
+				feed.position.y = 6;
+				const horn = new Mesh( new ConeGeometry( 1.2, 2, 12 ), grey );
+				horn.position.y = 12;
+				horn.rotation.x = Math.PI;
+				const axle = new Mesh( new CylinderGeometry( 1, 1, 12, 12 ), grey );
+				axle.rotation.z = Math.PI / 2;
+				dish.add( feed, horn, axle );
+				antenna.mount = mount;
+				return antenna;
+
+			}
+
+			function createPin( color ) {
+
+				const pin = new Group();
+				const material = new MeshStandardMaterial( { color, roughness: 0.5 } );
+				const needle = new Mesh( new ConeGeometry( 3, 12, 16 ), material );
+				needle.position.y = 6;
+				needle.rotation.x = Math.PI;
+				const head = new Mesh( new SphereGeometry( 5, 24, 16 ), material );
+				head.position.y = 15;
+				pin.add( needle, head );
+				return pin;
+
+			}
+
+			let antenna;
+			if ( params.has( 'model' ) ) {
+
+				const gltf = await new GLTFLoader().loadAsync( params.get( 'model' ) );
+				antenna = gltf.scene;
+				antenna.scale.setScalar( num( 'scale', 1 ) );
+
+			} else {
+
+				antenna = createAntenna();
+
+			}
+
+			scene.add( layer.place( antenna, ANTENNA.lng, ANTENNA.lat, 0, num( 'objectHeading', 250 ) ) );
+			// the pin floats 40 m over the pyramid: a place 250 m away from the anchor
+			scene.add( layer.place( createPin( 0xe03030 ), PYRAMID.lng, PYRAMID.lat, 40 ) );
+
+			map.addLayer( layer );
+
+			// slew the dish and keep the map redrawing while it moves
+			const info = document.getElementById( 'info' );
+			const t0 = performance.now();
+			map.on( 'render', () => {
+
+				if ( antenna.mount ) antenna.mount.rotation.y = 0.4 * Math.sin( ( performance.now() - t0 ) / 3000 );
+				const c = map.getCenter();
+				info.textContent = `threejs-maplibre bridge: ${ projection } | maplibre-gl ${ maplibregl.getVersion() } | zoom ${ map.getZoom().toFixed( 2 ) } | pitch ${ map.getPitch().toFixed( 0 ) }° | bearing ${ map.getBearing().toFixed( 0 ) }° | transition ${ layer.lastProjection.transition.toFixed( 2 ) }`;
+				window.__SHOT_READY = map.loaded();
+				map.triggerRepaint();
+
+			} );
+
+			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
+			window.__MAP = map;
+			window.__LAYER = layer;
+
+		</script>
+	</body>
+</html>

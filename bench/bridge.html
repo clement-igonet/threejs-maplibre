@@ -22,25 +22,18 @@
 			//
 			// scripts/bridge-check.mjs drives it and prints the table.
 
-			import { AmbientLight, BoxGeometry, DirectionalLight, DoubleSide, EdgesGeometry, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshLambertMaterial, PlaneGeometry, Vector4 } from 'three';
+			import { Vector4 } from 'three';
 			import { MapLibreLayer } from '../src/bridge/MapLibreLayer.js';
 			import { MAPLIBRE_EARTH_RADIUS } from '../src/bridge/MapLibreFrames.js';
 
 			const params = new URLSearchParams( location.search );
 			const projection = params.get( 'projection' ) === 'mercator' ? 'mercator' : 'globe';
-			// ?boxes=1: a MapLibre fill-extrusion and a three.js box of the same
-			// size in the same place, to see height and face winding line up
-			const boxes = params.get( 'boxes' ) === '1' || params.get( 'silhouette' ) === '1';
-			// ?silhouette=1: opaque, unlit, one colour per engine, for masks
-			const silhouette = params.get( 'silhouette' ) === '1';
-
 			const maplibregl = await import( 'maplibre-gl' );
 			await import( 'maplibre-gl/dist/maplibre-gl.css' );
 			maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?url' ) ).default );
 
-			// the Louvre pyramid, the reference scene, unless ?lng=&lat= say otherwise
-			const LNG = params.has( 'lng' ) ? parseFloat( params.get( 'lng' ) ) : 2.3359;
-			const LAT = params.has( 'lat' ) ? parseFloat( params.get( 'lat' ) ) : 48.8610;
+			// the Louvre pyramid, the reference scene
+			const LNG = 2.3359, LAT = 48.8610;
 
 			const map = new maplibregl.Map( {
 				container: 'map',
@@ -54,69 +47,12 @@
 				zoom: 14,
 				pixelRatio: 1,
 				maxPitch: 85,
-				// read back for the silhouette comparison
-				canvasContextAttributes: { preserveDrawingBuffer: true, antialias: false },
 				fadeDuration: 0,
 				attributionControl: false,
 			} );
 			await new Promise( resolve => map.once( 'load', resolve ) );
 
 			const layer = new MapLibreLayer( { lng: LNG, lat: LAT } );
-
-			if ( boxes ) {
-
-				// two sizes: one to see from the globe zooms, one for the street
-				// apart, so a street-level camera is not standing inside the big one
-				const BOXES = [ { east: 0, size: 3000, height: 1500 }, { east: 2500, size: 60, height: 50 } ];
-				// ?height= flattens both, to tell a ground offset from a height one
-				if ( params.has( 'height' ) ) for ( const box of BOXES ) box.height = parseFloat( params.get( 'height' ) );
-				const features = BOXES.map( ( { east, size, height } ) => {
-
-					const h = size / 2;
-					const ring = [ [ - h, - h ], [ h, - h ], [ h, h ], [ - h, h ], [ - h, - h ] ].map( ( [ e, n ] ) => offsetLngLat( east + e, n ) );
-					return { type: 'Feature', properties: { height }, geometry: { type: 'Polygon', coordinates: [ ring ] } };
-
-				} );
-				map.addSource( 'boxes', { type: 'geojson', data: { type: 'FeatureCollection', features } } );
-				// ?flat=1: a plain fill on the ground instead, against a flat square
-				const flat = params.get( 'flat' ) === '1';
-				map.addLayer( flat
-					? { id: 'maplibre-boxes', type: 'fill', source: 'boxes', paint: { 'fill-color': '#2244ff' } }
-					: {
-						id: 'maplibre-boxes', type: 'fill-extrusion', source: 'boxes',
-						paint: { 'fill-extrusion-color': '#2244ff', 'fill-extrusion-height': [ 'get', 'height' ], 'fill-extrusion-opacity': silhouette ? 1 : 0.6 },
-					} );
-
-				for ( const { east, size, height } of BOXES ) {
-
-					if ( silhouette ) {
-
-						// the same box MapLibre extrudes, unlit, one-sided; flat, a
-						// square lying on the ground seen from both sides
-						const box = params.get( 'flat' ) === '1'
-							? new Mesh( new PlaneGeometry( size, size ).rotateX( - Math.PI / 2 ), new MeshBasicMaterial( { color: 0xff0000, side: DoubleSide } ) )
-							: new Mesh( new BoxGeometry( size, height, size ), new MeshBasicMaterial( { color: 0xff0000 } ) );
-						box.position.set( east, params.get( 'flat' ) === '1' ? 0 : height / 2, 0 );
-						layer.scene.add( box );
-						continue;
-
-					}
-
-					// lit and one-sided: a box drawn inside out would show it
-					const box = new Mesh( new BoxGeometry( size * 0.5, height, size * 0.5 ), new MeshLambertMaterial( { color: 0xff5533 } ) );
-					box.position.set( east, height / 2, 0 );
-					const edges = new LineSegments( new EdgesGeometry( new BoxGeometry( size, height, size ) ), new LineBasicMaterial( { color: 0xff0000 } ) );
-					edges.position.set( east, height / 2, 0 );
-					layer.scene.add( box, edges );
-
-				}
-
-				layer.scene.add( new AmbientLight( 0xffffff, 0.6 ) );
-				const sun = new DirectionalLight( 0xffffff, 2 );
-				sun.position.set( 1, 2, 1.5 );
-				layer.scene.add( sun );
-
-			}
 
 			map.addLayer( layer );
 
@@ -174,119 +110,6 @@
 				}
 
 				return rows;
-
-			};
-
-			// for screenshots: a pose centred on a point east of the anchor
-			window.__pose = async ( { zoom, pitch = 0, bearing = 0, east = 0 } ) => {
-
-				map.jumpTo( { center: offsetLngLat( east, 0 ), zoom, pitch, bearing } );
-				await new Promise( resolve => map.once( 'idle', resolve ) );
-				return { transition: layer.lastProjection.transition };
-
-			};
-
-			// Which pixels one engine alone covers: blue for MapLibre's extrusion,
-			// red for the three.js box. The two masks are compared by overlap.
-			async function mask( which ) {
-
-				map.setLayoutProperty( 'maplibre-boxes', 'visibility', which === 'maplibre' ? 'visible' : 'none' );
-				layer.scene.visible = which === 'three';
-				map.triggerRepaint();
-				await new Promise( resolve => map.once( 'render', resolve ) );
-
-				const w = canvas.width, h = canvas.height;
-				const ctx = Object.assign( document.createElement( 'canvas' ), { width: w, height: h } ).getContext( '2d' );
-				ctx.drawImage( canvas, 0, 0 );
-				const px = ctx.getImageData( 0, 0, w, h ).data;
-				const out = new Uint8Array( w * h );
-				for ( let i = 0; i < w * h; i ++ ) {
-
-					const r = px[ 4 * i ], g = px[ 4 * i + 1 ], b = px[ 4 * i + 2 ];
-					out[ i ] = which === 'maplibre' ? ( b > r + 60 && b > g + 60 ? 1 : 0 ) : ( r > g + 60 && r > b + 60 ? 1 : 0 );
-
-				}
-
-				return out;
-
-			}
-
-			// the big box's footprint where map.project says it is, as a mask:
-			// MapLibre's own answer, to hold its rendering against
-			function projectedMask() {
-
-				const w = canvas.width, h = canvas.height;
-				const ctx = Object.assign( document.createElement( 'canvas' ), { width: w, height: h } ).getContext( '2d' );
-				ctx.fillStyle = '#ff0000';
-				ctx.beginPath();
-				for ( const [ e, n ] of [ [ - 1500, - 1500 ], [ 1500, - 1500 ], [ 1500, 1500 ], [ - 1500, 1500 ] ] ) {
-
-					// sampled along each edge, so a curved globe edge is followed
-					const p = map.project( offsetLngLat( e, n ) );
-					ctx.lineTo( p.x, p.y );
-
-				}
-
-				ctx.closePath();
-				ctx.fill();
-				const px = ctx.getImageData( 0, 0, w, h ).data;
-				const out = new Uint8Array( w * h );
-				for ( let i = 0; i < w * h; i ++ ) out[ i ] = px[ 4 * i ] > 128 ? 1 : 0;
-				return out;
-
-			}
-
-			window.__silhouette = async ( pose, { against = 'three' } = {} ) => {
-
-				const { transition } = await window.__pose( pose );
-				const a = await mask( 'maplibre' );
-				const b = against === 'project' ? projectedMask() : await mask( 'three' );
-				let both = 0, either = 0, onlyA = 0, onlyB = 0;
-				for ( let i = 0; i < a.length; i ++ ) {
-
-					if ( a[ i ] && b[ i ] ) both ++;
-					if ( a[ i ] || b[ i ] ) either ++;
-					if ( a[ i ] && ! b[ i ] ) onlyA ++;
-					if ( b[ i ] && ! a[ i ] ) onlyB ++;
-
-				}
-
-				// both masks in one picture: MapLibre alone blue, three.js alone red,
-				// both purple, for looking at what a low overlap is made of
-				const w = canvas.width, h = canvas.height;
-				const view = Object.assign( document.createElement( 'canvas' ), { width: w, height: h } ).getContext( '2d' );
-				const image = view.createImageData( w, h );
-				for ( let i = 0; i < a.length; i ++ ) {
-
-					const c = a[ i ] && b[ i ] ? [ 150, 60, 200 ] : a[ i ] ? [ 40, 80, 255 ] : b[ i ] ? [ 255, 40, 40 ] : [ 245, 245, 245 ];
-					image.data.set( [ ...c, 255 ], 4 * i );
-
-				}
-
-				view.putImageData( image, 0, 0 );
-				window.__overlay = view.canvas.toDataURL( 'image/png' );
-
-				return { transition, maplibrePx: both + onlyA, threePx: both + onlyB, iou: + ( both / Math.max( either, 1 ) ).toFixed( 4 ), onlyMaplibre: onlyA, onlyThree: onlyB };
-
-			};
-
-			// Where MapLibre draws the big square (centred on the anchor) against
-			// where map.project puts the anchor: the centroid of the rendered
-			// mask, in pixels, and the projected centre
-			window.__centroid = async pose => {
-
-				const { transition } = await window.__pose( pose );
-				const a = await mask( 'maplibre' );
-				const w = canvas.width;
-				let n = 0, sx = 0, sy = 0;
-				for ( let i = 0; i < a.length; i ++ ) if ( a[ i ] ) {
-
-					n ++; sx += i % w; sy += Math.floor( i / w );
-
-				}
-
-				const p = map.project( [ LNG, LAT ] );
-				return { transition, rendered: [ + ( sx / n + 0.5 ).toFixed( 2 ), + ( sy / n + 0.5 ).toFixed( 2 ) ], projected: [ + p.x.toFixed( 2 ), + p.y.toFixed( 2 ) ], pixels: n };
 
 			};
 

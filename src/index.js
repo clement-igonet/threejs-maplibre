@@ -21,3 +21,6 @@ export { VectorTileMap } from './three/VectorTileMap.js';
 export { VectorLineMaterial } from './three/VectorLineMaterial.js';
 export { buildTile, builtTileTransferables } from './build/buildTile.js';
 export { createTileProjection } from './build/TileProjection.js';
+// the bridge: this library's scenes inside a maplibre-gl map
+export { MapLibreLayer } from './bridge/MapLibreLayer.js';
+export { MAPLIBRE_EARTH_RADIUS, globeFrame, mercatorFrame, mercatorUnitsPerMeter, mercatorX, mercatorY } from './bridge/MapLibreFrames.js';
