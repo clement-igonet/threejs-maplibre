@@ -15,7 +15,11 @@ The native engine exists because the goals diverge:
   error semantics and content pipeline. Issues like
   [#1636](https://github.com/NASA-AMMOS/3DTilesRendererJS/issues/1636)
   (overlay splitting stalling on the geometric-error impedance mismatch)
-  come exactly from that adaptation layer. A raster map needs one thing:
+  come exactly from that adaptation layer. That one is fixed upstream now,
+  by [#1730](https://github.com/NASA-AMMOS/3DTilesRendererJS/pull/1730)
+  (a texel-size floor on the split tiles' error, merged 2026-09-28), but the
+  impedance is in the design and the next case will look like it. A raster
+  map needs one thing:
   screen-space texel error over a quadtree, which is ~200 lines here
   (`RasterTileMap`) instead of a tileset emulation.
 - **M2-M4 build on this tree.** Vector tiles, MapLibre styling, buildings and
