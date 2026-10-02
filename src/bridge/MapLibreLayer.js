@@ -1,5 +1,5 @@
 import { Matrix4, PerspectiveCamera, Scene, Vector3, Vector4, WebGLRenderer } from 'three';
-import { MAPLIBRE_EARTH_RADIUS, globeFrame, mercatorFrame } from './MapLibreFrames.js';
+import { MAPLIBRE_EARTH_RADIUS, globeFrame, mercatorFrame, mercatorUnitsPerMeter, mercatorX, mercatorY } from './MapLibreFrames.js';
 
 const _frame = new Matrix4();
 const _globe = new Matrix4();
@@ -38,10 +38,25 @@ const _local = new Vector3();
 // Precision: measured against map.project() over zooms 2 to 19, pitched
 // and turned, the scene lands within 0.1 px of where MapLibre puts the same
 // ground, in both projections (scripts/bridge-check.mjs).
+//
+// Terrain: with terrain on the map, the anchor stands on it. Its elevation
+// is asked of the map every frame (map.queryTerrainElevation, what
+// MapLibre's own three.js example does), so the scene settles as DEM tiles
+// land, and an object placed elsewhere through place() stands on its own
+// ground rather than the anchor's.
+//
+// Two spaces. 'local', the default: meters around the anchor, for anything
+// building-sized, where float32 has to hold a centimetre. 'world': the
+// scene's units are MapLibre's own, mercator 0..1 on the flat map and the
+// unit sphere on the globe, for content the size of a continent, where a
+// meters frame would drift (it is mercator linearised at one point) and a
+// kilometre of float32 precision is plenty. worldPosition() gives a place
+// in the space of the current frame; content that must survive the globe
+// to mercator morph rebuilds itself when onGlobe changes.
 
 export class MapLibreLayer {
 
-	constructor( { id = 'three', scene = new Scene(), lng = 0, lat = 0, altitude = 0 } = {} ) {
+	constructor( { id = 'three', scene = new Scene(), lng = 0, lat = 0, altitude = 0, space = 'local', terrain = true } = {} ) {
 
 		// the maplibre-gl CustomLayerInterface
 		this.id = id;
@@ -52,11 +67,22 @@ export class MapLibreLayer {
 		this.camera = new PerspectiveCamera(); // its projection is set every frame
 		this.map = null;
 		this.renderer = null;
+		this.space = space;
+		this.terrain = terrain; // follow the map's terrain, when it has one
 
 		this._anchor = { lng, lat, altitude };
+		this.elevation = 0; // terrain under the anchor, meters, as last asked
+		this._placed = []; // objects standing at a place, settled every frame
 		// the clip matrix of the last frame and the transition it was built
 		// for, for anyone checking where the scene lands
 		this.lastProjection = { matrix: new Matrix4(), transition: 0 };
+
+	}
+
+	// Globe or flat, as of the last frame: which space worldPosition speaks.
+	get onGlobe() {
+
+		return this.lastProjection.transition >= 0.5;
 
 	}
 
@@ -96,6 +122,13 @@ export class MapLibreLayer {
 
 	render( gl, args ) {
 
+		if ( this.space === 'local' ) {
+
+			this.elevation = this.terrainElevation( this._anchor.lng, this._anchor.lat );
+			this._settle();
+
+		}
+
 		this.projectionFor( args.defaultProjectionData, this.camera.projectionMatrix );
 		this.camera.projectionMatrixInverse.copy( this.camera.projectionMatrix ).invert();
 
@@ -104,11 +137,36 @@ export class MapLibreLayer {
 
 	}
 
-	// Local meters at the anchor to clip space, for MapLibre's projection data.
+	// The terrain under a place, in meters, as the map draws it (exaggeration
+	// included); 0 without terrain, or before its tiles have landed there.
+	terrainElevation( lng, lat ) {
+
+		if ( ! this.terrain || ! this.map ) return 0;
+		return this.map.queryTerrainElevation( [ lng, lat ] ) ?? 0;
+
+	}
+
+	// Scene units at the anchor to clip space, for MapLibre's projection data.
+	// In local space the anchor stands at its altitude plus the terrain under
+	// it; in world space the scene is already in MapLibre's units.
 	projectionFor( data, target ) {
 
-		const { lng, lat, altitude } = this._anchor;
 		const transition = data.projectionTransition ?? 0;
+
+		if ( this.space === 'world' ) {
+
+			// mainMatrix is the globe's past the midpoint of the morph and
+			// the flat map's before it; the fallback is the flat one while
+			// the globe is being drawn
+			target.fromArray( transition > 0 && transition < 0.5 ? data.fallbackMatrix : data.mainMatrix );
+			this.lastProjection.matrix.copy( target );
+			this.lastProjection.transition = transition;
+			return target;
+
+		}
+
+		const { lng, lat } = this._anchor;
+		const altitude = this._anchor.altitude + this.elevation;
 
 		if ( transition <= 0 ) {
 
@@ -176,14 +234,59 @@ export class MapLibreLayer {
 
 	}
 
-	// A three.js object placed at a place: position from localFromLngLat,
-	// heading in degrees clockwise from north as MapAnchor takes it.
+	// A place in world space, as of the current frame: mercator on the flat
+	// map, a point on the unit sphere on the globe, altitude in meters
+	// either way.
+	worldPosition( lng, lat, altitude = 0, target = new Vector3() ) {
+
+		if ( this.onGlobe ) {
+
+			const l = lng * Math.PI / 180, f = lat * Math.PI / 180;
+			const k = 1 + altitude / MAPLIBRE_EARTH_RADIUS;
+			return target.set( Math.sin( l ) * Math.cos( f ) * k, Math.sin( f ) * k, Math.cos( l ) * Math.cos( f ) * k );
+
+		}
+
+		return target.set( mercatorX( lng ), mercatorY( lat ), altitude * mercatorUnitsPerMeter( lat ) );
+
+	}
+
+	// A three.js object standing at a place, heading in degrees clockwise
+	// from north as MapAnchor takes it. It is settled every frame: on the
+	// terrain under it once the map has one, at its altitude above that.
 	place( object, lng, lat, altitude = 0, heading = 0 ) {
 
-		this.localFromLngLat( lng, lat, altitude, _local );
-		object.position.copy( _local );
+		const entry = this._placed.find( p => p.object === object ) ?? ( this._placed.push( { object } ), this._placed[ this._placed.length - 1 ] );
+		Object.assign( entry, { lng, lat, altitude, heading } );
 		object.rotation.set( 0, - heading * Math.PI / 180, 0 );
+		this._settleOne( entry );
 		return object;
+
+	}
+
+	// Forgets a placed object; the object itself stays where it is.
+	unplace( object ) {
+
+		const i = this._placed.findIndex( p => p.object === object );
+		if ( i !== - 1 ) this._placed.splice( i, 1 );
+		return object;
+
+	}
+
+	_settle() {
+
+		for ( const entry of this._placed ) this._settleOne( entry );
+
+	}
+
+	// An object stands at its own ground, not the anchor's: the frame's
+	// origin already sits at the anchor's elevation, so the difference is
+	// what to add.
+	_settleOne( { object, lng, lat, altitude } ) {
+
+		this.localFromLngLat( lng, lat, altitude, _local );
+		if ( this.space === 'local' ) _local.y += this.terrainElevation( lng, lat ) - this.elevation;
+		object.position.copy( _local );
 
 	}
 

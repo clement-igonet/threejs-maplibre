@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>threejs-maplibre bridge: three.js on MapLibre terrain</title>
+		<style>
+			html, body { margin: 0; height: 100%; overflow: hidden; }
+			#map { position: absolute; inset: 0; }
+			#info { position: absolute; top: 8px; left: 8px; padding: 6px 10px; font: 13px/1.4 ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; white-space: pre; pointer-events: none; }
+			#version { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; }
+		</style>
+	</head>
+	<body>
+		<div id="map"></div>
+		<div id="info"></div>
+		<div id="version"></div>
+		<script type="module">
+
+			// MapLibre's "Adding 3D models using three.js on terrain" example,
+			// ported to MapLibreLayer: two antennas standing on a Tyrolean
+			// hillside, each on its own ground, settling as DEM tiles land.
+			// The original re-queries the terrain every frame and builds the
+			// camera from mainMatrix by hand; here the layer does both.
+			//
+			//   ?projection=globe|mercator   ?model=<glTF url> &scale=
+			//   ?exaggeration=1              ?terrain=0 to switch it off
+
+			import { AmbientLight, DirectionalLight, Group, Mesh, MeshStandardMaterial, ConeGeometry, CylinderGeometry, DoubleSide, LatheGeometry, Vector2 } from 'three';
+			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+			import { MapLibreLayer } from '../src/index.js';
+
+			const maplibregl = await import( 'maplibre-gl' );
+			await import( 'maplibre-gl/dist/maplibre-gl.css' );
+			maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url' ) ).default );
+
+			const params = new URLSearchParams( location.search );
+			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
+			const projection = params.get( 'projection' ) === 'mercator' ? 'mercator' : 'globe';
+
+			// the example's places, near Achenkirch in Tyrol
+			const ORIGIN = { lng: 11.5255, lat: 47.6677 };
+			const MODELS = [ { lng: 11.527, lat: 47.6678 }, { lng: 11.5249, lat: 47.6676 } ];
+
+			const map = new maplibregl.Map( {
+				container: 'map',
+				style: 'https://tiles.openfreemap.org/styles/liberty',
+				center: [ num( 'lng', 11.5257 ), num( 'lat', 47.668 ) ],
+				zoom: num( 'zoom', 16.27 ),
+				pitch: num( 'pitch', 60 ),
+				bearing: num( 'bearing', - 28.5 ),
+				maxPitch: 85,
+				projection: { type: projection },
+				attributionControl: { compact: false },
+			} );
+			await new Promise( resolve => map.once( 'load', resolve ) );
+			map.setProjection( { type: projection } );
+
+			// the example's DEM, keyless (Mapterhorn, terrarium), and a hillshade on it
+			map.addSource( 'terrain', { type: 'raster-dem', url: 'https://tiles.mapterhorn.com/tilejson.json', tileSize: 512 } );
+			map.addLayer( { id: 'hills', type: 'hillshade', source: 'terrain', paint: { 'hillshade-shadow-color': '#473B24' } } );
+			if ( params.get( 'terrain' ) !== '0' ) map.setTerrain( { source: 'terrain', exaggeration: num( 'exaggeration', 1 ) } );
+
+			const layer = new MapLibreLayer( { id: 'antennas', ...ORIGIN } );
+			layer.scene.add( new AmbientLight( 0xffffff, 0.7 ) );
+			const sun = new DirectionalLight( 0xffffff, 2.2 );
+			sun.position.set( 60, 120, 40 );
+			layer.scene.add( sun );
+
+			function createAntenna() {
+
+				const white = new MeshStandardMaterial( { color: 0xe6e6e2, roughness: 0.6, metalness: 0.1 } );
+				const grey = new MeshStandardMaterial( { color: 0x8f959a, roughness: 0.5, metalness: 0.4 } );
+				const antenna = new Group();
+				const pedestal = new Mesh( new CylinderGeometry( 4, 5.5, 12, 24 ), grey );
+				pedestal.position.y = 6;
+				const tower = new Mesh( new CylinderGeometry( 1.6, 2.6, 10, 16 ), white );
+				tower.position.y = 17;
+				antenna.add( pedestal, tower );
+				const mount = new Group();
+				mount.position.y = 22;
+				const dish = new Group();
+				dish.rotation.x = - 0.9;
+				mount.add( dish );
+				antenna.add( mount );
+				const profile = [];
+				for ( let i = 0; i <= 24; i ++ ) profile.push( new Vector2( 17 * i / 24, ( 17 * i / 24 ) ** 2 / 48 ) );
+				dish.add( new Mesh( new LatheGeometry( profile, 48 ), new MeshStandardMaterial( { color: 0xf0f0ec, roughness: 0.4, metalness: 0.2, side: DoubleSide } ) ) );
+				const feed = new Mesh( new CylinderGeometry( 0.4, 0.4, 12, 8 ), grey );
+				feed.position.y = 6;
+				const horn = new Mesh( new ConeGeometry( 1.2, 2, 12 ), grey );
+				horn.position.y = 12;
+				horn.rotation.x = Math.PI;
+				dish.add( feed, horn );
+				antenna.mount = mount;
+				return antenna;
+
+			}
+
+			const models = [];
+			for ( const [ i, place ] of MODELS.entries() ) {
+
+				let model;
+				if ( params.has( 'model' ) ) {
+
+					model = ( await new GLTFLoader().loadAsync( params.get( 'model' ) ) ).scene;
+					model.scale.setScalar( num( 'scale', 1 ) );
+
+				} else {
+
+					model = createAntenna();
+
+				}
+
+				layer.scene.add( layer.place( model, place.lng, place.lat, 0, i === 0 ? 250 : 120 ) );
+				models.push( model );
+
+			}
+
+			map.addLayer( layer );
+
+			const info = document.getElementById( 'info' );
+			const t0 = performance.now();
+			map.on( 'render', () => {
+
+				for ( const model of models ) if ( model.mount ) model.mount.rotation.y = 0.4 * Math.sin( ( performance.now() - t0 ) / 3000 );
+				const ground = MODELS.map( p => layer.terrainElevation( p.lng, p.lat ).toFixed( 0 ) );
+				info.textContent = `threejs-maplibre bridge, terrain: ${ projection } | maplibre-gl ${ maplibregl.getVersion() } | zoom ${ map.getZoom().toFixed( 2 ) } | pitch ${ map.getPitch().toFixed( 0 ) }° | anchor on ${ layer.elevation.toFixed( 0 ) } m | antennas on ${ ground.join( ' and ' ) } m`;
+				window.__SHOT_READY = map.loaded() && layer.elevation > 0;
+				map.triggerRepaint();
+
+			} );
+
+			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
+			window.__MAP = map;
+			window.__LAYER = layer;
+
+		</script>
+	</body>
+</html>

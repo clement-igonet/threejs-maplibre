@@ -47,6 +47,11 @@ const SHOTS = [
 	// globe and on its flat map (MapLibre's demo tiles, so these are live)
 	{ name: 'bridge-globe', page: 'bridge', query: '', live: true },
 	{ name: 'bridge-mercator', page: 'bridge', query: '&projection=mercator', live: true },
+	// MapLibre's own examples ported: three.js models on its terrain, and
+	// world-scale content in its own units (both on demo tiles, so live)
+	{ name: 'bridge-terrain', page: 'bridge-terrain', query: '', live: true },
+	{ name: 'bridge-world-line', page: 'bridge-world', query: '&example=line&speed=300', live: true },
+	{ name: 'bridge-world-triangle', page: 'bridge-world', query: '&example=triangle', live: true },
 ];
 
 // live shots on OpenFreeMap's Liberty style (SHOT_LIVE=0 skips them): the
