@@ -32,7 +32,8 @@
 		"controls-check": "node scripts/controls-check.mjs",
 		"decode-check": "node scripts/decode-check.mjs",
 		"budget": "node scripts/budget.mjs",
-		"bridge-check": "node scripts/bridge-check.mjs"
+		"bridge-check": "node scripts/bridge-check.mjs",
+		"underlay-check": "node scripts/underlay-check.mjs"
 	},
 	"keywords": [
 		"three",

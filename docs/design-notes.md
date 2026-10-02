@@ -745,5 +745,51 @@ own surface for the depth buffer and loses.
 ![Bridge, terrain](../evidence/m3/bridge-terrain.png)
 ![Bridge, world space](../evidence/m3/bridge-world-triangle.png)
 
-Not in this PR, for the ones after: the direction B underlay, and the
-write-up against maplibre-gl-three, maplibre-three-plugin and threebox.
+### Direction B: the map under the scene
+
+The mirror of the layer: a maplibre-gl map in its own element beneath a
+transparent three.js canvas, this engine's `MapControls` owning the input,
+and every frame the map's camera derived from the scene's
+(`MapLibreUnderlay.sync( camera )`). MapLibre's whole style shows through
+under the 3D, labels and icons included, which is everything this engine
+does not draw yet.
+
+Flat map only, and exact there by construction. The scene is this
+library's planar frame, Web Mercator meters with x east, y up and -z
+north; MapLibre's flat map is the same projection. The underlay reads the
+camera, not the controls: the ground point under the screen centre is the
+map's centre, the distance to it against the vertical field of view gives
+the zoom (`cameraToCenterDistance` is `0.5 * height / tan( fov / 2 )`
+pixels in `transform`), the view direction gives bearing and pitch, the
+camera's right against the level right gives roll, and `fov` is passed
+through with `setVerticalFieldOfView`. `jumpTo` takes all of it. Measured
+(`npm run underlay-check`), ground points a third of the view out land
+0.000 px from where `map.project()` puts them, straight down, at pitch 85
+and turned, from zoom 1.5 to 18. A free camera works as long as its view
+ray still meets the ground; looking at the sky, `sync()` returns false and
+the map stays where it was.
+
+What a DOM underlay cannot do is share a depth buffer. The scene is always
+over the map, so a building drawn here hides a label drawn there, and
+MapLibre's own extrusions, if the style has them, are under everything.
+That is the layer's job (direction A): three.js content in among
+MapLibre's, one depth buffer. The underlay is for the other case, when the
+scene is the thing and MapLibre is the basemap under it.
+
+On the globe the two engines draw different shapes of the earth: this
+engine's globe is WGS84, MapLibre's is a sphere of 6 371 008.8 m with
+geodetic latitude taken as spherical. The two surfaces are 21 km apart on
+the ground at Paris (11.45 arcminutes of latitude, 5 km of radius), and no
+camera sync bridges that. It is a datum question, not a camera one, and the
+next PR gives this engine a sphere datum option so the globe can be an
+underlay too.
+
+Evidence: the antenna and the pin over MapLibre's Liberty style, flat,
+MapLibre's labels showing through under them; then with this engine's
+extruded Louvre buildings over the same basemap.
+
+![Underlay](../evidence/m3/underlay.png)
+![Underlay, with this engine's buildings](../evidence/m3/underlay-buildings.png)
+
+Not in this PR, for the ones after: the sphere datum, and the write-up
+against maplibre-gl-three, maplibre-three-plugin and threebox.

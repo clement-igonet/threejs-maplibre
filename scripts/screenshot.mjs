@@ -52,6 +52,10 @@ const SHOTS = [
 	{ name: 'bridge-terrain', page: 'bridge-terrain', query: '', live: true },
 	{ name: 'bridge-world-line', page: 'bridge-world', query: '&example=line&speed=300', live: true },
 	{ name: 'bridge-world-triangle', page: 'bridge-world', query: '&example=triangle', live: true },
+	// direction B: MapLibre's map under this engine's scene, on the Liberty
+	// style (live), the antenna and pin over it, then with our buildings too
+	{ name: 'underlay', page: 'underlay', query: '', live: true },
+	{ name: 'underlay-buildings', page: 'underlay', query: '&buildings=1&data=louvre', live: true },
 ];
 
 // live shots on OpenFreeMap's Liberty style (SHOT_LIVE=0 skips them): the
