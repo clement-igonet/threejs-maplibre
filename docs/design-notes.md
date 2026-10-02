@@ -714,6 +714,36 @@ MapLibre's buildings because the depth buffer is one.
 ![Bridge, globe](../evidence/m3/bridge-globe.png)
 ![Bridge, mercator](../evidence/m3/bridge-mercator.png)
 
-Not in this PR, for the ones after: terrain (`map.queryTerrainElevation`
-for the anchor), the direction B underlay, the ported MapLibre examples, and
-the write-up against maplibre-gl-three, maplibre-three-plugin and threebox.
+### Terrain, and two spaces
+
+With terrain on the map, the anchor stands on it. Its elevation is asked of
+the map every frame (`map.queryTerrainElevation`, exaggeration included,
+which is what MapLibre's own three.js-on-terrain example does), so the
+scene settles as DEM tiles land, and an object placed through
+`layer.place()` is settled every frame on its own ground rather than the
+anchor's: a pole 2 m above a hillside 240 m higher than the anchor stands
+242 m up. The port of that example, `demo/bridge-terrain.html`, puts two
+antennas on a Tyrolean hillside over Mapterhorn's keyless terrarium DEM;
+the HUD reads the ground under each.
+
+The layer has two spaces. `local`, the default, is meters around the
+anchor, for anything building-sized, where float32 has to hold a
+centimetre. `world` is MapLibre's own units, mercator 0..1 on the flat map
+and the unit sphere on the globe, for content the size of a continent,
+where a meters frame would drift (it is mercator linearised at one point)
+and a kilometre of float32 precision is plenty. `worldPosition( lng, lat,
+altitude )` gives a place in the space of the current frame and `onGlobe`
+says which; content that must survive the morph rebuilds itself when that
+flips, which is what MapLibre's own shaders do per vertex. Two of
+MapLibre's examples are ported that way in `demo/bridge-world.html`: the
+sine wave of "Animate a line", a point per frame across the world, and the
+red triangle of "Add a custom style layer" over Helsinki, Berlin and Kyiv,
+its raw WebGL replaced by a `Mesh`. Both are drawn without a depth test,
+as MapLibre draws its 2D layers: at altitude 0 a line fights the globe's
+own surface for the depth buffer and loses.
+
+![Bridge, terrain](../evidence/m3/bridge-terrain.png)
+![Bridge, world space](../evidence/m3/bridge-world-triangle.png)
+
+Not in this PR, for the ones after: the direction B underlay, and the
+write-up against maplibre-gl-three, maplibre-three-plugin and threebox.

@@ -101,6 +101,64 @@ describe( 'MapLibreLayer', () => {
 
 	} );
 
+	it( 'stands the anchor on the terrain the map reports, and settles placed objects on theirs', () => {
+
+		const layer = new MapLibreLayer( { lng: LNG, lat: LAT, altitude: 10 } );
+		// a map with terrain: 100 m under the anchor, 340 m a little east
+		layer.map = { queryTerrainElevation: ( [ lng ] ) => lng > LNG + 0.0005 ? 340 : 100, triggerRepaint() {} };
+		const pole = layer.place( new Object3D(), LNG + 0.001, LAT, 2 );
+
+		// what render does each frame: ask, then settle
+		layer.elevation = layer.terrainElevation( LNG, LAT );
+		layer._settle();
+		expect( layer.elevation ).toBe( 100 );
+		// the pole stands 2 m above its own ground, 342 m up; the frame's origin
+		// is at the anchor's 10 m plus the 100 m under it, so 232 m above that
+		expect( pole.position.y ).toBeCloseTo( 342 - ( 10 + 100 ), 9 );
+
+		// the frame lifts by the anchor's elevation
+		const m = layer.projectionFor( projectionData( { main: IDENTITY } ), new Matrix4() );
+		const lifted = new Vector3().applyMatrix4( m );
+		const flat = new Vector3().applyMatrix4( mercatorFrame( LNG, LAT, 10 + 100 ) );
+		expect( lifted.z ).toBeCloseTo( flat.z, 15 );
+
+		// terrain off, or no terrain on the map: ground is zero
+		layer.terrain = false;
+		expect( layer.terrainElevation( LNG, LAT ) ).toBe( 0 );
+		layer.terrain = true;
+		layer.map = { queryTerrainElevation: () => null, triggerRepaint() {} };
+		expect( layer.terrainElevation( LNG, LAT ) ).toBe( 0 );
+
+		layer.unplace( pole );
+		expect( layer._placed.length ).toBe( 0 );
+
+	} );
+
+	it( 'in world space speaks MapLibre\'s own units, flat or globe as the frame says', () => {
+
+		const layer = new MapLibreLayer( { space: 'world' } );
+		// flat: the matrix is MapLibre's as is, places are mercator
+		expect( layer.projectionFor( projectionData( { main: IDENTITY, transition: 0 } ), new Matrix4() ).equals( IDENTITY ) ).toBe( true );
+		expect( layer.onGlobe ).toBe( false );
+		const flat = layer.worldPosition( LNG, LAT, 1000 );
+		expect( flat.x ).toBeCloseTo( ( 180 + LNG ) / 360, 15 );
+		expect( flat.z ).toBeGreaterThan( 0 );
+
+		// globe: the sphere
+		layer.projectionFor( projectionData( { main: IDENTITY, transition: 1 } ), new Matrix4() );
+		expect( layer.onGlobe ).toBe( true );
+		const globe = layer.worldPosition( LNG, LAT );
+		expect( globe.length() ).toBeCloseTo( 1, 15 );
+		expect( globe.y ).toBeCloseTo( Math.sin( LAT * Math.PI / 180 ), 15 );
+		expect( layer.worldPosition( LNG, LAT, MAPLIBRE_EARTH_RADIUS ).length() ).toBeCloseTo( 2, 12 );
+
+		// in the morph, the flat map's matrix until the globe takes over
+		const g = new Matrix4().makeScale( 2, 2, 2 );
+		expect( layer.projectionFor( projectionData( { main: g, fallback: IDENTITY, transition: 0.25 } ), new Matrix4() ).equals( IDENTITY ) ).toBe( true );
+		expect( layer.projectionFor( projectionData( { main: g, fallback: IDENTITY, transition: 0.75 } ), new Matrix4() ).equals( g ) ).toBe( true );
+
+	} );
+
 	it( 'places an object at a place with a heading clockwise from north', () => {
 
 		const layer = new MapLibreLayer( { lng: LNG, lat: LAT } );

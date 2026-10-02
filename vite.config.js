@@ -33,6 +33,8 @@ export default defineConfig( {
 				vector: 'demo/vector.html',
 				objects: 'demo/objects.html',
 				bridge: 'demo/bridge.html',
+				bridgeTerrain: 'demo/bridge-terrain.html',
+				bridgeWorld: 'demo/bridge-world.html',
 				standalone: 'demo/standalone.html',
 				bench: 'bench/index.html',
 				decode: 'bench/decode.html',

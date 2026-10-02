@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>threejs-maplibre bridge: world-scale content</title>
+		<style>
+			html, body { margin: 0; height: 100%; overflow: hidden; }
+			#map { position: absolute; inset: 0; }
+			#info { position: absolute; top: 8px; left: 8px; padding: 6px 10px; font: 13px/1.4 ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; white-space: pre; pointer-events: none; }
+			#version { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; }
+		</style>
+	</head>
+	<body>
+		<div id="map"></div>
+		<div id="info"></div>
+		<div id="version"></div>
+		<script type="module">
+
+			// Two of MapLibre's examples, ported to MapLibreLayer in world space,
+			// where the scene's units are MapLibre's own and a thing can span a
+			// continent:
+			//
+			//   ?example=line      "Animate a line": a sine wave drawn across the
+			//                      world a point per frame, as a three.js Line
+			//   ?example=triangle  "Add a custom style layer": a translucent red
+			//                      triangle over Helsinki, Berlin and Kyiv, the
+			//                      example's raw WebGL replaced by a Mesh
+			//
+			// Both rebuild their geometry when the map morphs between the globe
+			// and the flat map (layer.onGlobe), since the two are different
+			// spaces. ?projection=globe|mercator, ?speed= for the line's sweep
+
+			import { BufferGeometry, DoubleSide, Float32BufferAttribute, Mesh, MeshBasicMaterial, Vector3 } from 'three';
+			import { Line2 } from 'three/addons/lines/Line2.js';
+			import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+			import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+			import { MapLibreLayer } from '../src/index.js';
+
+			const maplibregl = await import( 'maplibre-gl' );
+			await import( 'maplibre-gl/dist/maplibre-gl.css' );
+			maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url' ) ).default );
+
+			const params = new URLSearchParams( location.search );
+			const example = params.get( 'example' ) === 'triangle' ? 'triangle' : 'line';
+			const projection = params.get( 'projection' ) === 'mercator' ? 'mercator' : 'globe';
+
+			const map = new maplibregl.Map( {
+				container: 'map',
+				style: 'https://demotiles.maplibre.org/style.json',
+				center: example === 'triangle' ? [ 7.5, 58 ] : [ 0, 0 ],
+				zoom: example === 'triangle' ? 3 : 0.5,
+				projection: { type: projection },
+				attributionControl: { compact: false },
+			} );
+			await new Promise( resolve => map.once( 'load', resolve ) );
+			map.setProjection( { type: projection } );
+
+			const layer = new MapLibreLayer( { id: example, space: 'world' } );
+			const _p = new Vector3();
+
+			// positions of places in the space of the current frame
+			const positions = places => {
+
+				const out = new Float32Array( places.length * 3 );
+				places.forEach( ( [ lng, lat ], i ) => layer.worldPosition( lng, lat, 0, _p ).toArray( out, 3 * i ) );
+				return new Float32BufferAttribute( out, 3 );
+
+			};
+
+			let onGlobe = null;
+			const info = document.getElementById( 'info' );
+
+			if ( example === 'line' ) {
+
+				// the example's sine: x in degrees of longitude per 30 ms, y a 40
+				// degree swing; ?speed= stretches the sweep (300 for a screenshot
+				// on a slow renderer, where 30 ms a point outruns the frames)
+				const speedFactor = params.has( 'speed' ) ? parseFloat( params.get( 'speed' ) ) : 30;
+				const coordinates = [ [ 0, 0 ] ];
+				// the example's 5 px line: Line2 widens in screen space the way
+				// MapLibre's line-width does. Drawn over the map whatever the
+				// depth, as MapLibre draws its own 2D line layer; at altitude 0
+				// it would otherwise fight the globe's surface for the depth buffer
+				const material = new LineMaterial( { color: 0xed6498, linewidth: 5, transparent: true, opacity: 0.8, depthTest: false, depthWrite: false } );
+				const line = new Line2( new LineGeometry(), material );
+				line.frustumCulled = false;
+				layer.scene.add( line );
+				const canvas = map.getCanvas();
+				let startTime = performance.now();
+
+				map.on( 'render', () => {
+
+					const progress = performance.now() - startTime;
+					if ( progress > speedFactor * 360 ) {
+
+						startTime = performance.now();
+						coordinates.length = 0;
+
+					} else {
+
+						const x = progress / speedFactor;
+						coordinates.push( [ x, Math.sin( x * Math.PI / 90 ) * 40 ] );
+
+					}
+
+					// a point per frame, and all of them again when the space changes
+					if ( coordinates.length > 1 ) line.geometry.setPositions( positions( coordinates ).array );
+					line.visible = coordinates.length > 1;
+					material.resolution.set( canvas.width, canvas.height );
+					onGlobe = layer.onGlobe;
+					info.textContent = `threejs-maplibre bridge, animate a line: ${ projection } | ${ coordinates.length } points | ${ onGlobe ? 'on the globe' : 'on the flat map' }`;
+					window.__SHOT_READY = map.loaded() && coordinates.length > 30;
+					map.triggerRepaint();
+
+				} );
+
+			} else {
+
+				const cities = [ [ 25.004, 60.239 ], [ 13.403, 52.562 ], [ 30.498, 50.541 ] ]; // Helsinki, Berlin, Kyiv
+				const triangle = new Mesh( new BufferGeometry(), new MeshBasicMaterial( { color: 0xff0000, transparent: true, opacity: 0.5, side: DoubleSide, depthTest: false } ) );
+				triangle.frustumCulled = false;
+				layer.scene.add( triangle );
+
+				map.on( 'render', () => {
+
+					if ( onGlobe !== layer.onGlobe ) {
+
+						onGlobe = layer.onGlobe;
+						triangle.geometry.setAttribute( 'position', positions( cities ) );
+
+					}
+
+					info.textContent = `threejs-maplibre bridge, custom style layer: ${ projection } | zoom ${ map.getZoom().toFixed( 2 ) } | ${ onGlobe ? 'on the globe' : 'on the flat map' }`;
+					window.__SHOT_READY = map.loaded() && onGlobe !== null;
+					map.triggerRepaint();
+
+				} );
+
+			}
+
+			// below the country fills, as the example puts its triangle below 'crimea-fill'
+			map.addLayer( layer, example === 'triangle' && map.getLayer( 'crimea-fill' ) ? 'crimea-fill' : undefined );
+
+			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
+			window.__MAP = map;
+			window.__LAYER = layer;
+
+		</script>
+	</body>
+</html>
