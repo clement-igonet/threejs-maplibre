@@ -591,3 +591,74 @@ the library build (a Vite alias on `createWorker.js`). Earcut is bundled from
 `three/src/extras/Earcut.js` even in the module build, since import maps
 only know the bare `three` specifier. The package's `exports` point at the
 module build and keep `./src/*` open for a bundler that prefers sources.
+
+
+## M3 MapLibre bridge
+
+### A three.js scene inside a maplibre-gl map
+
+`MapLibreLayer` is a maplibre-gl custom layer (`renderingMode: '3d'`, so
+it shares the map's depth buffer) that draws a three.js scene with the
+map's own camera. The scene lives in meters around an anchor, in the frame
+`MapAnchor` gives its children (x east, y up, -z north), so an object built
+the usual way stands level and faces north, and `layer.place( object, lng,
+lat, altitude, heading )` puts it somewhere else on the map.
+
+The whole bridge is one matrix product, done on the CPU in float64. Every
+frame MapLibre hands the layer its projection as 64-bit matrices
+(`CustomLayerProjectionData`, new in maplibre-gl 6, added for exactly this
+reason: so a layer can transform before rounding to float32). The layer
+multiplies the one that applies by the matrix from the anchor's frame into
+MapLibre's space and gives three.js the product as the camera's projection.
+The anchor's world coordinates never reach the GPU, only offsets of a few
+hundred meters do, which is what keeps a building-scale scene still at
+street level.
+
+MapLibre has three spaces, not one, and `MapLibreFrames.js` builds the
+matrix into each:
+
+- mercator, 0..1 across the world, y southwards, z up in the same units
+  (a meter is the same length in every direction, what MapLibre calls
+  conformal); `mercatorFrame( lng, lat, altitude )`;
+- the globe, a unit sphere with a point at `(sin lng cos lat, sin lat, cos
+  lng cos lat)` (`globe_utils.ts`) and altitude along the radius;
+  `globeFrame( lng, lat, altitude )`;
+- the morph between them from zoom 11 to 12, where MapLibre's shader mixes
+  the two clip-space results per vertex (`projectionTransition` going from 1
+  to 0). A three.js camera holds one matrix, so the layer mixes the two
+  matrices, which is the same thing at the anchor and drifts with the square
+  of the distance from it, like the meters frame itself.
+
+Both spaces are MapLibre's sphere, 6 371 008.8 m in radius, not the WGS84
+ellipsoid this engine's own globe uses. On MapLibre's map, MapLibre's earth
+is the one to stand on, and `MAPLIBRE_EARTH_RADIUS` is where that number
+lives.
+
+The frames are unit-tested against maplibre-gl's own `MercatorCoordinate`
+and its sphere formula, and the whole path is measured against the map
+(`npm run bridge-check`): for zooms 2 to 19, pitched and turned, points a
+third of the view away from the anchor land within 0.08 px of where
+`map.project()` puts the same ground, in both projections and through the
+morph. A three.js box and a MapLibre `fill-extrusion` of the same size,
+drawn one at a time and compared by the pixels they cover, overlap at 0.999
+at every zoom where the map is flat.
+
+On the pure globe that same box test first came out at 0.81, with MapLibre's
+own square drawn up to 300 m north of `map.project()` at mid-latitudes,
+which looked like a bug in maplibre-gl's globe path. It was not: the same
+page on a real GPU (Apple, Safari) gives 0 at every latitude and zoom. The
+offset is SwiftShader's, the software renderer the VM's headless Chrome uses,
+so a sub-pixel discrepancy seen only there is not evidence of anything until
+a real GPU has drawn it.
+
+Evidence: the antenna and the pin from the objects demo, drawn inside a
+MapLibre map on OpenFreeMap's Liberty style, on its globe and on its flat
+map, standing where this engine's own map puts them, and occluded by
+MapLibre's buildings because the depth buffer is one.
+
+![Bridge, globe](../evidence/m3/bridge-globe.png)
+![Bridge, mercator](../evidence/m3/bridge-mercator.png)
+
+Not in this PR, for the ones after: terrain (`map.queryTerrainElevation`
+for the anchor), the direction B underlay, the ported MapLibre examples, and
+the write-up against maplibre-gl-three, maplibre-three-plugin and threebox.

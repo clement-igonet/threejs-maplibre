@@ -31,7 +31,8 @@
 		"bench": "node scripts/bench.mjs",
 		"controls-check": "node scripts/controls-check.mjs",
 		"decode-check": "node scripts/decode-check.mjs",
-		"budget": "node scripts/budget.mjs"
+		"budget": "node scripts/budget.mjs",
+		"bridge-check": "node scripts/bridge-check.mjs"
 	},
 	"keywords": [
 		"three",

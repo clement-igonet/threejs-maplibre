@@ -112,6 +112,7 @@ Nothing but a container runtime is needed, `docker compose` or `podman compose`:
 | `compose run --rm bench` | raster engine benchmark against 3d-tiles-renderer |
 | `compose run --rm bench-vector` | vector engine benchmark against maplibre-gl-js |
 | `compose run --rm budget` | the performance budget CI enforces (`bench/budget.json`) |
+| `compose run --rm bridge-check` | how far a three.js scene inside a maplibre-gl map lands from `map.project()`, in pixels |
 
 ## Milestones
 
