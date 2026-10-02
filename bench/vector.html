@@ -150,8 +150,9 @@
 				const maplibregl = await import( 'maplibre-gl' );
 				await import( 'maplibre-gl/dist/maplibre-gl.css' );
 				// and it resolves its worker next to its own module, which is
-				// not where a bundler puts it: hand it the URL
-				maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?url' ) ).default );
+				// not where a bundler puts it: hand it the URL of the worker as
+				// vite bundles it, self-contained, in dev and in the build alike
+				maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url' ) ).default );
 				// both engines fetch through one counted path: the extract's tile
 				// cutter, or the live template the native source resolved from the
 				// style's TileJSON (MapLibre fetches in its Workers otherwise, out of

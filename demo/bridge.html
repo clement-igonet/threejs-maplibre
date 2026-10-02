@@ -10,7 +10,6 @@
 			#info { position: absolute; top: 8px; left: 8px; padding: 6px 10px; font: 13px/1.4 ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; white-space: pre; pointer-events: none; }
 			#version { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; }
 		</style>
-		<link rel="stylesheet" href="../node_modules/maplibre-gl/dist/maplibre-gl.css">
 	</head>
 	<body>
 		<div id="map"></div>
@@ -35,7 +34,8 @@
 			import { MapLibreLayer } from '../src/index.js';
 
 			const maplibregl = await import( 'maplibre-gl' );
-			maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?url' ) ).default );
+			await import( 'maplibre-gl/dist/maplibre-gl.css' ); // bundled with the page, no node_modules on the site
+			maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url' ) ).default );
 
 			const params = new URLSearchParams( location.search );
 			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
