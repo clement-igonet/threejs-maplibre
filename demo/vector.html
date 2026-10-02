@@ -23,6 +23,7 @@
 			// ?data=louvre|stub|openfreemap and ?style=<url> pick the data (vector-data.js)
 			// ?mode=globe|planar, ?lat=&lon=&alt=&heading=&pitch=&fov=&maxPitch=
 			// ?viewDistance=<meters> stops the map there and hazes the edge
+			// ?memoryMB= ?cacheMB= ?retainMs= ?maxLoading= bound what the map holds (TileTree)
 			const params = new URLSearchParams( location.search );
 			const data = params.get( 'data' ) ?? 'louvre';
 			const mode = params.get( 'mode' ) === 'planar' ? 'planar' : 'globe';
@@ -56,7 +57,13 @@
 			controls.setView( { lat: num( 'lat', view.lat ), lon: num( 'lon', view.lon ), distance: num( 'alt', 900 ), heading: num( 'heading', 20 ), pitch: num( 'pitch', 50 ) } );
 
 			const viewDistance = num( 'viewDistance', Infinity );
-			const map = new VectorTileMap( source, style, { mode, sourceId, viewDistance } );
+			const map = new VectorTileMap( source, style, {
+				mode, sourceId, viewDistance,
+				memoryBudget: num( 'memoryMB', 192 ) * 1048576,
+				cacheBytes: num( 'cacheMB', 96 ) * 1048576,
+				retainMs: num( 'retainMs', 1000 ),
+				maxLoading: num( 'maxLoading', 16 ),
+			} );
 			scene.add( map );
 
 			// a view that stops before the horizon ends in air, not in a hole:
@@ -111,7 +118,7 @@
 				window.__MAP = map;
 				const s = map.stats;
 				const build = s.built ? ( s.buildMs / s.built ).toFixed( 1 ) : '-';
-				info.textContent = `threejs-maplibre M2 - ${ data } ${ mode } | zoom ${ map.zoom.toFixed( 2 ) } | heading ${ Math.round( controls.heading ) }° | pitch ${ Math.round( controls.pitch ) }° | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | built ${ s.built } (${ build } ms avg) | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles }`;
+				info.textContent = `threejs-maplibre M2 - ${ data } ${ mode } | zoom ${ map.zoom.toFixed( 2 ) } | heading ${ Math.round( controls.heading ) }° | pitch ${ Math.round( controls.pitch ) }° | selected ${ s.selected } | rendered ${ s.rendered } | loading ${ s.loading } | built ${ s.built } (${ build } ms avg) | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles } | resident ${ ( s.residentBytes / 1048576 ).toFixed( 0 ) } MB`;
 
 				stableFrames = ( s.loading === 0 && s.rendered > 0 && s.rendered >= s.selected ) ? stableFrames + 1 : 0;
 				window.__SHOT_READY = stableFrames > 30;

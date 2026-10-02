@@ -148,14 +148,15 @@ describe( 'RasterTileMap selection', () => {
 		const eye = latLonToEcef( 48.8566, 2.3522, 500, new Vector3() );
 		const loading = map => [ ...map._records.values() ].filter( r => r.state === 'loading' ).map( r => r.key );
 
-		const map = new RasterTileMap( createStubSource(), { mode: 'globe' } );
+		// uncapped and unbudgeted: this counts what the walk asks for, not what the limits admit
+		const map = new RasterTileMap( createStubSource(), { mode: 'globe', maxLoading: Infinity, memoryBudget: Infinity } );
 		map.update( createCamera( eye, surface ), rendererStub );
 		const withBackfill = loading( map );
 		expect( withBackfill ).not.toContain( '0/0/0' );
 		expect( withBackfill.some( key => key.startsWith( `${ maxSelectedZoom( map ) - 3 }/` ) ) ).toBe( true );
 		map.dispose();
 
-		const leavesOnly = new RasterTileMap( createStubSource(), { mode: 'globe', backfillLevels: 0 } );
+		const leavesOnly = new RasterTileMap( createStubSource(), { mode: 'globe', backfillLevels: 0, maxLoading: Infinity, memoryBudget: Infinity } );
 		leavesOnly.update( createCamera( eye, surface ), rendererStub );
 		expect( loading( leavesOnly ).length ).toBeLessThan( withBackfill.length );
 		expect( loading( leavesOnly ).length ).toBe( leavesOnly.stats.selected );
@@ -254,6 +255,19 @@ describe( 'RasterTileMap selection', () => {
 
 		map.dispose();
 		fastMap.dispose();
+
+	} );
+
+} );
+
+describe( 'RasterTileMap content weight', () => {
+
+	it( 'weighs a tile as its RGBA pixels', () => {
+
+		const map = new RasterTileMap( createStubSource(), { mode: 'globe' } );
+		expect( map._contentBytes( { image: { width: 256, height: 256 } } ) ).toBe( 256 * 256 * 4 );
+		expect( map._contentBytes( { image: null } ) ).toBe( 0 );
+		map.dispose();
 
 	} );
 
