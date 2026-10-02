@@ -32,6 +32,7 @@ export default defineConfig( {
 				planar: 'demo/planar.html',
 				vector: 'demo/vector.html',
 				objects: 'demo/objects.html',
+				bridge: 'demo/bridge.html',
 				standalone: 'demo/standalone.html',
 				bench: 'bench/index.html',
 				decode: 'bench/decode.html',

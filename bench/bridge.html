@@ -30,7 +30,7 @@
 			const projection = params.get( 'projection' ) === 'mercator' ? 'mercator' : 'globe';
 			const maplibregl = await import( 'maplibre-gl' );
 			await import( 'maplibre-gl/dist/maplibre-gl.css' );
-			maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?url' ) ).default );
+			maplibregl.setWorkerUrl( ( await import( 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url' ) ).default );
 
 			// the Louvre pyramid, the reference scene
 			const LNG = 2.3359, LAT = 48.8610;
