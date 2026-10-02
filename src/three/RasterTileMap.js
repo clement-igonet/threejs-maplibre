@@ -36,6 +36,14 @@ export class RasterTileMap extends TileTree {
 
 	}
 
+	// RGBA in memory, and again on the GPU once uploaded
+	_contentBytes( texture ) {
+
+		const image = texture.image;
+		return image && image.width ? image.width * image.height * 4 : 0;
+
+	}
+
 	_isUploaded( texture ) {
 
 		return texture.userData.uploaded === true;

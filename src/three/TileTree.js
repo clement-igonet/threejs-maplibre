@@ -43,8 +43,19 @@ export class TileTree extends Group {
 		mode = 'globe', // 'globe' | 'planar'
 		maxScreenTexel = 1.4, // split while a texel covers more than this many pixels
 		fadeDuration = 200, // ms; 0 draws a tile as soon as it is ready
-		cacheSize = 512,
-		retainFrames = 60, // frames an unused tile keeps its object
+		// What a tile that left the view keeps, and for how long. Retention is
+		// in milliseconds, not frames: a frame is slow exactly when the view
+		// is heavy, which is when memory matters, and a tilt towards the
+		// horizon at 5 fps would otherwise keep every tile it ever built.
+		retainMs = 1000, // an unused tile keeps its object and content this long
+		cacheSize = 512, // parked content, entries
+		cacheBytes = 96 * 1048576, // parked content, bytes (see _contentBytes)
+		// Resident tile content, in view and parked, past which the walk
+		// starts no new load and draws the coarser ancestor instead. The
+		// bound on memory a view can take: a phone tilted at the horizon
+		// asks for a hundred city tiles of ten megabytes each.
+		memoryBudget = 192 * 1048576,
+		maxLoading = 16, // loads in flight at once; the rest wait their turn
 		uploadBudgetMs = 2, // uploads per frame stop once this is spent (at least one)
 		backfillLevels = 4, // ancestors this many levels above a leaf are loaded to draw under it
 		contentHeight = 1000, // meters above the surface that content may reach, for culling
@@ -66,7 +77,12 @@ export class TileTree extends Group {
 		this.mode = mode;
 		this.maxScreenTexel = maxScreenTexel;
 		this.fadeDuration = fadeDuration;
-		this.retainFrames = retainFrames;
+		this.retainMs = retainMs;
+		this.memoryBudget = memoryBudget;
+		this.maxLoading = maxLoading;
+		// what a tile has weighed so far, to count the ones still in flight
+		// against the budget before they land; a guess until the first one
+		this._averageBytes = 4 * 1048576;
 		this.uploadBudgetMs = uploadBudgetMs;
 		this.backfillLevels = backfillLevels;
 		this.contentHeight = contentHeight;
@@ -74,6 +90,8 @@ export class TileTree extends Group {
 
 		this._cache = new LRUTileCache( {
 			capacity: cacheSize,
+			capacityBytes: cacheBytes,
+			sizeOf: content => this._contentBytes( content ),
 			onEvict: ( key, content ) => this._disposeContent( content ),
 		} );
 		this._records = new Map();
@@ -82,7 +100,7 @@ export class TileTree extends Group {
 		this._uploadQueue = [];
 
 		// stats for tests, demos and CI budgets
-		this.stats = { selected: 0, rendered: 0, loading: 0, culled: 0, created: 0, uploaded: 0, uploadMs: 0 };
+		this.stats = { selected: 0, rendered: 0, loading: 0, culled: 0, created: 0, uploaded: 0, uploadMs: 0, residentBytes: 0, refused: 0 };
 
 	}
 
@@ -112,6 +130,9 @@ export class TileTree extends Group {
 	_upload( content, renderer ) {} // eslint-disable-line no-unused-vars
 
 	_disposeContent( content ) {} // eslint-disable-line no-unused-vars
+
+	// What a tile's content weighs, in bytes, for the cache and the budget.
+	_contentBytes( content ) { return 0; } // eslint-disable-line no-unused-vars
 
 	// Creates record.object (added to this group, initially invisible).
 	_createObject( record ) { // eslint-disable-line no-unused-vars
@@ -163,7 +184,8 @@ export class TileTree extends Group {
 				opacity: 0,
 				bounds: null, // OrientedBox around the surface and its content
 				cone: null, // globe: { direction, halfAngle } enclosing the tile's surface
-				lastUsed: 0,
+				lastUsed: 0, // frame
+				lastUsedAt: 0, // ms, for retention
 				queued: false,
 			};
 			this._records.set( key, record );
@@ -226,11 +248,37 @@ export class TileTree extends Group {
 
 		if ( record.state !== 'empty' ) return;
 
-		const cached = this._cache.get( record.key );
+		// parked content comes back out of the cache, so it is counted and
+		// disposed once, not evicted from under a tile that draws it
+		const cached = this._cache.take( record.key );
 		if ( cached ) {
 
 			record.content = cached;
 			record.state = 'ready';
+			return;
+
+		}
+
+		// its turn comes when a load in flight lands
+		if ( this._pendingLoads >= this.maxLoading ) return;
+
+		// Over budget, the loads in flight counted at what a tile has weighed
+		// so far. Parked content is the least valuable thing held, so it goes
+		// first; only when the view alone fills the budget does the tile stay
+		// empty and its ancestor draw. Without the in-flight term one tilt
+		// asks for eighty tiles in a frame and the budget sees none of them.
+		const projected = () => this.stats.residentBytes + this._pendingLoads * this._averageBytes;
+		while ( projected() >= this.memoryBudget && this._cache.size > 0 ) {
+
+			const before = this._cache.bytes;
+			this._cache.evict();
+			this.stats.residentBytes -= before - this._cache.bytes;
+
+		}
+
+		if ( projected() >= this.memoryBudget ) {
+
+			this.stats.refused ++;
 			return;
 
 		}
@@ -240,6 +288,10 @@ export class TileTree extends Group {
 
 			record.content = content;
 			record.state = 'ready';
+			const bytes = this._contentBytes( content );
+			if ( bytes > 0 ) this._averageBytes += ( bytes - this._averageBytes ) * 0.2;
+			// counted now, not at the next sweep: a request this frame sees it
+			this.stats.residentBytes += bytes;
 
 		} ).catch( error => {
 
@@ -296,8 +348,10 @@ export class TileTree extends Group {
 		stats.rendered = 0;
 		stats.culled = 0;
 		stats.created = 0;
+		stats.refused = 0;
 
 		this._frame ++;
+		this._now = performance.now();
 		this.updateWorldMatrix( true, false );
 
 		// camera and view volume in layer-local space, the volume cut at the
@@ -351,20 +405,24 @@ export class TileTree extends Group {
 		// 3. upload content that the walk asked for, within the time budget
 		this._uploadPending( renderer );
 
-		// 4. sweep: abort stale loads, drop stale objects
+		// 4. sweep: abort stale loads, let go of what has been unused for
+		// retainMs, and weigh what is left for next frame's budget
+		let resident = 0;
 		for ( const record of this._records.values() ) {
 
-			const stale = this._frame - record.lastUsed;
-			if ( record.state === 'loading' && stale > 0 ) this._abortLoad( record );
-			if ( stale > this.retainFrames ) {
+			if ( record.state === 'loading' && record.lastUsed !== this._frame ) this._abortLoad( record );
+			if ( this._now - record.lastUsedAt > this.retainMs ) {
 
 				if ( record.object ) this._releaseObject( record );
 				else this._parkContent( record ); // loaded but never drawn
 
 			}
 
+			if ( record.content ) resident += this._contentBytes( record.content );
+
 		}
 
+		stats.residentBytes = resident + this._cache.bytes; // in view plus parked
 		stats.loading = this._pendingLoads;
 
 	}
@@ -470,6 +528,7 @@ export class TileTree extends Group {
 
 		const record = node.record;
 		record.lastUsed = this._frame;
+		record.lastUsedAt = this._now;
 
 		if ( node.children ) {
 

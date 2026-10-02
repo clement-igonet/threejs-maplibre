@@ -251,6 +251,114 @@ describe( 'VectorTileMap', () => {
 
 	} );
 
+	it( 'weighs what each tile holds, and what is resident in all', async () => {
+
+		const map = createMap();
+		await settle( map, cityCamera( 500 ) );
+		let total = 0;
+		for ( const record of map._records.values() ) {
+
+			if ( ! record.content ) continue;
+			expect( record.content.bytes ).toBeGreaterThan( 0 );
+			expect( map._contentBytes( record.content ) ).toBe( record.content.bytes );
+			total += record.content.bytes;
+
+		}
+
+		expect( total ).toBeGreaterThan( 0 );
+		expect( map.stats.residentBytes ).toBe( total + map._cache.bytes );
+		map.dispose();
+
+	} );
+
+	it( 'lets go of tiles unused for retainMs, counted in time rather than frames', async () => {
+
+		// retention 0: a tile not drawn this frame is parked this frame
+		const quick = createMap( { retainMs: 0 } );
+		await settle( quick, cityCamera( 500 ) );
+		const held = [ ...quick._records.values() ].filter( r => r.content ).length;
+		expect( held ).toBeGreaterThan( 0 );
+		await new Promise( resolve => setTimeout( resolve, 5 ) );
+		// look somewhere else: nothing of the city is drawn any more
+		quick.update( createCamera( latLonToEcef( 48.8566, 3.7, 500, new Vector3() ), latLonToEcef( 48.8566, 3.7, 0, new Vector3() ) ), rendererStub );
+		expect( quick._cache.size ).toBe( held );
+		expect( quick._cache.bytes ).toBeGreaterThan( 0 );
+		expect( [ ...quick._records.values() ].filter( r => r.content ).length ).toBe( 0 );
+		quick.dispose();
+
+		// a long retention keeps them, however many frames go by
+		const patient = createMap( { retainMs: 600000 } );
+		await settle( patient, cityCamera( 500 ) );
+		for ( let i = 0; i < 100; i ++ ) patient.update( createCamera( latLonToEcef( 48.8566, 3.7, 500, new Vector3() ), latLonToEcef( 48.8566, 3.7, 0, new Vector3() ) ), rendererStub );
+		expect( patient._cache.size ).toBe( 0 );
+		expect( [ ...patient._records.values() ].filter( r => r.content ).length ).toBeGreaterThan( 0 );
+		patient.dispose();
+
+	} );
+
+	it( 'starts no new load past the memory budget, loads in flight included, and says so', async () => {
+
+		// one byte of budget: the first load of the first frame goes out
+		// (nothing resident, nothing in flight), the second is already over
+		// budget by the in-flight estimate, so one tile lands, no more
+		const map = createMap( { memoryBudget: 1 } );
+		map.update( cityCamera( 500 ), rendererStub );
+		expect( map.stats.loading ).toBe( 1 );
+		expect( map.stats.refused ).toBeGreaterThan( 0 );
+		await settle( map, cityCamera( 500 ) );
+		const loaded = map.stats.built;
+		expect( loaded ).toBe( 1 );
+		expect( map.stats.residentBytes ).toBeGreaterThan( 1 );
+
+		// a view that wants other tiles gets none of them
+		for ( let i = 0; i < 5; i ++ ) map.update( cityCamera( 4000 ), rendererStub );
+		await new Promise( resolve => setTimeout( resolve, 50 ) );
+		expect( map.stats.refused ).toBeGreaterThan( 0 );
+		expect( map.stats.loading ).toBe( 0 );
+		expect( map.stats.built ).toBe( loaded );
+		map.dispose();
+
+	} );
+
+	it( 'gives parked content back before refusing a tile in view', async () => {
+
+		// a budget that fits the city once: park it, come back, it is taken
+		// from the cache; look elsewhere, the parked tiles make room
+		const map = createMap( { retainMs: 0, memoryBudget: 64 * 1048576 } );
+		await settle( map, cityCamera( 500 ) );
+		const city = map.stats.residentBytes;
+		expect( city ).toBeGreaterThan( 0 );
+		await new Promise( resolve => setTimeout( resolve, 5 ) );
+		const away = createCamera( latLonToEcef( 48.8566, 3.7, 500, new Vector3() ), latLonToEcef( 48.8566, 3.7, 0, new Vector3() ) );
+		map.update( away, rendererStub );
+		const parked = map._cache.size;
+		expect( parked ).toBeGreaterThan( 0 );
+		// now the budget is spent by what is parked, and a third place asks
+		// for tiles: they evict the parked ones first, and a refusal only
+		// ever happens once the cache is empty
+		map.memoryBudget = map._cache.bytes + 1;
+		const elsewhere = createCamera( latLonToEcef( 48.8566, 5.0, 500, new Vector3() ), latLonToEcef( 48.8566, 5.0, 0, new Vector3() ) );
+		map.update( elsewhere, rendererStub );
+		expect( map._cache.size ).toBeLessThan( parked );
+		if ( map.stats.refused > 0 ) expect( map._cache.size ).toBe( 0 );
+		expect( map.stats.loading + map.stats.refused ).toBeGreaterThan( 0 );
+		map.dispose();
+
+	} );
+
+	it( 'keeps no more loads in flight than maxLoading', async () => {
+
+		const map = createMap( { maxLoading: 2 } );
+		map.update( cityCamera( 500 ), rendererStub );
+		expect( map.stats.loading ).toBe( 2 );
+		// the rest wait their turn and get it as those land
+		await settle( map, cityCamera( 500 ) );
+		expect( map.stats.built ).toBeGreaterThan( 2 );
+		expect( map.stats.loading ).toBe( 0 );
+		map.dispose();
+
+	} );
+
 	it( 'reports what the batches reserve and what the tiles in them occupy', async () => {
 
 		const map = createMap();

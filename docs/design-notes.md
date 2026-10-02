@@ -507,6 +507,61 @@ with 20 319 triangles, because the horizon at that altitude is 40 000 km
 away and the default cuts nothing. One number covers a room and a
 geostationary orbit.
 
+### What the map may hold
+
+A free camera can be tilted at the horizon, and a tilt towards the horizon
+over a city asks for everything out to it. Measured on Liberty over Paris at
+300 m, 1200x800, pitch swept 60 to 89.5 and back in one session, the way a
+user tilts: the tiles in view went from 2 to 54, but the page went from 91
+MB to 510 MB and kept climbing. Three things were wrong, and the sweep
+found each one in turn.
+
+- **Retention was counted in frames.** A tile that left the view kept its
+  object and content for 60 frames, which is a second at 60 fps and minutes
+  on a software renderer at 0.2 fps: the frame is slow exactly when the
+  view is heavy, which is when memory matters. The whole sweep advanced 86
+  frames, so nothing was ever let go. Retention is `retainMs` now, 1000 by
+  default.
+- **The cache was a count.** 512 entries of parked content, and a Liberty
+  z14 tile is 10 MB built where a tile of sea is nothing. `cacheBytes`
+  (96 MB) bounds it, with `_contentBytes` saying what a tile weighs: the
+  block arrays for a vector tile, the RGBA pixels for a raster one.
+- **Nothing bounded what a frame could ask for.** One tilt issued 84 loads
+  in a single frame, and every one of them landed and stayed. `memoryBudget`
+  (192 MB) is the bound on resident content, in view and parked: past it the
+  walk starts no new load and the coarser ancestor draws. Two details make
+  it hold rather than leak. Loads in flight count against it at what a
+  tile has weighed so far, since a budget that only sees landed tiles sees
+  none of a burst, and a tile that lands is counted at once rather than at
+  the next sweep. And parked content goes first: the cache is evicted to
+  make room before a tile in view is refused, since what is parked is the
+  least valuable thing held. `maxLoading` (16) caps the loads in flight on
+  top, so a burst is sixteen tiles wide however many a frame wants.
+
+The same sweep after:
+
+| pitch | before: heap | after: resident | after: heap | refused | parked evicted |
+|---|---|---|---|---|---|
+| 60 | 131 MB | 41 MB | 123 MB | 0 | 0 |
+| 80 | 362 MB | 209 MB | 253 MB | 11 | 0 |
+| 89.5 | 425 MB | 195 MB | 261 MB | 20 | 8 |
+| back to 60 | 476 MB | 219 MB | 285 MB | 0 | 27 |
+| 89.5 again | 510 MB | 192 MB | 277 MB | 41 | 62 |
+
+Resident holds at the budget through the swing, and the heap above it is
+the engine itself plus the batches' own slack. The numbers a reader sees are
+in the demo HUD (`resident`) and in `stats.residentBytes`, `stats.refused`;
+the demo takes `?memoryMB= ?cacheMB= ?retainMs= ?maxLoading=` to try
+others. A phone wants a smaller budget than a desktop, and a scene that
+must never show a coarse tile wants a larger one; neither is a reason for
+the default to be unbounded.
+
+What a refusal looks like on screen is a coarser tile where a finer one
+would have been, which is what the engine does while a tile loads anyway.
+Not done here: choosing which tile to refuse. The walk is spatial, not
+nearest first, so under pressure the budget goes to whichever tiles the
+walk reaches first rather than to the ones in front of the camera.
+
 ### Labels and symbols
 
 Symbol layers are parsed and kept but not drawn yet (`style-subset.md`).

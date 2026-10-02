@@ -102,6 +102,19 @@ export class VectorTileMap extends TileTree {
 			this.stats.built ++;
 			this.stats.buildMs += built.stats.buildMs;
 			built.uploaded = false;
+			// what it weighs, for the cache and the memory budget: the arrays
+			// now, the same bytes in the batches once uploaded
+			built.bytes = 0;
+			for ( const block of built.blocks ) {
+
+				for ( const key of [ 'positions', 'colors', 'indices', 'extrudes', 'sides', 'props' ] ) {
+
+					if ( block[ key ] ) built.bytes += block[ key ].byteLength;
+
+				}
+
+			}
+
 			return built;
 
 		} );
@@ -123,6 +136,12 @@ export class VectorTileMap extends TileTree {
 	_isUploaded( built ) {
 
 		return built.uploaded;
+
+	}
+
+	_contentBytes( built ) {
+
+		return built.bytes ?? 0;
 
 	}
 
