@@ -17,6 +17,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: npm run types-check
       - run: npm test
 
   budget:

@@ -95,7 +95,10 @@ scene.add( map, antenna );
 ```
 
 Everything in `src/` is also importable directly (`threejs-maplibre/src/index.js`)
-for a bundler that prefers sources. The package is not on npm yet; install it
+for a bundler that prefers sources. Type declarations ship in
+`types/index.d.ts`, written by hand against the sources and compiled against
+`types/check.ts` on every CI run (`npm run types-check`); a test keeps them
+in step with what `src/index.js` exports. The package is not on npm yet; install it
 from a checkout or the built files until the first release (M6).
 
 ## Local workflow

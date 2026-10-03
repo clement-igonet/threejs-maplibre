@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"noEmit": true,
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"lib": [ "ES2022", "DOM" ],
+		"skipLibCheck": true,
+		"types": [],
+		"paths": { "threejs-maplibre": [ "./index.d.ts" ] }
+	},
+	"files": [ "./check.ts", "./index.d.ts" ]
+}

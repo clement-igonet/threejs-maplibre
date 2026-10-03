@@ -819,5 +819,66 @@ pyramid.
 ![Underlay, globe](../evidence/m3/underlay-globe.png)
 ![Underlay, the whole earth](../evidence/m3/underlay-globe-far.png)
 
-Not in this PR, for the one after: the write-up against
-maplibre-gl-three, maplibre-three-plugin and threebox.
+### Compared with threebox, maplibre-three-plugin and maplibre-gl-three
+
+The kickoff table, filled in from the sources rather than the READMEs, all
+read on 2026-10-03. Three libraries put three.js content on a MapLibre or
+Mapbox map; this one does that both ways and also draws the map itself.
+
+| | [threebox](https://github.com/jscastro76/threebox) | [maplibre-three-plugin](https://github.com/dvt3d/maplibre-three-plugin) | [maplibre-gl-three](https://github.com/safwat-halaby/maplibre-gl-three) | threejs-maplibre |
+|---|---|---|---|---|
+| map engine | Mapbox GL 1.11 / 2.x; MapLibre declined ([#375](https://github.com/jscastro76/threebox/issues/375)) | maplibre-gl, no version declared (v5 implied) | maplibre-gl ^6.11.2 | maplibre-gl ^6.11.2 for the bridge; none for the engine |
+| three.js | r132, bundled | ^0.178 | ^0.186 | ^0.180 peer |
+| camera | rebuilt from `map.transform` private fields | rebuilt from `map.painter.transform` | `mainMatrix` times a local frame, decomposed back into a camera | `mainMatrix` times a local frame, kept as a float64 product |
+| precision | one 1 024 000-unit mercator world, float32 | the same world, per-object "RTC" groups | ECEF scene, anchor moved to the map centre on every `move` | meters around an anchor, or MapLibre's units for continent-sized content |
+| globe | no ([#367](https://github.com/jscastro76/threebox/issues/367)) | no | `mainMatrix` passed through; the morph (`fallbackMatrix`, `projectionTransition`) not read | globe, flat, and the morph mixed as MapLibre mixes it |
+| terrain | adds Mapbox's DEM; objects do not settle ([#241](https://github.com/jscastro76/threebox/issues/241)) | not integrated ([#6](https://github.com/dvt3d/maplibre-three-plugin/issues/6)) | no settling; EGM96 geoid applied to heights | anchor and placed objects settled every frame on `queryTerrainElevation` |
+| depth with MapLibre layers | shared | shared, except behind its post-processing ([#8](https://github.com/dvt3d/maplibre-three-plugin/issues/8)) | cleared before and after by default; shared on request | shared |
+| the other direction | no | no | no | the map under the scene, flat and globe |
+| measured alignment | none stated | none stated | none stated | 0.08 px (layer), 0.000 px (underlay) against `map.project()` |
+| toolkit | loaders, CSS2D labels, drag and rotate, sun, shadows, tubes, extrusions | sun, shadow ground, post-processing, flyTo | 3D Tiles, raycasting, several layers | the style itself; anchors; fog; no labels yet |
+| last release | 2.2.7, 2022-06 | 1.7.1, 2026-07 | 2.0.0, 2026-10 | not on npm yet |
+
+What the table does not say. threebox is the richest object toolkit of
+the four and the one with the most users (63 000 npm downloads a month),
+and it is frozen: three r132 bundled, Mapbox only, the maintainer's last
+own commit in 2022. maplibre-three-plugin is threebox's camera sync
+rewritten in TypeScript for MapLibre, flat map only, with post-processing
+through an `EffectComposer` that costs it the shared depth buffer.
+maplibre-gl-three is the closest in intent and the one to watch: it reads
+the matrix MapLibre hands a custom layer rather than rebuilding it, moves
+its anchor with the map, and is the only one that thinks about vertical
+datums, fetching the EGM96 geoid so ECEF data lands on MapLibre's
+orthometric terrain. It does not read `fallbackMatrix` or
+`projectionTransition`, so content crosses the zoom 11 to 12 morph on the
+globe's matrix alone, and it clears the depth buffer around its scene by
+default. Its author's criticism in
+[discussion 8552](https://github.com/maplibre/maplibre-gl-js/discussions/8552)
+(shaders, a compose build, custom low-level math) is fair as a description
+and is also where this library's numbers come from: the alignment and the
+budget are measured because the math is ours.
+
+What this library takes from them, in order: the vertical datum, which
+maplibre-gl-three has and this one lacks (heights here are MapLibre's own
+meters, right for objects placed on its terrain, wrong by up to 100 m for
+an ECEF dataset like 3D Tiles until a geoid is applied); the toolkit
+breadth of threebox, which the label engine after M3 and the anchor API
+chip at; and a contribution upstream where one fits, which for this
+milestone is the custom layer documentation of `defaultProjectionData`
+under globe, since none of the three libraries, nor MapLibre's own 3D
+model example, handles the morph, and this one does.
+
+### The typed API
+
+The library is plain JavaScript and stays so; what an application written
+in TypeScript needs is the declarations, so `types/index.d.ts` is written
+by hand against the sources rather than generated from JSDoc, which would
+have typed half the options as `any`. Every option bag, every stats object
+and the two slices of maplibre-gl's `Map` that the bridge calls
+(`MapLibreMapLike` for the layer, `MapLibreUnderlayMapLike` for the
+underlay, so a real map satisfies them and a test double does too) are
+declared. Two things keep the file honest: `types/check.ts` uses the API
+the way an application would and is compiled with `tsc --strict` on every
+CI run (`npm run types-check`), and `test/types.test.js` checks that every
+export of `src/index.js` is declared and nothing is declared that is not
+exported.
