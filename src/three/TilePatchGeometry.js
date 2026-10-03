@@ -1,5 +1,5 @@
 import { BufferAttribute, BufferGeometry, Vector3 } from 'three';
-import { latLonToEcef } from '../math/Ellipsoid.js';
+import { WGS84, latLonToEcef } from '../math/Ellipsoid.js';
 import { normalizedToLatitude, normalizedToLongitude, normalizedToMeters } from '../math/WebMercator.js';
 
 // Tile patch geometries. Vertices are laid out on a grid that is uniform in
@@ -10,7 +10,7 @@ import { normalizedToLatitude, normalizedToLongitude, normalizedToMeters } from 
 
 const _pos = new Vector3();
 
-function buildGrid( x, y, z, segments, project ) {
+function buildGrid( x, y, z, segments, project, datum ) {
 
 	const n = 1 << z;
 	const verts = ( segments + 1 ) * ( segments + 1 );
@@ -19,7 +19,7 @@ function buildGrid( x, y, z, segments, project ) {
 	const indices = [];
 
 	// tile center in world space becomes the mesh origin
-	const center = project( ( x + 0.5 ) / n, ( y + 0.5 ) / n, new Vector3() );
+	const center = project( ( x + 0.5 ) / n, ( y + 0.5 ) / n, new Vector3(), datum );
 
 	let v = 0;
 	for ( let iy = 0; iy <= segments; iy ++ ) {
@@ -28,7 +28,7 @@ function buildGrid( x, y, z, segments, project ) {
 
 			const fx = ix / segments;
 			const fy = iy / segments;
-			project( ( x + fx ) / n, ( y + fy ) / n, _pos ).sub( center );
+			project( ( x + fx ) / n, ( y + fy ) / n, _pos, datum ).sub( center );
 			positions[ v * 3 + 0 ] = _pos.x;
 			positions[ v * 3 + 1 ] = _pos.y;
 			positions[ v * 3 + 2 ] = _pos.z;
@@ -64,9 +64,9 @@ function buildGrid( x, y, z, segments, project ) {
 
 }
 
-function projectGlobe( nx, ny, target ) {
+function projectGlobe( nx, ny, target, datum ) {
 
-	return latLonToEcef( normalizedToLatitude( ny ), normalizedToLongitude( nx ), 0, target );
+	return latLonToEcef( normalizedToLatitude( ny ), normalizedToLongitude( nx ), 0, target, datum );
 
 }
 
@@ -78,9 +78,9 @@ function projectPlanar( nx, ny, target ) {
 
 }
 
-export function createGlobePatch( x, y, z, segments = 16 ) {
+export function createGlobePatch( x, y, z, segments = 16, datum = WGS84 ) {
 
-	return buildGrid( x, y, z, segments, projectGlobe );
+	return buildGrid( x, y, z, segments, projectGlobe, datum );
 
 }
 

@@ -1,5 +1,5 @@
 import { Group, Matrix4, Vector3 } from 'three';
-import { latLonToEcef, localFrame } from '../math/Ellipsoid.js';
+import { WGS84, latLonToEcef, localFrame } from '../math/Ellipsoid.js';
 import { latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../math/WebMercator.js';
 
 const _east = new Vector3();
@@ -19,13 +19,16 @@ const _basis = new Matrix4();
 //   scene.add( map, antenna );
 //
 // heading turns the object clockwise from north, as a MapControls heading.
+// On the globe the anchor stands on the map's datum (WGS84 unless the map
+// is built on another, like MapLibre's sphere).
 
 export class MapAnchor extends Group {
 
-	constructor( { mode = 'globe' } = {} ) {
+	constructor( { mode = 'globe', datum = WGS84 } = {} ) {
 
 		super();
 		this.mode = mode;
+		this.datum = datum;
 		this.lat = 0;
 		this.lon = 0;
 		this.height = 0;
@@ -49,7 +52,7 @@ export class MapAnchor extends Group {
 
 		} else {
 
-			latLonToEcef( lat, lon, height, this.position );
+			latLonToEcef( lat, lon, height, this.position, this.datum );
 			localFrame( lat, lon, _east, _north, _up );
 			_south.copy( _north ).negate();
 			_basis.makeBasis( _east, _up, _south );

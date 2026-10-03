@@ -3,7 +3,7 @@ import { buildTile, builtTileTransferables } from '../build/buildTile.js';
 import { Style } from '../style/Style.js';
 
 // Worker entry. Messages:
-//   { type: 'init', style, sourceId, mode }
+//   { type: 'init', style, sourceId, mode, datum }
 //       compiles the style once; no answer
 //   { type: 'build', id, buffer, x, y, z }
 //       decodes and builds the tile, answers { id, built } with the geometry
@@ -25,6 +25,7 @@ export function createVectorTileHandler() {
 				style: new Style( data.style ),
 				sourceId: data.sourceId,
 				mode: data.mode,
+				datum: data.datum,
 			};
 			return;
 

@@ -56,6 +56,10 @@ const SHOTS = [
 	// style (live), the antenna and pin over it, then with our buildings too
 	{ name: 'underlay', page: 'underlay', query: '', live: true },
 	{ name: 'underlay-buildings', page: 'underlay', query: '&buildings=1&data=louvre', live: true },
+	// and under MapLibre's globe, the scene on its sphere: the Louvre, and
+	// the whole earth from 20 000 km with the pin still on the pyramid
+	{ name: 'underlay-globe', page: 'underlay', query: '&projection=globe&buildings=1&data=louvre', live: true },
+	{ name: 'underlay-globe-far', page: 'underlay', query: '&projection=globe&alt=20000000&pitch=0&heading=0', live: true },
 ];
 
 // live shots on OpenFreeMap's Liberty style (SHOT_LIVE=0 skips them): the

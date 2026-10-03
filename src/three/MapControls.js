@@ -14,7 +14,7 @@
 //   sliding vertically together tilt the view instead
 
 import { Vector3 } from 'three';
-import { latLonToEcef, localFrame, WGS84_RADIUS } from '../math/Ellipsoid.js';
+import { WGS84, latLonToEcef, localFrame, WGS84_RADIUS } from '../math/Ellipsoid.js';
 import { latitudeToNormalized, longitudeToNormalized, metersToNormalized, normalizedToLatitude, normalizedToLongitude, normalizedToMeters } from '../math/WebMercator.js';
 
 const DEG2RAD = Math.PI / 180;
@@ -38,13 +38,14 @@ export class MapControls {
 	/**
 	 * @param {PerspectiveCamera} camera
 	 * @param {HTMLElement} [domElement] element receiving the gestures; omit to drive the state from code only
-	 * @param {{ mode?: 'globe' | 'planar' }} [options] the RasterTileMap mode the camera looks at
+	 * @param {{ mode?: 'globe' | 'planar', datum?: { radius: number, polarRadius: number } }} [options] the map's mode and, on the globe, its datum
 	 */
-	constructor( camera, domElement = null, { mode = 'globe' } = {} ) {
+	constructor( camera, domElement = null, { mode = 'globe', datum = WGS84 } = {} ) {
 
 		this.camera = camera;
 		this.domElement = domElement;
 		this.mode = mode;
+		this.datum = datum;
 		this.enabled = true;
 
 		// view state; degrees and meters
@@ -163,7 +164,7 @@ export class MapControls {
 
 		} else {
 
-			latLonToEcef( this.lat, this.lon, 0, target );
+			latLonToEcef( this.lat, this.lon, 0, target, this.datum );
 			if ( up ) localFrame( this.lat, this.lon, _east, _north, up );
 
 		}
