@@ -35,6 +35,7 @@ export default defineConfig( {
 				bridge: 'demo/bridge.html',
 				bridgeTerrain: 'demo/bridge-terrain.html',
 				bridgeWorld: 'demo/bridge-world.html',
+				underlay: 'demo/underlay.html',
 				standalone: 'demo/standalone.html',
 				bench: 'bench/index.html',
 				decode: 'bench/decode.html',
