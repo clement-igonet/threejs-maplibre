@@ -1,4 +1,4 @@
-import { latLonToEcef } from '../math/Ellipsoid.js';
+import { WGS84, latLonToEcef } from '../math/Ellipsoid.js';
 import { normalizedToLatitude, normalizedToLongitude, normalizedToMeters } from '../math/WebMercator.js';
 
 const DEG2RAD = Math.PI / 180;
@@ -13,9 +13,10 @@ const _p = { x: 0, y: 0, z: 0 };
 //   up( px, py, out, o )                unit vector away from the ground there
 //
 // planar: x east, z south, y up, meters (Web Mercator, no scale correction)
-// globe:  ECEF with +Y through the pole, height along the geodetic normal
+// globe:  ECEF with +Y through the pole, height along the geodetic normal,
+//         on the datum given (WGS84, or MapLibre's sphere under its globe)
 
-export function createTileProjection( x, y, z, extent, mode ) {
+export function createTileProjection( x, y, z, extent, mode, datum = WGS84 ) {
 
 	const n = 1 << z;
 	const scaleX = 1 / ( n * extent );
@@ -53,7 +54,7 @@ export function createTileProjection( x, y, z, extent, mode ) {
 
 	}
 
-	latLonToEcef( normalizedToLatitude( ( y + 0.5 ) / n ), normalizedToLongitude( ( x + 0.5 ) / n ), 0, center );
+	latLonToEcef( normalizedToLatitude( ( y + 0.5 ) / n ), normalizedToLongitude( ( x + 0.5 ) / n ), 0, center, datum );
 
 	return {
 		mode, center,
@@ -61,7 +62,7 @@ export function createTileProjection( x, y, z, extent, mode ) {
 
 			const lat = normalizedToLatitude( originY + py * scaleY );
 			const lon = normalizedToLongitude( originX + px * scaleX );
-			latLonToEcef( lat, lon, height, _p );
+			latLonToEcef( lat, lon, height, _p, datum );
 			out[ o ] = _p.x - center.x;
 			out[ o + 1 ] = _p.y - center.y;
 			out[ o + 2 ] = _p.z - center.z;

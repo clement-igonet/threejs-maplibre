@@ -78,7 +78,7 @@ export class VectorTileMap extends TileTree {
 		this.zoom = 0; // map zoom derived from the camera, for camera-kind properties
 
 		this._loader = new VectorTileLoader( { workers, createWorker } );
-		this._loader.configure( { style, sourceId: this.sourceId, mode: this.mode } );
+		this._loader.configure( { style, sourceId: this.sourceId, mode: this.mode, datum: this.datum } );
 		this._materials = new Map(); // block key -> { material, layer, type, outline, batch, instances }
 		this._origin = new Vector3(); // layer-local; where the batches sit
 		this.originRadius = 10000; // meters the camera may move before the origin follows
@@ -501,14 +501,14 @@ export class VectorTileMap extends TileTree {
 
 		} else {
 
-			if ( rayEllipsoidIntersection( _camPos, _dir, _hit ) ) {
+			if ( rayEllipsoidIntersection( _camPos, _dir, _hit, this.datum ) ) {
 
 				distance = _hit.distanceTo( _camPos );
 
 			} else {
 
 				// looking past the globe: use the nearest point of the surface
-				distance = Math.max( geocentricHeight( _camPos ), 1 );
+				distance = Math.max( geocentricHeight( _camPos, this.datum ), 1 );
 				_hit.copy( _camPos );
 
 			}

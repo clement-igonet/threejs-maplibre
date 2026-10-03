@@ -89,7 +89,7 @@ function finishBlock( block ) {
 
 }
 
-export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe' } ) {
+export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', datum } ) {
 
 	const t0 = performance.now();
 	const blocks = [];
@@ -106,7 +106,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe' } ) 
 
 		const zoom = Math.min( Math.max( z, layer.minzoom ), Math.max( layer.minzoom, layer.maxzoom - 1 ) );
 
-		if ( projection === null ) projection = createTileProjection( x, y, z, sourceLayer.extent, mode );
+		if ( projection === null ) projection = createTileProjection( x, y, z, sourceLayer.extent, mode, datum );
 		const extent = sourceLayer.extent;
 		const type = layer.type;
 		const block = newBlock( layer, index, type );

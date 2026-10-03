@@ -1,6 +1,6 @@
 import { Group, Matrix4, Vector3 } from 'three';
 import { LRUTileCache } from '../core/LRUTileCache.js';
-import { localFrame, WGS84_RADIUS_POLAR } from '../math/Ellipsoid.js';
+import { localFrame, WGS84 } from '../math/Ellipsoid.js';
 import { normalizedToLatitude, normalizedToLongitude, texelSizeMeters } from '../math/WebMercator.js';
 import { OrientedBox, ViewVolume } from './TileBounds.js';
 import { createGlobePatch, createPlanarPatch } from './TilePatchGeometry.js';
@@ -41,6 +41,7 @@ export class TileTree extends Group {
 
 	constructor( source, {
 		mode = 'globe', // 'globe' | 'planar'
+		datum = WGS84, // the globe's shape: { radius, polarRadius }; MAPLIBRE_SPHERE under a MapLibre globe
 		maxScreenTexel = 1.4, // split while a texel covers more than this many pixels
 		fadeDuration = 200, // ms; 0 draws a tile as soon as it is ready
 		// What a tile that left the view keeps, and for how long. Retention is
@@ -75,6 +76,7 @@ export class TileTree extends Group {
 
 		this.source = source;
 		this.mode = mode;
+		this.datum = datum;
 		this.maxScreenTexel = maxScreenTexel;
 		this.fadeDuration = fadeDuration;
 		this.retainMs = retainMs;
@@ -237,7 +239,7 @@ export class TileTree extends Group {
 
 		const { x, y, z } = record;
 		return this.mode === 'globe'
-			? createGlobePatch( x, y, z, segments )
+			? createGlobePatch( x, y, z, segments, this.datum )
 			: createPlanarPatch( x, y, z, segments );
 
 	}
@@ -361,7 +363,7 @@ export class TileTree extends Group {
 		let far = camera.far;
 		if ( this.mode === 'globe' ) {
 
-			const R = WGS84_RADIUS_POLAR;
+			const R = this.datum.polarRadius;
 			const d2 = _camLocal.lengthSq();
 			const horizon = Math.sqrt( Math.max( 0, d2 - R * R ) ) + Math.sqrt( ( R + this.contentHeight ) ** 2 - R * R );
 			far = Math.min( far, Math.max( horizon, 2 * camera.near ) );
@@ -512,7 +514,7 @@ export class TileTree extends Group {
 
 		if ( this.mode !== 'globe' ) return false;
 
-		const R = WGS84_RADIUS_POLAR;
+		const R = this.datum.polarRadius;
 		const distance = _camLocal.length();
 		if ( distance <= R ) return false;
 

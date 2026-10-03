@@ -20,18 +20,21 @@
 		<div id="version"></div>
 		<script type="module">
 
-			// Direction B: a maplibre-gl map under this library's planar scene,
-			// one controller driving both. MapLibre's whole style shows through,
+			// Direction B: a maplibre-gl map under this library's scene, one
+			// controller driving both. MapLibre's whole style shows through,
 			// labels included, under the antenna and the pin of the objects
 			// demo; ?buildings=1 draws this engine's extruded buildings on top
 			// of it too (and over MapLibre's labels, since two canvases share
 			// no depth buffer: that is what the layer, direction A, is for).
+			// On ?projection=globe the scene is this engine's globe built on
+			// MapLibre's sphere, under MapLibre's globe.
 			//
-			//   ?style=<url>   ?lat=&lon=&alt=&heading=&pitch=&fov=
+			//   ?projection=mercator|globe   ?style=<url>
+			//   ?lat=&lon=&alt=&heading=&pitch=&fov=
 			//   ?data=louvre|openfreemap for the buildings' tiles
 
 			import { Color, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, SRGBColorSpace, Vector3, WebGLRenderer, Group, Mesh, MeshStandardMaterial, ConeGeometry, CylinderGeometry, DoubleSide, LatheGeometry, SphereGeometry, Vector2 } from 'three';
-			import { MAPLIBRE_FOV, MapAnchor, MapControls, MapLibreUnderlay, Style, VectorTileMap } from '../src/index.js';
+			import { MAPLIBRE_FOV, MAPLIBRE_SPHERE, MapAnchor, MapControls, MapLibreUnderlay, Style, VectorTileMap } from '../src/index.js';
 			import { loadVectorData } from './vector-data.js';
 
 			const maplibregl = await import( 'maplibre-gl' );
@@ -40,6 +43,9 @@
 
 			const params = new URLSearchParams( location.search );
 			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
+			const projection = params.get( 'projection' ) === 'globe' ? 'globe' : 'mercator';
+			const mode = projection === 'globe' ? 'globe' : 'planar';
+			const datum = MAPLIBRE_SPHERE; // the scene stands on MapLibre's earth
 			const ANTENNA = { lat: 48.8613, lon: 2.3323 };
 			const PYRAMID = { lat: 48.86107, lon: 2.33590 };
 
@@ -50,10 +56,12 @@
 				center: [ 2.3342, 48.8615 ],
 				zoom: 16,
 				interactive: false,
+				projection: { type: projection },
 				attributionControl: { compact: false },
 			} );
 			await new Promise( resolve => map.once( 'load', resolve ) );
-			const underlay = new MapLibreUnderlay( map );
+			map.setProjection( { type: projection } );
+			const underlay = new MapLibreUnderlay( map, { mode, datum } );
 
 			// the scene, on a transparent canvas over it
 			const renderer = new WebGLRenderer( { antialias: true, alpha: true } );
@@ -65,7 +73,7 @@
 
 			const scene = new Scene();
 			const camera = new PerspectiveCamera( num( 'fov', MAPLIBRE_FOV ), window.innerWidth / window.innerHeight, 1, 1e8 );
-			const controls = new MapControls( camera, renderer.domElement, { mode: 'planar' } );
+			const controls = new MapControls( camera, renderer.domElement, { mode, datum } );
 			controls.minAltitude = 20;
 			controls.setView( { lat: num( 'lat', 48.8615 ), lon: num( 'lon', 2.3342 ), distance: num( 'alt', 520 ), heading: num( 'heading', 70 ), pitch: num( 'pitch', 60 ) } );
 
@@ -80,7 +88,7 @@
 				// this engine's extrusions only: the basemap draws the rest
 				const { source, style, sourceId } = await loadVectorData( params );
 				const extrusions = new Style( { ...style.json, layers: style.json.layers.filter( l => l.type === 'fill-extrusion' ) } );
-				buildings = new VectorTileMap( source, extrusions, { mode: 'planar', sourceId } );
+				buildings = new VectorTileMap( source, extrusions, { mode, datum, sourceId } );
 				scene.add( buildings );
 
 			}
@@ -130,14 +138,14 @@
 			}
 
 			const antenna = createAntenna();
-			scene.add( new MapAnchor( { mode: 'planar' } ).setLocation( ANTENNA.lat, ANTENNA.lon, 0, 250 ).add( antenna ) );
-			scene.add( new MapAnchor( { mode: 'planar' } ).setLocation( PYRAMID.lat, PYRAMID.lon, 40 ).add( createPin( 0xe03030 ) ) );
+			scene.add( new MapAnchor( { mode, datum } ).setLocation( ANTENNA.lat, ANTENNA.lon, 0, 250 ).add( antenna ) );
+			scene.add( new MapAnchor( { mode, datum } ).setLocation( PYRAMID.lat, PYRAMID.lon, 40 ).add( createPin( 0xe03030 ) ) );
 
 			// alignment: a ground point through this camera against map.project
 			const _p = new Vector3();
 			window.__align = places => places.map( ( [ lat, lon ] ) => {
 
-				const anchor = new MapAnchor( { mode: 'planar' } ).setLocation( lat, lon, 0 );
+				const anchor = new MapAnchor( { mode, datum } ).setLocation( lat, lon, 0 );
 				_p.copy( anchor.position ).project( camera );
 				const ours = [ ( _p.x * 0.5 + 0.5 ) * window.innerWidth, ( 0.5 - _p.y * 0.5 ) * window.innerHeight ];
 				const theirs = map.project( [ lon, lat ] );
@@ -159,7 +167,7 @@
 				if ( buildings ) buildings.update( camera, renderer );
 				renderer.render( scene, camera );
 				const state = underlay._last;
-				info.textContent = `threejs-maplibre bridge, underlay: planar | maplibre-gl ${ maplibregl.getVersion() } under three.js | zoom ${ state.zoom?.toFixed( 2 ) } | pitch ${ Math.round( controls.pitch ) }° | heading ${ Math.round( controls.heading ) }° | map ${ synced ? 'following' : 'sees no ground' }${ buildings ? ` | buildings: ${ buildings.stats.rendered } tiles, ${ renderer.info.render.calls } draws` : '' } | ${ ( frameMs / frames ).toFixed( 1 ) } ms/frame`;
+				info.textContent = `threejs-maplibre bridge, underlay: ${ projection } | maplibre-gl ${ maplibregl.getVersion() } under three.js | zoom ${ state.zoom?.toFixed( 2 ) } | pitch ${ Math.round( controls.pitch ) }° | heading ${ Math.round( controls.heading ) }° | map ${ synced ? 'following' : 'sees no ground' }${ buildings ? ` | buildings: ${ buildings.stats.rendered } tiles, ${ renderer.info.render.calls } draws` : '' } | ${ ( frameMs / frames ).toFixed( 1 ) } ms/frame`;
 				window.__SHOT_READY = map.loaded() && ( ! buildings || ( buildings.stats.loading === 0 && buildings.stats.rendered > 0 ) );
 				requestAnimationFrame( frame );
 

@@ -1,4 +1,5 @@
 import { createVectorTileHandler } from './vectorTileWorker.js';
+import { WGS84 } from '../math/Ellipsoid.js';
 import { createVectorTileWorker } from './createWorker.js';
 
 // Loads MVT tiles: the fetch runs on the main thread (abortable, like
@@ -42,10 +43,10 @@ export class VectorTileLoader {
 
 	// Sends the style to the Workers; tiles loaded with a { x, y, z } are
 	// built against it.
-	configure( { style, sourceId, mode = 'globe' } ) {
+	configure( { style, sourceId, mode = 'globe', datum = WGS84 } ) {
 
 		const styleJSON = style.json ?? style;
-		this._config = { type: 'init', style: styleJSON, sourceId, mode };
+		this._config = { type: 'init', style: styleJSON, sourceId, mode, datum };
 		for ( const worker of this._workers ) worker.postMessage( this._config );
 		if ( this._workers.length === 0 ) this._inline( this._config, () => {} );
 

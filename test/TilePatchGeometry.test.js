@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { latLonToEcef, WGS84_RADIUS, WGS84_RADIUS_POLAR } from '../src/math/Ellipsoid.js';
+import { MAPLIBRE_SPHERE, latLonToEcef, WGS84_RADIUS, WGS84_RADIUS_POLAR } from '../src/math/Ellipsoid.js';
 import { createGlobePatch, createPlanarPatch } from '../src/three/TilePatchGeometry.js';
 
 describe( 'Ellipsoid', () => {
@@ -73,6 +73,19 @@ describe( 'TilePatchGeometry', () => {
 				expect( position.getZ( i ) ).toBeLessThan( 0 );
 
 			}
+
+		}
+
+	} );
+
+	it( 'builds a patch on another datum when given one', () => {
+
+		const { geometry, center } = createGlobePatch( 16, 10, 5, 4, MAPLIBRE_SPHERE );
+		const p = geometry.attributes.position;
+		for ( let i = 0; i < p.count; i ++ ) {
+
+			const radius = Math.hypot( p.getX( i ) + center.x, p.getY( i ) + center.y, p.getZ( i ) + center.z );
+			expect( radius ).toBeCloseTo( MAPLIBRE_SPHERE.radius, 0 ); // float32 positions around the center
 
 		}
 
