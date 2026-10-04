@@ -8,7 +8,8 @@
 //
 // A dataset may be several queries, <name>.overpassql and <name>.<part>.overpassql,
 // fetched one by one and merged (Overpass times out on one big one); the
-// bbox written into the output is the first query's.
+// bbox written into the output is the union of the queries' boxes: where
+// the data is, which a demo keeps its character inside.
 //
 // The output keeps the OpenMapTiles layer names (building, transportation,
 // water, waterway, park, landuse, place, poi) plus a "tree" layer, so a style
@@ -444,8 +445,16 @@ async function main() {
 	}
 
 	const osm = JSON.parse( await readFile( rawPath, 'utf8' ) );
-	const query = await readFile( queryPath, 'utf8' );
-	const bbox = /\[bbox:([^\]]+)\]/.exec( query )[ 1 ].split( ',' ).map( Number );
+	const { readdir } = await import( 'node:fs/promises' );
+	const queries = ( await readdir( dataDir ) ).filter( f => f === `${ dataset }.overpassql` || ( f.startsWith( `${ dataset }.` ) && f.endsWith( '.overpassql' ) ) );
+	const bbox = [ Infinity, Infinity, - Infinity, - Infinity ]; // south, west, north, east, as Overpass writes it
+	for ( const file of queries ) {
+
+		const [ s, w, n, e ] = /\[bbox:([^\]]+)\]/.exec( await readFile( path.join( dataDir, file ), 'utf8' ) )[ 1 ].split( ',' ).map( Number );
+		bbox[ 0 ] = Math.min( bbox[ 0 ], s ); bbox[ 1 ] = Math.min( bbox[ 1 ], w );
+		bbox[ 2 ] = Math.max( bbox[ 2 ], n ); bbox[ 3 ] = Math.max( bbox[ 3 ], e );
+
+	}
 	const layers = convert( osm );
 
 	const out = {

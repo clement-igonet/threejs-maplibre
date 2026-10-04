@@ -58,7 +58,8 @@
 	"dependencies": {
 		"@mapbox/vector-tile": "^2.0.3",
 		"@maplibre/maplibre-gl-style-spec": "^26.4.4",
-		"pbf": "^4.0.1"
+		"pbf": "^4.0.1",
+		"three-mesh-bvh": "^0.9.15"
 	},
 	"peerDependencies": {
 		"three": ">=0.160.0"

@@ -4,11 +4,11 @@ import { PerspectiveCamera } from 'three';
 import { createGeoJSONVectorSource } from '../demo/geojson-vector-source.js';
 import { STATION_STYLE } from '../demo/station-style.js';
 import { buildTile } from '../src/build/buildTile.js';
-import { appendRamp, appendWallRun, featureLevels } from '../src/build/buildIndoor.js';
+import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex } from '../src/build/buildIndoor.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { VectorTileMap } from '../src/three/VectorTileMap.js';
-import { latitudeToNormalized, longitudeToNormalized } from '../src/math/WebMercator.js';
+import { latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/math/WebMercator.js';
 
 // Gare Saint-Lazare, the committed extract, cut into tiles as the demo does
 const { layers } = JSON.parse( readFileSync( new URL( '../demo/data/saint-lazare.json', import.meta.url ) ) );
@@ -23,6 +23,7 @@ function build( z ) {
 
 }
 
+const toLocal = ( lat, lon ) => { const [ mx, my ] = normalizedToMeters( longitudeToNormalized( lon ), latitudeToNormalized( lat ) ); return [ mx, - my ]; };
 const ys = block => { const out = []; for ( let i = 1; i < block.positions.length; i += 3 ) out.push( block.positions[ i ] ); return out; };
 
 describe( 'indoor', () => {
@@ -136,6 +137,55 @@ describe( 'indoor', () => {
 		expect( Math.max( ...y ) ).toBeGreaterThan( 0 ); // and one up
 		const lifts = built.blocks.filter( b => b.id === 'indoor-lift' );
 		expect( lifts.length ).toBeGreaterThan( 0 );
+
+	} );
+
+	it( 'cuts a stairwell out of a floor: the area left is the floor minus the hole', () => {
+
+		const projection = { project( x, y, h, out ) { out[ 0 ] = x; out[ 1 ] = h; out[ 2 ] = y; return out; } };
+		const out = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		const square = [ [ 0, 0, 20, 0, 20, 20, 0, 20 ] ]; // 400
+		const holes = stairwell( [ 5, 10, 15, 10 ], 2 ); // a 10 x 2 strip across the middle: 20
+		appendFloorWithHoles( out, square, projection, [ 255, 255, 255, 255 ], 3, holes );
+		// the top faces' area
+		let area = 0;
+		for ( let i = 0; i < out.indices.length; i += 3 ) {
+
+			const [ a, b, c ] = [ 0, 1, 2 ].map( k => out.indices[ i + k ] );
+			if ( out.positions[ 3 * a + 1 ] !== 3.15 ) continue;
+			const ax = out.positions[ 3 * a ], az = out.positions[ 3 * a + 2 ], bx = out.positions[ 3 * b ], bz = out.positions[ 3 * b + 2 ], cx = out.positions[ 3 * c ], cz = out.positions[ 3 * c + 2 ];
+			area += Math.abs( ( bx - ax ) * ( cz - az ) - ( cx - ax ) * ( bz - az ) ) / 2;
+
+		}
+
+		expect( area ).toBeCloseTo( 380, 6 );
+		// a convex piece entirely inside the hole disappears, one clear of it stays whole
+		expect( subtractConvex( [ [ 6, 9.5 ], [ 7, 9.5 ], [ 7, 10.5 ] ], holes[ 0 ] ) ).toEqual( [] );
+		expect( subtractConvex( [ [ 0, 0 ], [ 2, 0 ], [ 2, 2 ] ], holes[ 0 ] ) ).toEqual( [ [ [ 0, 0 ], [ 2, 0 ], [ 2, 2 ] ] ] );
+
+	} );
+
+	it( 'opens the station\'s floors over their stairs and escalators', () => {
+
+		const built = build( 16 );
+		const one = built.blocks.find( b => b.id === 'indoor-floor' && b.level === 1 );
+		expect( one ).toBeDefined();
+		// over the top of the escalators that come up from the hall, level 1
+		// has a hole: no floor triangle covers the middle of the escalator
+		const [ ax, az ] = toLocal( 48.876162, 2.32514 ), [ bx, bz ] = toLocal( 48.876143, 2.324984 );
+		const mx = ( ax + bx ) / 2 - built.center.x, mz = ( az + bz ) / 2 - built.center.z;
+		let covered = false;
+		for ( let i = 0; i < one.indices.length; i += 3 ) {
+
+			const p = [ 0, 1, 2 ].map( k => [ one.positions[ 3 * one.indices[ i + k ] ], one.positions[ 3 * one.indices[ i + k ] + 2 ] ] );
+			const s = ( u, v, w ) => ( v[ 0 ] - u[ 0 ] ) * ( w[ 1 ] - u[ 1 ] ) - ( w[ 0 ] - u[ 0 ] ) * ( v[ 1 ] - u[ 1 ] );
+			if ( Math.abs( s( p[ 0 ], p[ 1 ], p[ 2 ] ) ) < 1e-9 ) continue; // a sliver covers nothing
+			const d1 = s( p[ 0 ], p[ 1 ], [ mx, mz ] ), d2 = s( p[ 1 ], p[ 2 ], [ mx, mz ] ), d3 = s( p[ 2 ], p[ 0 ], [ mx, mz ] );
+			if ( ( d1 >= 0 && d2 >= 0 && d3 >= 0 ) || ( d1 <= 0 && d2 <= 0 && d3 <= 0 ) ) covered = true;
+
+		}
+
+		expect( covered ).toBe( false );
 
 	} );
 

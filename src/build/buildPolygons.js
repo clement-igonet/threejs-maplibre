@@ -117,7 +117,12 @@ export function appendFill( out, polygon, projection, rgba, height = 0 ) {
 // and "height", wound so the outward face is the front one. No normals are
 // stored: the faces are flat, so the material shades them from the
 // derivatives of the view position (flatShading).
-export function appendExtrusion( out, polygon, projection, rgba, base, height, roofRGBA = rgba ) {
+// covered( ax, ay, bx, by ), when given, says what of the wall a-b another
+// building already stands against, as [ [ base, height ], ... ]: two parts
+// of one building, side by side, share a wall, and drawing both makes a
+// partition through the inside of the building. Only the spans no
+// neighbour covers are drawn: above a lower neighbour, below a raised one.
+export function appendExtrusion( out, polygon, projection, rgba, base, height, roofRGBA = rgba, openings = null, covered = null ) {
 
 	if ( height <= base ) return 0;
 
@@ -126,7 +131,8 @@ export function appendExtrusion( out, polygon, projection, rgba, base, height, r
 	// roof: flat, lit from above
 	triangles += appendFill( out, polygon, projection, roofRGBA, height );
 
-	// walls
+	// walls, each edge in one quad, or in pieces around its entrances: the
+	// door's height cut out, the wall above it kept
 	for ( const ring of polygon ) {
 
 		const count = ring.length / 2;
@@ -137,31 +143,114 @@ export function appendExtrusion( out, polygon, projection, rgba, base, height, r
 			const bx = ring[ 2 * j ], by = ring[ 2 * j + 1 ];
 			if ( ax === bx && ay === by ) continue;
 
-			const start = out.vertexCount;
-			projection.project( ax, ay, base, _v );
-			const a0 = [ _v[ 0 ], _v[ 1 ], _v[ 2 ] ];
-			projection.project( ax, ay, height, _v );
-			const a1 = [ _v[ 0 ], _v[ 1 ], _v[ 2 ] ];
-			projection.project( bx, by, base, _v );
-			const b0 = [ _v[ 0 ], _v[ 1 ], _v[ 2 ] ];
-			projection.project( bx, by, height, _v );
-			const b1 = [ _v[ 0 ], _v[ 1 ], _v[ 2 ] ];
+			const spans = covered ? uncovered( base, height, covered( ax, ay, bx, by ) ) : [ [ base, height ] ];
+			for ( const [ z0, z1 ] of spans ) {
 
-			for ( const p of [ a0, b0, b1, a1 ] ) {
+				const cut = openings && z0 === base ? wallPieces( ax, ay, bx, by, openings ) : null;
+				if ( cut === null ) {
 
-				out.positions.push( p[ 0 ], p[ 1 ], p[ 2 ] );
-				out.colors.push( rgba[ 0 ], rgba[ 1 ], rgba[ 2 ], rgba[ 3 ] );
+					triangles += appendWallQuad( out, projection, rgba, ax, ay, bx, by, z0, z1 );
+					continue;
+
+				}
+
+				const doorTop = Math.min( z1, z0 + cut.height );
+				for ( const [ s0, s1 ] of cut.pieces ) triangles += appendWallQuad( out, projection, rgba, ax + ( bx - ax ) * s0, ay + ( by - ay ) * s0, ax + ( bx - ax ) * s1, ay + ( by - ay ) * s1, z0, doorTop );
+				if ( doorTop < z1 ) triangles += appendWallQuad( out, projection, rgba, ax, ay, bx, by, doorTop, z1 );
 
 			}
-
-			out.vertexCount += 4;
-			out.indices.push( start, start + 2, start + 1, start, start + 3, start + 2 );
-			triangles += 2;
 
 		}
 
 	}
 
 	return triangles;
+
+}
+
+// [ base, height ] less the spans in cover, as the spans left.
+export function uncovered( base, height, cover ) {
+
+	let spans = [ [ base, height ] ];
+	if ( ! cover ) return spans;
+	for ( const [ c0, c1 ] of cover ) {
+
+		const next = [];
+		for ( const [ z0, z1 ] of spans ) {
+
+			if ( c1 <= z0 || c0 >= z1 ) { next.push( [ z0, z1 ] ); continue; }
+			if ( c0 > z0 ) next.push( [ z0, c0 ] );
+			if ( c1 < z1 ) next.push( [ c1, z1 ] );
+
+		}
+
+		spans = next;
+
+	}
+
+	return spans.filter( ( [ z0, z1 ] ) => z1 - z0 > 1e-3 );
+
+}
+
+function appendWallQuad( out, projection, rgba, ax, ay, bx, by, base, height ) {
+
+	const start = out.vertexCount;
+	projection.project( ax, ay, base, _v );
+	const a0 = [ _v[ 0 ], _v[ 1 ], _v[ 2 ] ];
+	projection.project( ax, ay, height, _v );
+	const a1 = [ _v[ 0 ], _v[ 1 ], _v[ 2 ] ];
+	projection.project( bx, by, base, _v );
+	const b0 = [ _v[ 0 ], _v[ 1 ], _v[ 2 ] ];
+	projection.project( bx, by, height, _v );
+	const b1 = [ _v[ 0 ], _v[ 1 ], _v[ 2 ] ];
+
+	for ( const p of [ a0, b0, b1, a1 ] ) {
+
+		out.positions.push( p[ 0 ], p[ 1 ], p[ 2 ] );
+		out.colors.push( rgba[ 0 ], rgba[ 1 ], rgba[ 2 ], rgba[ 3 ] );
+
+	}
+
+	out.vertexCount += 4;
+	out.indices.push( start, start + 2, start + 1, start, start + 3, start + 2 );
+	return 2;
+
+}
+
+// The parts of the edge a-b left once the openings on it are cut out, as
+// [ s0, s1 ] fractions along it, with the openings' height; null when no
+// opening lies on the edge. An opening is [ x, y, halfWidth, height ] in
+// the ring's units, height in the projection's.
+export function wallPieces( ax, ay, bx, by, openings ) {
+
+	const dx = bx - ax, dy = by - ay;
+	const len2 = dx * dx + dy * dy;
+	const len = Math.sqrt( len2 );
+	const cuts = [];
+	let height = 0;
+	for ( const [ ox, oy, half, h ] of openings ) {
+
+		const t = ( ( ox - ax ) * dx + ( oy - ay ) * dy ) / len2;
+		if ( t < - 1e-6 || t > 1 + 1e-6 ) continue;
+		const px = ax + dx * t - ox, py = ay + dy * t - oy;
+		if ( px * px + py * py > half * half * 0.25 ) continue; // not on this edge
+		cuts.push( [ Math.max( 0, t - half / len ), Math.min( 1, t + half / len ) ] );
+		height = Math.max( height, h ?? Infinity );
+
+	}
+
+	if ( cuts.length === 0 ) return null;
+	cuts.sort( ( p, q ) => p[ 0 ] - q[ 0 ] );
+	const pieces = [];
+	let s = 0;
+	for ( const [ c0, c1 ] of cuts ) {
+
+		if ( c0 > s + 1e-9 ) pieces.push( [ s, c0 ] );
+		s = Math.max( s, c1 );
+
+	}
+
+	if ( s < 1 - 1e-9 ) pieces.push( [ s, 1 ] );
+	return { pieces, height };
 
 }

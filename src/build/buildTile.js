@@ -1,6 +1,6 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
-import { appendFloor, appendRamp, appendShaft, appendWallRun, featureLevels } from './buildIndoor.js';
+import { FLOOR_THICKNESS, appendFillWithHoles, appendFloor, appendFloorWithHoles, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -149,6 +149,64 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 		}
 
+		// the entrances of the tile's indoor layer cut the buildings' ground
+		// floor walls, so a street leads into a hall
+		let entrances = null;
+		if ( type === 'fill-extrusion' && ! indoor && tile.layers.indoor ) {
+
+			const doors = tile.layers.indoor;
+			for ( let f = 0; f < doors.featureCount; f ++ ) {
+
+				if ( doors.types[ f ] !== 1 || doors.properties[ f ].class !== 'entrance' ) continue;
+				const r = doors.featureStart[ f ], v = doors.ringStart[ r ];
+				const width = parseFloat( doors.properties[ f ].width );
+				( entrances ??= [] ).push( [ doors.positions[ 2 * v ], doors.positions[ 2 * v + 1 ], ( Number.isFinite( width ) ? width : 1.8 ) / 2 * unitsPerMeter, 2.5 ] );
+
+			}
+
+		}
+
+		// the stairwells of the tile: every floor a staircase or escalator
+		// climbs to gets a hole along it, 2 m wide, so it comes up through
+		const holesByLevel = new Map();
+		if ( ( indoor === 'floor' || type === 'fill' ) && tile.layers.transportation ) {
+
+			const ways = tile.layers.transportation;
+			for ( let f = 0; f < ways.featureCount; f ++ ) {
+
+				const props = ways.properties[ f ];
+				if ( ways.types[ f ] !== 2 || props.subclass !== 'steps' ) continue;
+				const levels = featureLevels( props );
+				if ( levels.length < 2 ) continue;
+				const quads = featureLines( ways, f, extent ).flatMap( run => stairwell( run.points, 2 * unitsPerMeter ) );
+				for ( const level of levels.slice( 1 ) ) {
+
+					if ( ! holesByLevel.has( level ) ) holesByLevel.set( level, [] );
+					holesByLevel.get( level ).push( ...quads );
+
+				}
+
+			}
+
+		}
+
+		// the walls buildings share: a wall asks what other extrusions of the
+		// layer stand a quarter meter off it, on either side, and gets their
+		// [ base, height ]. Parts of one building that meet corner to corner,
+		// and parts where one's corner sits along the other's wall, alike.
+		const neighbours = type === 'fill-extrusion' && ! indoor ? indexExtrusions( sourceLayer, layer, zoom, extent ) : null;
+		const probe = 0.25 * unitsPerMeter;
+		let coveredFor = () => null;
+		if ( neighbours ) coveredFor = self => ( ax, ay, bx, by ) => {
+
+			const len = Math.hypot( bx - ax, by - ay );
+			if ( len === 0 ) return null;
+			const mx = ( ax + bx ) / 2, my = ( ay + by ) / 2, nx = - ( by - ay ) / len * probe, ny = ( bx - ax ) / len * probe;
+			const spans = [ ...neighbours.at( mx + nx, my + ny, self ), ...neighbours.at( mx - nx, my - ny, self ) ];
+			return spans.length ? spans : null;
+
+		};
+
 		const levelBlocks = new Map();
 		const levelBlock = level => {
 
@@ -193,9 +251,12 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 			if ( type === 'fill' ) {
 
 				if ( feature.type !== 3 ) continue;
+				// the street over a staircase down to level -1 or below gets
+				// the hole the station's floors get, so the stairs open up
+				const streetHoles = holesByLevel.get( 0 );
 				for ( const polygon of featurePolygons( sourceLayer, f, extent ) ) {
 
-					triangles += appendFill( block, polygon, projection, rgba );
+					triangles += streetHoles ? appendFillWithHoles( block, polygon, projection, rgba, 0, streetHoles ) : appendFill( block, polygon, projection, rgba );
 					if ( outline ) {
 
 						const outlineRGBA = toRGBA( layer.get( 'fill-outline-color', zoom, feature ), 1 );
@@ -232,7 +293,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 							for ( const level of levels ) {
 
 								const target = levelBlock( level );
-								const t = appendRamp( target, run.points, projection, rgba, 1.5 * unitsPerMeter, ( down ? hi : lo ) * levelHeight, ( down ? lo : hi ) * levelHeight );
+								const t = appendRamp( target, run.points, projection, rgba, 1.5 * unitsPerMeter, ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS );
 								if ( t > 0 ) { target.triangles += t; target.features ++; }
 
 							}
@@ -264,7 +325,8 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 					let t = 0;
 					if ( indoor === 'floor' && polygons ) {
 
-						for ( const polygon of polygons ) t += appendFloor( target, polygon, projection, rgba, base );
+						const holes = holesByLevel.get( level );
+						for ( const polygon of polygons ) t += holes ? appendFloorWithHoles( target, polygon, projection, rgba, base, holes ) : appendFloor( target, polygon, projection, rgba, base );
 
 					} else if ( indoor === 'wall' ) {
 
@@ -297,7 +359,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 					if ( roof ) {
 
-						const t = appendRoofedExtrusion( target, polygon, projection, colours, base, height, roof, unitsPerMeter );
+						const t = appendRoofedExtrusion( target, polygon, projection, colours, base, height, roof, unitsPerMeter, coveredFor( f ) );
 						triangles += t;
 						if ( target !== block ) { target.triangles += t; block.triangles -= t; }
 
@@ -305,13 +367,13 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 						// a flat building=roof is a slab under its top, as OSM2World draws it
 						const slabBase = hasWalls( feature.properties ) ? base : Math.max( base, height - 0.3 );
-						const t = appendExtrusion( target, polygon, projection, colours.wall, slabBase, height, colours.roof );
+						const t = appendExtrusion( target, polygon, projection, colours.wall, slabBase, height, colours.roof, entrances, coveredFor( f ) );
 						triangles += t;
 						if ( target !== block ) { target.triangles += t; block.triangles -= t; }
 
 					} else {
 
-						triangles += appendExtrusion( block, polygon, projection, rgba, base, height );
+						triangles += appendExtrusion( block, polygon, projection, rgba, base, height, rgba, entrances, coveredFor( f ) );
 
 					}
 
@@ -392,3 +454,82 @@ function tileCenterLatitude( y, z ) {
 	return Math.atan( 0.5 * ( Math.exp( n ) - Math.exp( - n ) ) ) * 180 / Math.PI;
 
 }
+
+// The extrusions of a layer in a tile, for asking which stand at a point:
+// their polygons in tile units with their [ base, height ], in a 16 x 16
+// grid of the tile so a query looks at a handful.
+function indexExtrusions( sourceLayer, layer, zoom, extent ) {
+
+	const cells = 16, size = extent / cells, grid = new Map();
+	const items = [];
+	for ( let f = 0; f < sourceLayer.featureCount; f ++ ) {
+
+		if ( sourceLayer.types[ f ] !== 3 ) continue;
+		const feature = { type: 3, properties: sourceLayer.properties[ f ], id: sourceLayer.ids[ f ] };
+		if ( ! layer.matches( zoom, feature ) ) continue;
+		const span = [ layer.get( 'fill-extrusion-base', zoom, feature ), layer.get( 'fill-extrusion-height', zoom, feature ) ];
+		for ( const polygon of featurePolygons( sourceLayer, f, extent ) ) {
+
+			let minX = Infinity, minY = Infinity, maxX = - Infinity, maxY = - Infinity;
+			for ( let i = 0; i < polygon[ 0 ].length; i += 2 ) { minX = Math.min( minX, polygon[ 0 ][ i ] ); maxX = Math.max( maxX, polygon[ 0 ][ i ] ); minY = Math.min( minY, polygon[ 0 ][ i + 1 ] ); maxY = Math.max( maxY, polygon[ 0 ][ i + 1 ] ); }
+			const item = { f, span, polygon, minX, minY, maxX, maxY };
+			items.push( item );
+			for ( let cx = Math.max( 0, Math.floor( minX / size ) ); cx <= Math.min( cells - 1, Math.floor( maxX / size ) ); cx ++ ) {
+
+				for ( let cy = Math.max( 0, Math.floor( minY / size ) ); cy <= Math.min( cells - 1, Math.floor( maxY / size ) ); cy ++ ) {
+
+					const key = cx * cells + cy;
+					if ( ! grid.has( key ) ) grid.set( key, [] );
+					grid.get( key ).push( item );
+
+				}
+
+			}
+
+		}
+
+	}
+
+	return {
+		// the spans of the extrusions other than feature self containing x, y
+		at( x, y, self ) {
+
+			const cx = Math.floor( x / size ), cy = Math.floor( y / size );
+			if ( cx < 0 || cy < 0 || cx >= cells || cy >= cells ) return [];
+			const out = [];
+			for ( const item of grid.get( cx * cells + cy ) ?? [] ) {
+
+				if ( item.f === self || x < item.minX || x > item.maxX || y < item.minY || y > item.maxY ) continue;
+				if ( insidePolygon( x, y, item.polygon ) ) out.push( item.span );
+
+			}
+
+			return out;
+
+		},
+	};
+
+}
+
+function insidePolygon( x, y, polygon ) {
+
+	let inside = false;
+	for ( let r = 0; r < polygon.length; r ++ ) {
+
+		const ring = polygon[ r ], n = ring.length / 2;
+		let inRing = false;
+		for ( let i = 0, j = n - 1; i < n; j = i ++ ) {
+
+			const xi = ring[ 2 * i ], yi = ring[ 2 * i + 1 ], xj = ring[ 2 * j ], yj = ring[ 2 * j + 1 ];
+			if ( ( yi > y ) !== ( yj > y ) && x < ( xj - xi ) * ( y - yi ) / ( yj - yi ) + xi ) inRing = ! inRing;
+
+		}
+
+		if ( r === 0 ) inside = inRing; else if ( inRing ) inside = false;
+
+	}
+
+	return inside;
+
+}
+
