@@ -1,5 +1,5 @@
 import { createTileProjection } from './TileProjection.js';
-import { appendRoofedExtrusion, roofColours, roofFromTags } from './buildRoofs.js';
+import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -184,7 +184,9 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 					} else if ( colours ) {
 
-						const t = appendExtrusion( target, polygon, projection, colours.wall, base, height, colours.roof );
+						// a flat building=roof is a slab under its top, as OSM2World draws it
+						const slabBase = hasWalls( feature.properties ) ? base : Math.max( base, height - 0.3 );
+						const t = appendExtrusion( target, polygon, projection, colours.wall, slabBase, height, colours.roof );
 						triangles += t;
 						if ( target !== block ) { target.triangles += t; block.triangles -= t; }
 

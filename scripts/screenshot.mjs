@@ -47,6 +47,11 @@ const SHOTS = [
 	// Pavillon de Marsan and the Richelieu wing's courtyards
 	{ name: 'louvre-marsan', page: 'vector', query: '&data=louvre&lat=48.8629&lon=2.3335&alt=260&heading=290&pitch=60' },
 	{ name: 'louvre-marly', page: 'vector', query: '&data=louvre&lat=48.8614&lon=2.3372&alt=300&heading=330&pitch=58' },
+	// roofs from OSM tags alone, where F4Map draws from the same data and
+	// not from its hand-made models: the Palais de Justice's mansards and
+	// the Theatre du Chatelet's hip
+	{ name: 'louvre-justice', page: 'vector', query: '&data=louvre&lat=48.8560&lon=2.3445&alt=320&heading=20&pitch=60' },
+	{ name: 'louvre-chatelet', page: 'vector', query: '&data=louvre&lat=48.8580&lon=2.3462&alt=220&heading=300&pitch=60' },
 	{ name: 'vector-louvre-close', page: 'vector', query: '&data=louvre&lat=48.8608&lon=2.3362&alt=420&heading=-35&pitch=62' },
 	{ name: 'vector-stub', page: 'vector', query: '&data=stub&alt=1200&heading=30&pitch=55' },
 	// a view that stops before the horizon does, hazed so the edge is air
