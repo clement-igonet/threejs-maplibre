@@ -6,6 +6,10 @@
 //   node scripts/osm-extract.mjs --fetch                # runs demo/data/louvre.overpassql first
 //   node scripts/osm-extract.mjs --dataset saint-lazare # the station, demo/data/saint-lazare.*
 //
+// A dataset may be several queries, <name>.overpassql and <name>.<part>.overpassql,
+// fetched one by one and merged (Overpass times out on one big one); the
+// bbox written into the output is the first query's.
+//
 // The output keeps the OpenMapTiles layer names (building, transportation,
 // water, waterway, park, landuse, place, poi) plus a "tree" layer, so a style
 // written for OpenFreeMap applies to it unchanged. Unlike OpenMapTiles it keeps
@@ -411,10 +415,31 @@ async function main() {
 
 	if ( process.argv.includes( '--fetch' ) ) {
 
-		const query = await readFile( queryPath, 'utf8' );
-		const response = await fetch( ENDPOINT, { method: 'POST', headers: { 'User-Agent': USER_AGENT }, body: new URLSearchParams( { data: query } ) } );
-		if ( ! response.ok ) throw new Error( `Overpass: ${ response.status } ${ response.statusText }` );
-		await writeFile( rawPath, await response.text() );
+		const { readdir } = await import( 'node:fs/promises' );
+		const parts = ( await readdir( dataDir ) ).filter( f => f === `${ dataset }.overpassql` || ( f.startsWith( `${ dataset }.` ) && f.endsWith( '.overpassql' ) ) ).sort();
+		const seen = new Set();
+		let merged = null;
+		for ( const part of parts ) {
+
+			const query = await readFile( path.join( dataDir, part ), 'utf8' );
+			const response = await fetch( ENDPOINT, { method: 'POST', headers: { 'User-Agent': USER_AGENT }, body: new URLSearchParams( { data: query } ) } );
+			if ( ! response.ok ) throw new Error( `Overpass: ${ response.status } ${ response.statusText } on ${ part }` );
+			const json = JSON.parse( await response.text() );
+			if ( merged === null ) merged = { ...json, elements: [] };
+			for ( const element of json.elements ) {
+
+				const key = `${ element.type }/${ element.id }`;
+				if ( seen.has( key ) ) continue;
+				seen.add( key );
+				merged.elements.push( element );
+
+			}
+
+			console.log( `${ part }: ${ json.elements.length } elements` );
+
+		}
+
+		await writeFile( rawPath, JSON.stringify( merged ) );
 
 	}
 
