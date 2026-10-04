@@ -117,14 +117,14 @@ export function appendFill( out, polygon, projection, rgba, height = 0 ) {
 // and "height", wound so the outward face is the front one. No normals are
 // stored: the faces are flat, so the material shades them from the
 // derivatives of the view position (flatShading).
-export function appendExtrusion( out, polygon, projection, rgba, base, height ) {
+export function appendExtrusion( out, polygon, projection, rgba, base, height, roofRGBA = rgba ) {
 
 	if ( height <= base ) return 0;
 
 	let triangles = 0;
 
 	// roof: flat, lit from above
-	triangles += appendFill( out, polygon, projection, rgba, height );
+	triangles += appendFill( out, polygon, projection, roofRGBA, height );
 
 	// walls
 	for ( const ring of polygon ) {

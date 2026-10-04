@@ -36,6 +36,13 @@ const SHOTS = [
 	{ name: 'vector-louvre', page: 'vector', query: '&data=louvre' },
 	{ name: 'vector-louvre-planar', page: 'vector', query: '&data=louvre&mode=planar' },
 	{ name: 'vector-louvre-top', page: 'vector', query: '&data=louvre&alt=1400&heading=0&pitch=0' },
+	// Simple 3D Buildings: the Pyramide du Louvre as a glass pyramid, and
+	// the Cour Carree's pavilions with their roofs
+	{ name: 'louvre-pyramid', page: 'vector', query: '&data=louvre&lat=48.8611&lon=2.3360&alt=220&heading=200&pitch=62' },
+	{ name: 'louvre-roofs', page: 'vector', query: '&data=louvre&lat=48.8604&lon=2.3395&alt=320&heading=0&pitch=58' },
+	// the same two views as fill-extrusion alone draws them, for the before
+	{ name: 'louvre-pyramid-flat', page: 'vector', query: '&data=louvre&roofs=0&lat=48.8611&lon=2.3360&alt=220&heading=200&pitch=62' },
+	{ name: 'louvre-roofs-flat', page: 'vector', query: '&data=louvre&roofs=0&lat=48.8604&lon=2.3395&alt=320&heading=0&pitch=58' },
 	{ name: 'vector-louvre-close', page: 'vector', query: '&data=louvre&lat=48.8608&lon=2.3362&alt=420&heading=-35&pitch=62' },
 	{ name: 'vector-stub', page: 'vector', query: '&data=stub&alt=1200&heading=30&pitch=55' },
 	// a view that stops before the horizon does, hazed so the edge is air

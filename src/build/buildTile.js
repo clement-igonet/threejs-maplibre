@@ -1,4 +1,5 @@
 import { createTileProjection } from './TileProjection.js';
+import { appendRoofedExtrusion, roofColours, roofFromTags } from './buildRoofs.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -50,10 +51,10 @@ function toRGBA( color, alpha ) {
 
 }
 
-function newBlock( layer, index, type ) {
+function newBlock( layer, index, type, glass = false ) {
 
 	return {
-		id: layer.id, index, type,
+		id: layer.id, index, type, glass,
 		positions: [], colors: [], indices: [], extrudes: [], sides: [], props: [],
 		vertexCount: 0, features: 0, triangles: 0,
 	};
@@ -67,6 +68,7 @@ function finishBlock( block ) {
 		id: block.id,
 		index: block.index,
 		type: block.type,
+		glass: block.glass,
 		features: block.features,
 		triangles: block.triangles,
 		vertices: block.vertexCount,
@@ -111,6 +113,11 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 		const type = layer.type;
 		const block = newBlock( layer, index, type );
 		const outline = type === 'fill' && layer.has( 'fill-outline-color' ) ? newBlock( layer, index, 'line' ) : null;
+		// roofs: a metadata key, so the style stays one MapLibre reads
+		const roofs = type === 'fill-extrusion' && layer.metadata && layer.metadata[ 'threejs-maplibre:roofs' ] ? { levelHeight: layer.metadata[ 'threejs-maplibre:level-height' ] ?? 2.5 } : null;
+		let glass = null; // translucent features go in a block of their own
+		// tile units per meter at this tile, for roofs sized from their footprint
+		const unitsPerMeter = extent / ( 40075016.686 * Math.cos( tileCenterLatitude( y, z ) * Math.PI / 180 ) / ( 1 << z ) );
 
 		// what is baked per vertex for this layer
 		const colorName = `${ type }-color`;
@@ -162,9 +169,30 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 				if ( feature.type !== 3 ) continue;
 				const height = layer.get( 'fill-extrusion-height', zoom, feature );
 				const base = layer.get( 'fill-extrusion-base', zoom, feature );
+				// Simple 3D Buildings, when the layer asks for them: the roof
+				// shape and colours from the feature's own tags
+				const roof = roofs ? roofFromTags( feature.properties, height, roofs.levelHeight ) : null;
+				const colours = roofs ? roofColours( feature.properties, rgba ) : null;
+				const target = colours && colours.glass ? ( glass ?? ( glass = newBlock( layer, index, type, true ) ) ) : block;
 				for ( const polygon of featurePolygons( sourceLayer, f, extent ) ) {
 
-					triangles += appendExtrusion( block, polygon, projection, rgba, base, height );
+					if ( roof ) {
+
+						const t = appendRoofedExtrusion( target, polygon, projection, colours, base, height, roof, unitsPerMeter );
+						triangles += t;
+						if ( target !== block ) { target.triangles += t; block.triangles -= t; }
+
+					} else if ( colours ) {
+
+						const t = appendExtrusion( target, polygon, projection, colours.wall, base, height, colours.roof );
+						triangles += t;
+						if ( target !== block ) { target.triangles += t; block.triangles -= t; }
+
+					} else {
+
+						triangles += appendExtrusion( block, polygon, projection, rgba, base, height );
+
+					}
 
 				}
 
@@ -198,7 +226,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 		}
 
-		for ( const b of [ block, outline ] ) {
+		for ( const b of [ block, outline, glass ] ) {
 
 			const finished = b && finishBlock( b );
 			if ( finished ) {
@@ -234,5 +262,12 @@ export function builtTileTransferables( built ) {
 	}
 
 	return list;
+
+}
+
+function tileCenterLatitude( y, z ) {
+
+	const n = Math.PI - 2 * Math.PI * ( y + 0.5 ) / ( 1 << z );
+	return Math.atan( 0.5 * ( Math.exp( n ) - Math.exp( - n ) ) ) * 180 / Math.PI;
 
 }

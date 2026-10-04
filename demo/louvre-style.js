@@ -127,6 +127,9 @@ export const LOUVRE_STYLE = {
 			id: 'building-3d', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'building',
 			minzoom: 14,
 			filter: [ '!', [ 'has', 'hide_3d' ] ],
+			// Simple 3D Buildings from the features' own tags: a metadata key
+			// MapLibre ignores, so this stays a style it can load
+			metadata: { 'threejs-maplibre:roofs': true },
 			paint: {
 				'fill-extrusion-color': BUILDING_COLOR,
 				'fill-extrusion-height': [ 'get', 'render_height' ],

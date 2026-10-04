@@ -304,7 +304,7 @@ export class VectorTileMap extends TileTree {
 
 	_entry( block ) {
 
-		const key = `${ block.index }:${ block.type }`;
+		const key = `${ block.index }:${ block.type }${ block.glass ? ':glass' : '' }`;
 		let entry = this._materials.get( key );
 		if ( entry ) return entry;
 
@@ -320,6 +320,8 @@ export class VectorTileMap extends TileTree {
 			// flat faces shaded from the derivatives of the view position:
 			// no normal attribute to build, transfer or keep
 			material = new MeshLambertMaterial( { vertexColors: true, flatShading: true } );
+			// glass: the vertex alpha shows through, drawn after the opaque batch
+			if ( block.glass ) Object.assign( material, { transparent: true, depthWrite: false } );
 
 		} else {
 
@@ -344,7 +346,7 @@ export class VectorTileMap extends TileTree {
 
 		// an outline block is the line drawn around a fill layer
 		const outline = layer.type === 'fill' && block.type === 'line';
-		entry = { material, layer, type: block.type, outline, batch, instances: 0 };
+		entry = { material, layer, type: block.type, outline, batch, instances: 0, glass: !! block.glass };
 		this._materials.set( key, entry );
 		this._updateMaterial( entry );
 		return entry;
@@ -352,7 +354,7 @@ export class VectorTileMap extends TileTree {
 	}
 
 	// Evaluates the layer's camera-kind properties at the current zoom.
-	_updateMaterial( { material, layer, type, outline } ) {
+	_updateMaterial( { material, layer, type, outline, glass } ) {
 
 		const zoom = this.zoom;
 		material.visible = zoom >= layer.minzoom && zoom < layer.maxzoom;
@@ -387,7 +389,7 @@ export class VectorTileMap extends TileTree {
 
 		if ( type === 'fill-extrusion' ) {
 
-			material.transparent = alpha < 1;
+			material.transparent = alpha < 1 || glass;
 
 		} else if ( type === 'line' ) {
 

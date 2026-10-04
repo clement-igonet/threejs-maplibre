@@ -22,7 +22,9 @@ const dataDir = path.join( root, 'demo', 'data' );
 const rawPath = path.join( dataDir, 'louvre.osm.json' );
 const outPath = path.join( dataDir, 'louvre.json' );
 const queryPath = path.join( dataDir, 'louvre.overpassql' );
-const ENDPOINT = 'https://overpass-api.de/api/interpreter';
+const ENDPOINT = process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter';
+// Overpass answers 406 to a request without a User-Agent naming its sender
+const USER_AGENT = 'threejs-maplibre/0.1 (+https://github.com/clement-igonet/threejs-maplibre)';
 
 // tags that describe the object rather than its bookkeeping
 const DROP_TAG = /^(addr:|source|wiki|ref|note|fixme|contact:|check_date|survey|mapillary|panoramax|heritage|mhs:|name:|alt_name|old_name|official_name|short_name|opening_hours|phone|website|email|description|image|url|start_date|inscription|created_by|is_in|toilets|payment:|diet:|cuisine|brand|operator|wheelchair|internet|smoking|takeaway|outdoor_seating|delivery|drive_through|reservation|capacity|fee|access|level$)/;
@@ -239,26 +241,51 @@ function convert( osm ) {
 
 	}
 
-	// buildings that contain building parts are hidden in 3D too
+	// buildings that contain building parts are hidden in 3D too, and the
+	// parts inherit what the outline says and they do not (OSM2World's
+	// inheritTags; heights only when the part gives none of its own, as its
+	// LevelAndHeightData does), so a pavilion mapped as a bare part stands
+	// as tall as its palace rather than at the 5 m default
 	const buildings = layers.building.features;
 	const parts = buildings.filter( f => f.properties[ 'building:part' ] && ! f.properties.building );
 	const outlines = buildings.filter( f => f.properties.building );
-	for ( const outline of outlines ) {
+	const HEIGHT_TAGS = [ 'height', 'building:levels', 'roof:levels' ];
+	let inherited = 0;
+	for ( const part of parts ) {
 
-		if ( outline.properties.hide_3d ) continue;
-		for ( const part of parts ) {
+		const rings = part.geometry.type === 'Polygon' ? part.geometry.coordinates : part.geometry.coordinates[ 0 ];
+		const centroid = ringCentroid( rings[ 0 ] );
+		const outline = outlines.find( o => pointInPolygon( centroid, o.geometry ) );
+		if ( ! outline ) continue;
+		outline.properties.hide_3d = true;
 
-			const rings = part.geometry.type === 'Polygon' ? part.geometry.coordinates : part.geometry.coordinates[ 0 ];
-			if ( pointInPolygon( ringCentroid( rings[ 0 ] ), outline.geometry ) ) {
+		const from = outline.properties, into = part.properties;
+		const ownHeight = HEIGHT_TAGS.some( key => into[ key ] !== undefined );
+		let changed = false;
+		for ( const key of Object.keys( from ) ) {
 
-				outline.properties.hide_3d = true;
-				break;
+			if ( key === 'building' || key === 'hide_3d' || key.startsWith( 'render_' ) || into[ key ] !== undefined ) continue;
+			if ( ownHeight && ( HEIGHT_TAGS.includes( key ) || key === 'min_height' || key === 'building:min_level' || key === 'roof:height' ) ) continue;
+			into[ key ] = from[ key ];
+			changed = true;
+
+		}
+
+		if ( changed ) {
+
+			inherited ++;
+			if ( ! ownHeight ) {
+
+				into.render_height = from.render_height;
+				into.render_min_height = from.render_min_height;
 
 			}
 
 		}
 
 	}
+
+	console.log( `parts inheriting from their outline: ${ inherited }` );
 
 	return layers;
 
@@ -269,7 +296,7 @@ async function main() {
 	if ( process.argv.includes( '--fetch' ) ) {
 
 		const query = await readFile( queryPath, 'utf8' );
-		const response = await fetch( ENDPOINT, { method: 'POST', body: new URLSearchParams( { data: query } ) } );
+		const response = await fetch( ENDPOINT, { method: 'POST', headers: { 'User-Agent': USER_AGENT }, body: new URLSearchParams( { data: query } ) } );
 		if ( ! response.ok ) throw new Error( `Overpass: ${ response.status } ${ response.statusText }` );
 		await writeFile( rawPath, await response.text() );
 
