@@ -11,6 +11,9 @@
 			#levels { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; }
 			#levels button { font: 13px ui-monospace, monospace; padding: 4px 10px; border: 0; border-radius: 4px; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; }
 			#levels button.on { background: #d9452b; }
+			#route { position: absolute; top: 48px; left: 8px; display: flex; gap: 6px; align-items: center; font: 13px ui-monospace, monospace; color: #fff; }
+			#route select, #route button { font: 13px ui-monospace, monospace; padding: 4px 6px; border: 0; border-radius: 4px; background: rgba(0, 0, 0, 0.6); color: #fff; max-width: 220px; }
+			#route button.on { background: #d9452b; }
 			#version { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; }
 			#attribution { position: absolute; bottom: 8px; right: 8px; padding: 2px 6px; font: 11px sans-serif; background: rgba(255, 255, 255, 0.8); }
 		</style>
@@ -18,6 +21,7 @@
 	<body>
 		<div id="info"></div>
 		<div id="levels"></div>
+		<div id="route"><select id="from"></select><span>to</span><select id="to"></select><button id="go">route</button><button id="follow">follow</button></div>
 		<div id="version"></div>
 		<div id="attribution"></div>
 		<script type="module">
@@ -28,11 +32,22 @@
 			// level, so the buttons show one level or all, and the levels can
 			// be pulled apart.
 			//
+			// A route: two named spaces (the selects, or ?from=&to=), the
+			// graph of rooms, doors, stairs and lifts routed with A*, the way
+			// drawn as a line through the levels and walked at 1.4 m/s by a
+			// figure the camera can follow, the shown level following it.
+			//
 			//   ?level=0|-1|...|all   ?explode=<meters between levels>
+			//   ?from=Sephora&to=Ladurée   ?t=<seconds into the walk>   ?follow=1   ?speed=<times real time>
 			//   ?lat=&lon=&alt=&heading=&pitch=
 
-			import { DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, SRGBColorSpace, WebGLRenderer } from 'three';
-			import { AttributionControl, MAPLIBRE_FOV, MapControls, Style, VectorTileMap } from '../src/index.js';
+			import { CapsuleGeometry, Color, DirectionalLight, HemisphereLight, Mesh, MeshStandardMaterial, PerspectiveCamera, Scene, SRGBColorSpace, Vector2, WebGLRenderer } from 'three';
+			import { Line2 } from 'three/addons/lines/Line2.js';
+			import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+			import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+			import { AttributionControl, MAPLIBRE_FOV, MapControls, Style, VectorTileMap, latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/index.js';
+			import { IndoorGraph } from '../src/indoor/IndoorGraph.js';
+			import { RouteWalker } from '../src/indoor/RouteWalker.js';
 			import { createGeoJSONVectorSource } from './geojson-vector-source.js';
 			import { STATION_STYLE } from './station-style.js';
 
@@ -98,24 +113,134 @@
 			const explode = document.createElement( 'button' );
 			let spacing = num( 'explode', 0 );
 			explode.textContent = 'explode';
-			explode.addEventListener( 'click', () => { spacing = spacing ? 0 : 12; map.explode( spacing ); explode.classList.toggle( 'on', spacing > 0 ); } );
+			explode.addEventListener( 'click', () => { spacing = spacing ? 0 : 12; map.explode( spacing ); explode.classList.toggle( 'on', spacing > 0 ); drawRoute(); } );
 			explode.classList.toggle( 'on', spacing > 0 );
 			bar.appendChild( explode );
 			map.explode( spacing );
 			select( params.get( 'level' ) === 'all' ? null : num( 'level', 0 ) );
 
+			// --- the route and its walker -----------------------------------------
+
+			const graph = IndoorGraph.fromLayers( layers );
+			const LEVEL_HEIGHT = 3;
+			const toScene = ( x, y, level ) => {
+
+				const { lon, lat } = graph.toLonLat( x, y );
+				const [ mx, my ] = normalizedToMeters( longitudeToNormalized( lon ), latitudeToNormalized( lat ) );
+				return [ mx, level * LEVEL_HEIGHT + 0.3 + level * spacing, - my ];
+
+			};
+
+			const named = graph.nodes.filter( n => n.kind === 'space' && n.name ).sort( ( a, b ) => a.level - b.level || a.name.localeCompare( b.name ) );
+			for ( const id of [ 'from', 'to' ] ) {
+
+				const select = document.getElementById( id );
+				for ( const n of named ) {
+
+					const option = document.createElement( 'option' );
+					option.value = n.id;
+					option.textContent = `${ n.name } (level ${ n.level })`;
+					select.appendChild( option );
+
+				}
+
+			}
+
+			const lineMaterial = new LineMaterial( { color: 0xd9452b, linewidth: 4, depthTest: false, resolution: new Vector2( window.innerWidth, window.innerHeight ) } );
+			let routeLine = null, walker = null, route = null, walkerMesh = null, startedAt = 0;
+			const speed = num( 'speed', 1 );
+			let following = params.get( 'follow' ) === '1';
+			const figure = new Mesh( new CapsuleGeometry( 0.35, 1.0, 4, 12 ), new MeshStandardMaterial( { color: 0xff7a1a, roughness: 0.6 } ) );
+			figure.visible = false;
+			scene.add( figure );
+
+			function drawRoute() {
+
+				if ( routeLine ) { scene.remove( routeLine ); routeLine.geometry.dispose(); routeLine = null; }
+				if ( ! route ) return;
+				const geometry = new LineGeometry();
+				geometry.setPositions( route.path.flatMap( p => toScene( p.x, p.y, p.level ) ) );
+				routeLine = new Line2( geometry, lineMaterial );
+				routeLine.computeLineDistances();
+				// drawn after every floor: with no depth test of its own it still
+				// gets overdrawn by what is drawn later and nearer, which pulled
+				// apart levels are
+				routeLine.renderOrder = 1000;
+				scene.add( routeLine );
+
+			}
+
+			function setRoute( fromId, toId ) {
+
+				const a = graph.node( fromId ), b = graph.node( toId );
+				if ( ! a || ! b ) return;
+				route = graph.route( { x: a.x, y: a.y, level: a.level }, { x: b.x, y: b.y, level: b.level } );
+				walker = route ? new RouteWalker( route ) : null;
+				startedAt = performance.now() - num( 't', 0 ) * 1000 / speed;
+				figure.visible = !! walker;
+				drawRoute();
+				// the view goes to the route's middle unless the URL placed it
+				if ( route && ! params.has( 'lat' ) ) {
+
+					const mid = route.path[ Math.floor( route.path.length / 2 ) ];
+					const { lon, lat } = graph.toLonLat( mid.x, mid.y );
+					controls.setView( { lat, lon } );
+
+				}
+
+			}
+
+			// a name, or name@level when the name is on several levels (Paul@1)
+			const byName = text => { const [ name, level ] = text.split( '@' ); const n = graph.findSpace( name, level === undefined ? undefined : Number( level ) ); return n ? n.id : null; };
+			document.getElementById( 'go' ).addEventListener( 'click', () => setRoute( document.getElementById( 'from' ).value, document.getElementById( 'to' ).value ) );
+			const followButton = document.getElementById( 'follow' );
+			followButton.classList.toggle( 'on', following );
+			followButton.addEventListener( 'click', () => { following = ! following; followButton.classList.toggle( 'on', following ); } );
+			if ( params.has( 'from' ) && params.has( 'to' ) ) {
+
+				const fromId = byName( params.get( 'from' ) ), toId = byName( params.get( 'to' ) );
+				if ( fromId && toId ) {
+
+					document.getElementById( 'from' ).value = fromId;
+					document.getElementById( 'to' ).value = toId;
+					setRoute( fromId, toId );
+
+				}
+
+			}
+
 			const info = document.getElementById( 'info' );
 			let last = performance.now(), stableFrames = 0;
+			const where = { x: 0, y: 0, level: 0, heading: 0, done: false };
 			renderer.setAnimationLoop( () => {
 
 				const now = performance.now();
 				const delta = now - last;
 				last = now;
+
+				if ( walker ) {
+
+					walker.at( ( now - startedAt ) / 1000 * speed, where );
+					const [ x, y, z ] = toScene( where.x, where.y, where.level );
+					figure.position.set( x, y + 0.9, z );
+					figure.rotation.y = where.heading;
+					if ( following ) {
+
+						const { lon, lat } = graph.toLonLat( where.x, where.y );
+						controls.setView( { lat, lon, distance: 45, heading: ( 90 - where.heading * 180 / Math.PI + 360 ) % 360, pitch: 62 } );
+						const level = Math.round( where.level );
+						if ( map.level !== null && map.level !== undefined && map.level !== level ) select( level );
+
+					}
+
+				}
+
 				controls.update();
 				map.update( camera, renderer, delta );
 				renderer.render( scene, camera );
 				const s = map.stats;
-				info.textContent = `threejs-maplibre M4, indoor: Gare Saint-Lazare | level ${ map.level === null || map.level === undefined ? 'all' : map.level } | explode ${ spacing } m | levels built ${ map.levels.length } | rendered ${ s.rendered } | loading ${ s.loading } | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles }`;
+				const walk = walker ? ` | route ${ Math.round( route.seconds ) } s, ${ route.path.length } points, levels ${ [ ...new Set( route.path.map( p => p.level ) ) ].join( ' ' ) } | walker at ${ Math.round( ( now - startedAt ) / 1000 * speed ) } s on level ${ where.level.toFixed( 1 ) }${ where.done ? ', arrived' : '' }` : '';
+				info.textContent = `threejs-maplibre M4, indoor: Gare Saint-Lazare | level ${ map.level === null || map.level === undefined ? 'all' : map.level } | explode ${ spacing } m | levels built ${ map.levels.length } | rendered ${ s.rendered } | loading ${ s.loading } | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles }${ walk }`;
 				stableFrames = s.loading === 0 && s.rendered > 0 ? stableFrames + 1 : 0;
 				window.__SHOT_READY = stableFrames > 30;
 
@@ -126,9 +251,12 @@
 				camera.aspect = window.innerWidth / window.innerHeight;
 				camera.updateProjectionMatrix();
 				renderer.setSize( window.innerWidth, window.innerHeight );
+				lineMaterial.resolution.set( window.innerWidth, window.innerHeight );
 
 			} );
 
+			window.__GRAPH = graph;
+			window.__ROUTE = () => ( { line: routeLine, figure, route } );
 			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
 			window.__MAP = map;
 			window.__CONTROLS = controls;

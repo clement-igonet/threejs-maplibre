@@ -1063,3 +1063,60 @@ level heights from `indoor=level`, and the walker (PR D).
 
 ![Gare Saint-Lazare, level 0](../evidence/m4/indoor-level-0.png)
 ![Gare Saint-Lazare, every level pulled apart](../evidence/m4/indoor-exploded.png)
+
+### Doors, stairs, lifts, and a walker
+
+A door is a node on a room's ring (209 of Saint-Lazare's 254 sit on a
+vertex, the rest on an edge), so the wall builder cuts the edges it lies
+on, 1.2 m wide unless `width` says otherwise, half a door off each edge
+meeting at a vertex. A staircase or escalator (`highway=steps` with
+levels) is drawn as the slope it climbs, 1.5 m wide from its lowest level
+to its highest, down the way when `incline=down`, built into every level
+it serves so each level shows its own way up; a lift is a shaft of four
+walls over the levels it serves. Both come from the transportation
+source layer through the same metadata key.
+
+The route is a graph over the same data (`src/indoor/IndoorGraph.js`,
+no three.js): a node per room, corridor or area per level, per door per
+level, per staircase end and per lift per level; edges from a door to
+the spaces whose ring it lies on or whose polygon contains it, between
+open spaces that share a vertex or nest, along a staircase at its length
+over walking speed plus 20 s a level (escalators 0.7 of that), up a lift
+at 15 s a level; A* with the horizontal time plus the cheapest climb as
+its heuristic. On Saint-Lazare: 463 spaces, 320 doors, 178 staircases, 6
+lifts, 1 459 edges; Sephora on level -1 to Ladurée on level 0 in 111 s
+through one climb, to Paul on level 1 in 242 s through two. What the
+data defeats is counted in `graph.stats` and said in the tests: 45 spaces
+with no door mapped, 33 doors on no ring, the Passage du Havre across the
+street as a component of its own, the Métro 3 platforms 5 m from the
+hall's areas. `RouteWalker` walks the route in time, the flat at 1.4 m/s
+and the stairs at the route's own pace; the demo draws the route as a
+line through the levels (drawn last, since a line with no depth test is
+still overdrawn by a nearer floor drawn later), moves a figure along it,
+and can follow it with the camera, the shown level following the figure.
+
+Not here: `conveying` direction (edges are undirected), doors as rooms'
+only way in (a room sharing a vertex with an open area is open to it),
+windows, level heights from `indoor=level`.
+
+![A route from a shop on level -1 to a cafe on level 1, through the exploded levels](../evidence/m4/indoor-route.png)
+![The walker followed up the escalators onto level 0](../evidence/m4/indoor-walker.png)
+
+### Where this stands against OSM2World
+
+OSM2World is the rule book the north star names, MIT since 2026, and
+every rule here is read in its source and carried with its tests where
+it has them. The table is kept current.
+
+| area | OSM2World | here |
+|---|---|---|
+| heights | 2.5 m a level, `height` wins, `min_height`, `building:min_level` | same; the extract keeps OpenMapTiles' 3.66 m for `building:levels` without `height` |
+| roof height | `roof:height`, `roof:angle`, `roof:levels`, else a dome's radius or 5 m | same |
+| ridge | `roof:direction` snapped to walls (45, 10, 0.5 degrees), `roof:orientation`, longest side | same |
+| roof shapes | 17 values, unknown flat; hipped quasi-rectangular | same values; hipped family on the straight skeleton (F4Map's way); `roof:ridge` and `roof:edge` not yet |
+| parts | inherit the outline's tags, heights only when the part has none; outline drawn below 90% coverage | same, the outline minus its parts (F4Map's way) |
+| colours and materials | `building:colour`, `roof:colour`, material to colour, glass | colours and glass; no textures |
+| `level=*` | integers, lists, ranges; decimals rejected | same, decimals accepted since the data has them |
+| indoor | rooms as walls, floor and ceiling; areas; walls; doors and windows on walls; lifts; level heights from `indoor=level` | floors, walls, doors as openings, stairs as ramps (none there), lifts; no ceilings, no windows, levels 3 m |
+| routing | none | a graph and A* |
+| roads in 3D, trees, power lines, LOD | yes | no, M5 |
