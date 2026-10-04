@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>threejs-maplibre indoor: Gare Saint-Lazare</title>
+		<style>
+			html, body { margin: 0; height: 100%; overflow: hidden; background: #e9e6df; }
+			canvas { display: block; }
+			#info { position: absolute; top: 8px; left: 8px; padding: 6px 10px; font: 13px/1.4 ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; white-space: pre; pointer-events: none; }
+			#levels { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; }
+			#levels button { font: 13px ui-monospace, monospace; padding: 4px 10px; border: 0; border-radius: 4px; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; }
+			#levels button.on { background: #d9452b; }
+			#version { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; }
+			#attribution { position: absolute; bottom: 8px; right: 8px; padding: 2px 6px; font: 11px sans-serif; background: rgba(255, 255, 255, 0.8); }
+		</style>
+	</head>
+	<body>
+		<div id="info"></div>
+		<div id="levels"></div>
+		<div id="version"></div>
+		<div id="attribution"></div>
+		<script type="module">
+
+			// Simple Indoor Tagging in 3D: Gare Saint-Lazare from the extract in
+			// demo/data/saint-lazare.json, rooms, corridors and areas as floor
+			// slabs, indoor=wall ways and room outlines as walls, one block per
+			// level, so the buttons show one level or all, and the levels can
+			// be pulled apart.
+			//
+			//   ?level=0|-1|...|all   ?explode=<meters between levels>
+			//   ?lat=&lon=&alt=&heading=&pitch=
+
+			import { DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, SRGBColorSpace, WebGLRenderer } from 'three';
+			import { AttributionControl, MAPLIBRE_FOV, MapControls, Style, VectorTileMap } from '../src/index.js';
+			import { createGeoJSONVectorSource } from './geojson-vector-source.js';
+			import { STATION_STYLE } from './station-style.js';
+
+			const params = new URLSearchParams( location.search );
+			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
+
+			const response = await fetch( new URL( './data/saint-lazare.json', import.meta.url ) );
+			const { meta, layers } = await response.json();
+			const { source } = createGeoJSONVectorSource( layers, {
+				maxZoom: 16,
+				attribution: `<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (${ meta.osm_base.slice( 0, 10 ) })`,
+			} );
+			const style = new Style( STATION_STYLE );
+
+			// the levels the data holds, for the buttons
+			const levels = new Set();
+			for ( const f of layers.indoor.features ) if ( f.properties.levels ) for ( const l of f.properties.levels.split( ';' ) ) levels.add( Number( l ) );
+			const LEVELS = [ ...levels ].filter( l => Number.isInteger( l ) ).sort( ( a, b ) => b - a );
+
+			const renderer = new WebGLRenderer( { antialias: true } );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.outputColorSpace = SRGBColorSpace;
+			document.body.appendChild( renderer.domElement );
+
+			const scene = new Scene();
+			scene.background = style.backgroundLayer ? style.backgroundLayer.get( 'background-color', 16 ) : null;
+			if ( scene.background ) { const { rgb } = scene.background; scene.background = new ( await import( 'three' ) ).Color( rgb[ 0 ], rgb[ 1 ], rgb[ 2 ] ); }
+			const camera = new PerspectiveCamera( MAPLIBRE_FOV, window.innerWidth / window.innerHeight, 1, 1e7 );
+			const controls = new MapControls( camera, renderer.domElement, { mode: 'planar' } );
+			controls.minAltitude = 5;
+			controls.setView( { lat: num( 'lat', 48.8762 ), lon: num( 'lon', 2.3253 ), distance: num( 'alt', 520 ), heading: num( 'heading', 25 ), pitch: num( 'pitch', 58 ) } );
+
+			scene.add( new HemisphereLight( 0xffffff, 0x8a8478, 1.1 ) );
+			const sun = new DirectionalLight( 0xffffff, 1.8 );
+			sun.position.set( 300, 600, 200 );
+			scene.add( sun );
+
+			const map = new VectorTileMap( source, style, { mode: 'planar', sourceId: 'openmaptiles', viewDistance: 3000 } );
+			scene.add( map );
+			new AttributionControl( document.getElementById( 'attribution' ) ).addSource( source );
+
+			// level buttons
+			const bar = document.getElementById( 'levels' );
+			const buttons = new Map();
+			function select( level ) {
+
+				map.setLevel( level );
+				for ( const [ key, button ] of buttons ) button.classList.toggle( 'on', key === String( level ) );
+
+			}
+
+			for ( const level of [ 'all', ...LEVELS ] ) {
+
+				const button = document.createElement( 'button' );
+				button.textContent = level === 'all' ? 'all levels' : `level ${ level }`;
+				button.addEventListener( 'click', () => select( level === 'all' ? null : level ) );
+				buttons.set( String( level === 'all' ? null : level ), button );
+				bar.appendChild( button );
+
+			}
+
+			const explode = document.createElement( 'button' );
+			let spacing = num( 'explode', 0 );
+			explode.textContent = 'explode';
+			explode.addEventListener( 'click', () => { spacing = spacing ? 0 : 12; map.explode( spacing ); explode.classList.toggle( 'on', spacing > 0 ); } );
+			explode.classList.toggle( 'on', spacing > 0 );
+			bar.appendChild( explode );
+			map.explode( spacing );
+			select( params.get( 'level' ) === 'all' ? null : num( 'level', 0 ) );
+
+			const info = document.getElementById( 'info' );
+			let last = performance.now(), stableFrames = 0;
+			renderer.setAnimationLoop( () => {
+
+				const now = performance.now();
+				const delta = now - last;
+				last = now;
+				controls.update();
+				map.update( camera, renderer, delta );
+				renderer.render( scene, camera );
+				const s = map.stats;
+				info.textContent = `threejs-maplibre M4, indoor: Gare Saint-Lazare | level ${ map.level === null || map.level === undefined ? 'all' : map.level } | explode ${ spacing } m | levels built ${ map.levels.length } | rendered ${ s.rendered } | loading ${ s.loading } | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles }`;
+				stableFrames = s.loading === 0 && s.rendered > 0 ? stableFrames + 1 : 0;
+				window.__SHOT_READY = stableFrames > 30;
+
+			} );
+
+			window.addEventListener( 'resize', () => {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			} );
+
+			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
+			window.__MAP = map;
+			window.__CONTROLS = controls;
+
+		</script>
+	</body>
+</html>

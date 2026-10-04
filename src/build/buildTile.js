@@ -1,5 +1,6 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
+import { appendFloor, appendWallRun, featureLevels } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -69,6 +70,7 @@ function finishBlock( block ) {
 		index: block.index,
 		type: block.type,
 		glass: block.glass,
+		level: block.level,
 		features: block.features,
 		triangles: block.triangles,
 		vertices: block.vertexCount,
@@ -116,6 +118,26 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 		// roofs: a metadata key, so the style stays one MapLibre reads
 		const roofs = type === 'fill-extrusion' && layer.metadata && layer.metadata[ 'threejs-maplibre:roofs' ] ? { levelHeight: layer.metadata[ 'threejs-maplibre:level-height' ] ?? 2.5 } : null;
 		let glass = null; // translucent features go in a block of their own
+		// indoor: 'floor' or 'wall' from the metadata, built per level into a
+		// block per level, so levels can be shown one at a time
+		const indoor = type === 'fill-extrusion' && layer.metadata && layer.metadata[ 'threejs-maplibre:indoor' ] || null;
+		const levelHeight = layer.metadata && layer.metadata[ 'threejs-maplibre:level-height' ] || 3;
+		const wallHeight = layer.metadata && layer.metadata[ 'threejs-maplibre:wall-height' ] || levelHeight - 0.5;
+		const levelBlocks = new Map();
+		const levelBlock = level => {
+
+			let b = levelBlocks.get( level );
+			if ( ! b ) {
+
+				b = newBlock( layer, index, type );
+				b.level = level;
+				levelBlocks.set( level, b );
+
+			}
+
+			return b;
+
+		};
 		// tile units per meter at this tile, for roofs sized from their footprint
 		const unitsPerMeter = extent / ( 40075016.686 * Math.cos( tileCenterLatitude( y, z ) * Math.PI / 180 ) / ( 1 << z ) );
 
@@ -159,6 +181,38 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 							outline.triangles += appendLine( outline, { points, startEdge: null, endEdge: null }, projection, outlineRGBA, [ 1, 0, 0 ] );
 
 						}
+
+					}
+
+				}
+
+			} else if ( indoor ) {
+
+				if ( feature.type === 1 ) continue;
+				const levels = featureLevels( feature.properties );
+				if ( levels.length === 0 ) continue;
+				const polygons = feature.type === 3 ? featurePolygons( sourceLayer, f, extent ) : null;
+				const runs = feature.type === 2 ? featureLines( sourceLayer, f, extent ) : null;
+				for ( const level of levels ) {
+
+					const target = levelBlock( level );
+					const base = level * levelHeight;
+					let t = 0;
+					if ( indoor === 'floor' && polygons ) {
+
+						for ( const polygon of polygons ) t += appendFloor( target, polygon, projection, rgba, base );
+
+					} else if ( indoor === 'wall' ) {
+
+						if ( polygons ) for ( const polygon of polygons ) for ( const ring of polygon ) t += appendWallRun( target, ring, projection, rgba, base, base + wallHeight, true );
+						if ( runs ) for ( const run of runs ) t += appendWallRun( target, run.points, projection, rgba, base, base + wallHeight, false );
+
+					}
+
+					if ( t > 0 ) {
+
+						target.triangles += t;
+						target.features ++;
 
 					}
 
@@ -228,7 +282,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 		}
 
-		for ( const b of [ block, outline, glass ] ) {
+		for ( const b of [ block, outline, glass, ...levelBlocks.values() ] ) {
 
 			const finished = b && finishBlock( b );
 			if ( finished ) {

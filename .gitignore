@@ -3,3 +3,4 @@ screenshots/
 /dist/
 demo/data/louvre.osm.json
 /build/
+demo/data/saint-lazare.osm.json

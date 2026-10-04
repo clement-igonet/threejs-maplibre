@@ -304,7 +304,7 @@ export class VectorTileMap extends TileTree {
 
 	_entry( block ) {
 
-		const key = `${ block.index }:${ block.type }${ block.glass ? ':glass' : '' }`;
+		const key = `${ block.index }:${ block.type }${ block.glass ? ':glass' : '' }${ block.level !== undefined ? `:L${ block.level }` : '' }`;
 		let entry = this._materials.get( key );
 		if ( entry ) return entry;
 
@@ -346,10 +346,51 @@ export class VectorTileMap extends TileTree {
 
 		// an outline block is the line drawn around a fill layer
 		const outline = layer.type === 'fill' && block.type === 'line';
-		entry = { material, layer, type: block.type, outline, batch, instances: 0, glass: !! block.glass };
+		entry = { material, layer, type: block.type, outline, batch, instances: 0, glass: !! block.glass, level: block.level };
 		this._materials.set( key, entry );
 		this._updateMaterial( entry );
+		if ( block.level !== undefined ) this._placeLevel( entry );
 		return entry;
+
+	}
+
+	// --- levels ------------------------------------------------------------
+
+	// The indoor levels built so far, sorted.
+	get levels() {
+
+		const levels = new Set();
+		for ( const entry of this._materials.values() ) if ( entry.level !== undefined ) levels.add( entry.level );
+		return [ ...levels ].sort( ( a, b ) => a - b );
+
+	}
+
+	// Shows one indoor level, or all of them with null. What has no level
+	// (the buildings, the streets) is always shown.
+	setLevel( level ) {
+
+		this.level = level;
+		for ( const entry of this._materials.values() ) if ( entry.level !== undefined ) this._placeLevel( entry );
+
+	}
+
+	// Pulls the levels apart by this many meters each, 0 to stack them back.
+	// Along the map's up, so a planar map; on the globe the floors would
+	// rise along world y, which is only up at the equator.
+	explode( spacing ) {
+
+		this.explodeSpacing = spacing;
+		for ( const entry of this._materials.values() ) if ( entry.level !== undefined ) this._placeLevel( entry );
+
+	}
+
+	_placeLevel( entry ) {
+
+		const { batch, level } = entry;
+		batch.visible = this.level === undefined || this.level === null || this.level === level;
+		batch.position.copy( this._origin );
+		batch.position.y += level * ( this.explodeSpacing ?? 0 );
+		batch.updateMatrix();
 
 	}
 
@@ -466,10 +507,18 @@ export class VectorTileMap extends TileTree {
 		if ( _camPos.distanceTo( this._origin ) < this.originRadius ) return;
 
 		this._origin.copy( _camPos );
-		for ( const { batch } of this._materials.values() ) {
+		for ( const entry of this._materials.values() ) {
 
-			batch.position.copy( this._origin );
-			batch.updateMatrix();
+			if ( entry.level !== undefined ) {
+
+				this._placeLevel( entry ); // keeps the level's lift
+
+			} else {
+
+				entry.batch.position.copy( this._origin );
+				entry.batch.updateMatrix();
+
+			}
 
 		}
 

@@ -76,6 +76,11 @@ const SHOTS = [
 	// the whole earth from 20 000 km with the pin still on the pyramid
 	{ name: 'underlay-globe', page: 'underlay', query: '&projection=globe&buildings=1&data=louvre', live: true },
 	{ name: 'underlay-globe-far', page: 'underlay', query: '&projection=globe&alt=20000000&pitch=0&heading=0', live: true },
+	// indoor: Gare Saint-Lazare, the ground level alone, the first basement,
+	// and every level pulled apart
+	{ name: 'indoor-level-0', page: 'indoor', query: '&level=0' },
+	{ name: 'indoor-level-minus1', page: 'indoor', query: '&level=-1' },
+	{ name: 'indoor-exploded', page: 'indoor', query: '&level=all&explode=12&alt=900&pitch=55' },
 ];
 
 // live shots on OpenFreeMap's Liberty style (SHOT_LIVE=0 skips them): the
