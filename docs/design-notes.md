@@ -1025,3 +1025,41 @@ The shapes match; what F4Map has over this picture is materials, textured
 facades and slate, which is M5's concern, not a roof's.
 
 ![The Palais de Justice from its tags](../evidence/m4/louvre-justice.png)
+### Indoor: Simple Indoor Tagging as levels
+
+What the kickoff assumed did not hold up to reading the code: neither
+map-gl-indoor nor TUM's maplibre-gl-indoor parses OSM's `level=*` (a list
+of three is dropped, a range parses as its first number, `repeat_on` is
+never read), neither has a router, and the "shared corpus" of level
+tagging does not exist. What does exist is two renderers that publish
+their level grammar with tests, indoorequal's `level_to_array` (SQL, BSD,
+17 cases) and OSM2World's `parseLevels` (Java, MIT), so
+`src/indoor/levels.js` is written from both, every case carried over,
+decimals accepted where OSM2World rejects them because the Paris
+stations use them (`-3.5;-3` at Chatelet-Les Halles).
+
+The data: Gare Saint-Lazare, the richest Paris station in OSM (236
+rooms, 98 corridors, 54 areas, 80 `indoor=wall` ways, 254 doors over
+levels -7 to 2), extracted by `scripts/osm-extract.mjs --dataset
+saint-lazare` into an `indoor` layer with each feature's levels parsed
+next to its tags (`levels` as a list, `level_min`, `level_max`).
+
+The geometry: a style's `fill-extrusion` layer over that source layer
+with `"threejs-maplibre:indoor": "floor"` or `"wall"` in its metadata
+(MapLibre would draw them as extrusions of no height and ignore the
+levels). The worker builds a floor as the footprint's slab, 15 cm thick,
+at `level * levelHeight` (3 m unless the metadata says otherwise;
+OSM2World sizes levels from `indoor=level` outlines' `height=*`, which
+the stations do not tag), and a wall as a run along an `indoor=wall` way
+or around a room, drawn on both sides, half a meter short of the next
+floor so the eye gets over it. A feature on several levels is built once
+per level, each into a block of that level, which is the whole trick:
+blocks are batches, so `map.setLevel( n )` is a visibility flag per batch
+and `map.explode( meters )` a translation per batch, no rebuild. On a
+planar map; the globe's up is not world y.
+
+Not here: doors as openings in walls, stairs and lifts between levels,
+level heights from `indoor=level`, and the walker (PR D).
+
+![Gare Saint-Lazare, level 0](../evidence/m4/indoor-level-0.png)
+![Gare Saint-Lazare, every level pulled apart](../evidence/m4/indoor-exploded.png)

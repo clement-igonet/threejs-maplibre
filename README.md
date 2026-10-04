@@ -20,7 +20,8 @@ from `main` by the Pages workflow: the M1 globe and planar raster demos, the M2
 [vector demo](https://clement-igonet.github.io/threejs-maplibre/demo/vector.html)
 (the Louvre from an OSM extract, or [any city](https://clement-igonet.github.io/threejs-maplibre/demo/vector.html?data=openfreemap)
 from OpenFreeMap's Liberty style), [3D objects](https://clement-igonet.github.io/threejs-maplibre/demo/objects.html)
-placed by latitude and longitude, and the [standalone page](https://clement-igonet.github.io/threejs-maplibre/demo/standalone.html)
+placed by latitude and longitude, [Gare Saint-Lazare indoors](https://clement-igonet.github.io/threejs-maplibre/demo/indoor.html)
+from Simple Indoor Tagging, and the [standalone page](https://clement-igonet.github.io/threejs-maplibre/demo/standalone.html)
 that loads the built library from one `<script>` tag.
 
 ![The Louvre from the vector demo](evidence/m2/vector-louvre.png)
