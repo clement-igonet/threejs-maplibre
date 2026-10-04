@@ -50,6 +50,20 @@ describe( 'Louvre extract', () => {
 
 	} );
 
+	it( 'keeps the palace outline, minus its parts, since the parts cover a quarter of it', () => {
+
+		const palace = layers.building.features.find( f => f.properties.name === 'Palais du Louvre' && f.properties.building === 'castle' );
+		expect( palace ).toBeDefined();
+		expect( palace.properties.hide_3d ).toBeUndefined();
+		// the courtyards are holes, the pavilions are cut out: more rings than before
+		const rings = palace.geometry.type === 'Polygon' ? [ palace.geometry.coordinates ] : palace.geometry.coordinates;
+		expect( rings.flat().length ).toBeGreaterThan( 7 );
+		// an outline its parts cover is still hidden
+		const covered = layers.building.features.filter( f => f.properties.hide_3d );
+		expect( covered.length ).toBeGreaterThan( 20 );
+
+	} );
+
 	it( 'builds footprints, outlines and extrusions for the palace', () => {
 
 		const flat = build( 13 ).built;
