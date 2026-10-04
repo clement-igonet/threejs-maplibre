@@ -963,3 +963,65 @@ gets a cut roof, since the roof is built from the tile's geometry.
 
 ![The Pyramide du Louvre as fill-extrusion draws it](../evidence/m4/louvre-pyramid-flat.png)
 ![The Pyramide du Louvre from its tags](../evidence/m4/louvre-pyramid.png)
+
+### The straight skeleton
+
+A hipped roof on anything but a rectangle needs the straight skeleton:
+shrink the outline inwards at unit speed with every edge parallel to
+itself, the corners trace the skeleton, the region each edge sweeps is one
+face, and lifting every skeleton vertex by the time it was reached makes
+those faces the planes of the roof. F4Map has it ("roofs ridges are
+generated using a straight skeleton algorithm"), OSM2World does not (one
+ridge from the bounding box, "quasi-rectangular", which is what PR A
+shipped), and no JavaScript library was fit to take: the two CGAL
+builds are 330 and 500 KB gzipped for one function, the pure ports are
+abandoned or hole-less or described by their own authors as unreliable on
+real polygons. So `src/build/straightSkeleton.js` is ours: Felkel and
+Obdrzalek (1998) the way kendzi's Java port handles it, 1 100 lines with
+holes, edge and split events, events at one time and point taken
+together, faces closed as they form, and three departures from kendzi
+found on real footprints (a vertex's split candidates judged against the
+edge's current piece rather than its original wedge; events due at the
+time being processed taken rather than dropped; two neighbours left at
+one point merged). It never throws: null, and the caller falls back to
+the ridge.
+
+Measured: the five real footprints of `test/fixtures/footprints.json`
+(the Cour Marly's 179 vertices in 37 ms), 350 seeded random stars and
+staircases, 3 000 more in an extra run, all closed, every face set
+summing to the footprint's area to float precision; the degenerate
+inputs (two vertices, a bow tie, a hole touching the exterior) answered
+with null.
+
+On top of it (`appendSkeletonRoof`): hipped and its family lift each
+face from the eave by its time, the farthest to the top; mansard and
+gambrel cut every face at a third of the way in, steep below the cut
+and shallow above it, both parts planar; gabled stands every triangular
+face up vertical by moving its apex onto its own wall, which carries the
+ridge out to the wall in the faces beside it, so a rectangle gives the
+same gable as the ridge method and an L gives one gable per wing end.
+A tagged `roof:direction` or `roof:orientation=across` asks for one ridge
+where the mapper put it, which a skeleton cannot take, so those keep the
+ridge method, as F4Map falls back to its bounding box then. `building=roof`
+and `wall=no` draw no walls (the Cour Marly and Cour Puget glass roofs
+stand on the wing, not on glass walls to the ground).
+
+Cost on the Louvre budget scene: 0.9% more triangles than the ridge
+method. Evidence: the Richelieu wing's courtyard roofs, hipped on 179
+and 145 vertices, where the ridge method had drawn them as crooked
+pyramids; F4Map's own picture of the same view is at
+https://demo.f4map.com/#lat=48.8614&lon=2.3372&zoom=18&camera.theta=58&camera.phi=330
+(its Louvre is a hand-made model, so around it the comparison is against
+their proprietary database, not their skeleton).
+
+![Cour Marly and Cour Puget from the skeleton](../evidence/m4/louvre-marly-skeleton.png)
+
+Like for like, where F4Map draws from the same OSM data and not from its
+models: the Palais de Justice, its mansards on 13 to 77-sided footprints
+in their tagged `roof:colour`, the Sainte-Chapelle's spire, the
+Conciergerie's cones. F4Map's view:
+https://demo.f4map.com/#lat=48.8560&lon=2.3445&zoom=18&camera.theta=60&camera.phi=20
+The shapes match; what F4Map has over this picture is materials, textured
+facades and slate, which is M5's concern, not a roof's.
+
+![The Palais de Justice from its tags](../evidence/m4/louvre-justice.png)

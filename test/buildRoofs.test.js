@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { appendRoofedExtrusion, roofColours, roofFromTags } from '../src/build/buildRoofs.js';
+import { readFileSync } from 'node:fs';
+import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from '../src/build/buildRoofs.js';
+
+const FIXTURES = JSON.parse( readFileSync( new URL( './fixtures/footprints.json', import.meta.url ) ) );
 
 // tile space straight to a y-up world: x east, z south, 1 unit a meter
 const projection = { project( x, y, h, out, o = 0 ) { out[ o ] = x; out[ o + 1 ] = h; out[ o + 2 ] = y; return out; } };
@@ -153,6 +156,81 @@ describe( 'appendRoofedExtrusion', () => {
 		out = newOut();
 		appendRoofedExtrusion( out, RECT, projection, colours, 0, 15, { shape: 'gabled', height: 5, angle: null, direction: 80.0, tolerance: 0.5, orientation: 'along' }, 1 );
 		expect( Math.max( ...ridge( out ) ) - Math.min( ...ridge( out ) ) ).toBeGreaterThan( 1 ); // kept oblique
+
+	} );
+
+	describe( 'from the straight skeleton', () => {
+
+		const roof = ( shape, height = 5 ) => ( { shape, height, angle: null, direction: null, orientation: 'along' } );
+		// an L: a 20 x 20 square missing the 10 x 10 corner at x > 10, z < 10,
+		// so a wing along x = 0..10 and a wing along z = 10..20, both 10 wide
+		const L = [ [ 0, 0, 10, 0, 10, 10, 20, 10, 20, 20, 0, 20 ] ];
+
+		it( 'hips an L-shaped footprint: every roof vertex between eave and top, the top reached', () => {
+
+			const out = newOut();
+			const triangles = appendRoofedExtrusion( out, L, projection, colours, 0, 15, roof( 'hipped' ), 1 );
+			expect( triangles ).toBeGreaterThan( 12 + 6 );
+			const ys = tops( out ).filter( y => y > 0 );
+			expect( Math.min( ...ys ) ).toBeCloseTo( 10, 9 );
+			expect( Math.max( ...ys ) ).toBeCloseTo( 15, 9 );
+			// the ridges run down the middle of each wing: x = 5 or z = 15
+			const top = at( out, 15 );
+			expect( top.length ).toBeGreaterThan( 0 );
+			for ( const [ x, z ] of top ) expect( Math.min( Math.abs( x - 5 ), Math.abs( z - 15 ) ) ).toBeLessThan( 1e-6 );
+
+		} );
+
+		it( 'gables an L: the ridge ends stand on the end walls', () => {
+
+			const out = newOut();
+			appendRoofedExtrusion( out, L, projection, colours, 0, 15, roof( 'gabled' ), 1 );
+			const top = at( out, 15 );
+			// a ridge end on the east wall of the north wing (x = 20) and on the south wall of the west wing (z = 0)
+			expect( top.some( ( [ x ] ) => Math.abs( x - 20 ) < 1e-6 ) ).toBe( true );
+			expect( top.some( ( [ , z ] ) => Math.abs( z ) < 1e-6 ) ).toBe( true );
+
+		} );
+
+		it( 'cuts a mansard where the slope changes, three quarters of the way up', () => {
+
+			const out = newOut();
+			appendRoofedExtrusion( out, RECT, projection, colours, 0, 14, roof( 'mansard', 4 ), 1 );
+			const ys = tops( out ).filter( y => y > 10 && y < 14 );
+			expect( ys.length ).toBeGreaterThan( 0 );
+			for ( const y of ys ) expect( y ).toBeCloseTo( 13, 9 ); // 10 + 0.75 * 4
+
+		} );
+
+		it( 'roofs the real footprints of the extract', () => {
+
+			for ( const key of [ 'marsan', 'barreau', 'chatelet', 'bourse', 'marly' ] ) {
+
+				const f = FIXTURES[ key ];
+				const ring = f.meters.flatMap( ( [ x, y ] ) => [ x, - y ] ); // y down, as tile space
+				const out = newOut();
+				const shape = f.tags[ 'roof:shape' ];
+				const triangles = appendRoofedExtrusion( out, [ ring ], projection, colours, 0, 20, roof( shape, 6 ), 1 );
+				expect( triangles ).toBeGreaterThan( ring.length ); // more than the walls alone
+				const ys = tops( out );
+				expect( Math.max( ...ys ) ).toBeCloseTo( 20, 6 );
+				expect( Math.min( ...ys.filter( y => y > 0 ) ) ).toBeCloseTo( 14, 6 );
+				for ( const y of ys ) expect( Number.isFinite( y ) ).toBe( true );
+
+			}
+
+		} );
+
+		it( 'draws no walls for a building=roof', () => {
+
+			expect( hasWalls( { building: 'roof' } ) ).toBe( false );
+			expect( hasWalls( { 'building:part': 'yes', wall: 'no' } ) ).toBe( false );
+			expect( hasWalls( { building: 'yes' } ) ).toBe( true );
+			const out = newOut();
+			appendRoofedExtrusion( out, RECT, projection, colours, 0, 15, { ...roof( 'hipped' ), walls: false }, 1 );
+			expect( Math.min( ...tops( out ) ) ).toBeCloseTo( 10, 9 ); // nothing below the eave
+
+		} );
 
 	} );
 
