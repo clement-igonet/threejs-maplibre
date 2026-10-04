@@ -1,8 +1,10 @@
-// Builds demo/data/louvre.json, the offline dataset of the Louvre demo, from
-// an Overpass extract of the area around the museum.
+// Builds demo/data/<dataset>.json, an offline dataset of a demo, from an
+// Overpass extract: the Louvre (the default) or Gare Saint-Lazare's indoor
+// mapping.
 //
-//   node scripts/louvre-extract.mjs            # converts demo/data/louvre.osm.json
-//   node scripts/louvre-extract.mjs --fetch    # runs demo/data/louvre.overpassql first
+//   node scripts/osm-extract.mjs                        # converts demo/data/louvre.osm.json
+//   node scripts/osm-extract.mjs --fetch                # runs demo/data/louvre.overpassql first
+//   node scripts/osm-extract.mjs --dataset saint-lazare # the station, demo/data/saint-lazare.*
 //
 // The output keeps the OpenMapTiles layer names (building, transportation,
 // water, waterway, park, landuse, place, poi) plus a "tree" layer, so a style
@@ -11,24 +13,28 @@
 // roof:height, building:colour, building:part, ...) are what the later
 // milestones render. render_height and render_min_height follow the
 // OpenMapTiles rules so the extrusion layer of a standard style applies too.
+// Simple Indoor Tagging goes to an "indoor" layer of its own, each feature
+// with its levels parsed (levels, level_min, level_max) next to the raw tags.
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import osmtogeojson from 'osmtogeojson';
 import polygonClipping from 'polygon-clipping';
+import { levelsOf } from '../src/indoor/levels.js';
 
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const dataDir = path.join( root, 'demo', 'data' );
-const rawPath = path.join( dataDir, 'louvre.osm.json' );
-const outPath = path.join( dataDir, 'louvre.json' );
-const queryPath = path.join( dataDir, 'louvre.overpassql' );
+const dataset = process.argv.includes( '--dataset' ) ? process.argv[ process.argv.indexOf( '--dataset' ) + 1 ] : 'louvre';
+const rawPath = path.join( dataDir, `${ dataset }.osm.json` );
+const outPath = path.join( dataDir, `${ dataset }.json` );
+const queryPath = path.join( dataDir, `${ dataset }.overpassql` );
 const ENDPOINT = process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter';
 // Overpass answers 406 to a request without a User-Agent naming its sender
 const USER_AGENT = 'threejs-maplibre/0.1 (+https://github.com/clement-igonet/threejs-maplibre)';
 
 // tags that describe the object rather than its bookkeeping
-const DROP_TAG = /^(addr:|source|wiki|ref|note|fixme|contact:|check_date|survey|mapillary|panoramax|heritage|mhs:|name:|alt_name|old_name|official_name|short_name|opening_hours|phone|website|email|description|image|url|start_date|inscription|created_by|is_in|toilets|payment:|diet:|cuisine|brand|operator|wheelchair|internet|smoking|takeaway|outdoor_seating|delivery|drive_through|reservation|capacity|fee|access|level$)/;
+const DROP_TAG = /^(addr:|source|wiki|ref|note|fixme|contact:|check_date|survey|mapillary|panoramax|heritage|mhs:|name:|alt_name|old_name|official_name|short_name|opening_hours|phone|website|email|description|image|url|start_date|inscription|created_by|is_in|toilets|payment:|diet:|cuisine|brand|operator|wheelchair|internet|smoking|takeaway|outdoor_seating|delivery|drive_through|reservation|capacity|fee|access)/;
 
 const METERS_PER_LEVEL = 3.66; // OpenMapTiles
 
@@ -146,6 +152,20 @@ function pointInPolygon( point, geometry ) {
 
 }
 
+// The levels a feature is on, as the tile can carry them: a list, and the
+// two ends for a cheap filter.
+function withLevels( props, tags ) {
+
+	const levels = levelsOf( tags );
+	if ( levels === null ) return;
+	props.levels = levels.join( ';' );
+	props.level_min = levels[ 0 ];
+	props.level_max = levels[ levels.length - 1 ];
+	const height = parseMeters( tags.height );
+	if ( height !== undefined ) props.height = height;
+
+}
+
 function roundCoordinates( geometry ) {
 
 	const round = c => [ Math.round( c[ 0 ] * 1e6 ) / 1e6, Math.round( c[ 1 ] * 1e6 ) / 1e6 ];
@@ -194,6 +214,20 @@ function convert( osm ) {
 
 		}
 
+		// Simple Indoor Tagging: rooms, corridors, areas, walls, doors,
+		// columns and level outlines, with their levels parsed; indoor=yes
+		// on a point of interest is not a room and stays a point of interest
+		const indoorClass = tags.indoor && tags.indoor !== 'yes' && tags.indoor !== 'no' ? tags.indoor : isPoint && tags.level !== undefined && ( tags.door || tags.entrance ) ? ( tags.door ? 'door' : 'entrance' ) : null;
+		if ( indoorClass ) {
+
+			const props = pruneTags( tags );
+			props.class = indoorClass;
+			withLevels( props, tags );
+			add( 'indoor', feature, props );
+			continue;
+
+		}
+
 		if ( tags.highway && ( isLine || isArea ) ) {
 
 			const props = pruneTags( tags );
@@ -201,6 +235,18 @@ function convert( osm ) {
 			props.subclass = tags.highway;
 			if ( tags.bridge && tags.bridge !== 'no' ) props.brunnel = 'bridge';
 			if ( tags.tunnel && tags.tunnel !== 'no' ) props.brunnel = 'tunnel';
+			if ( tags.level !== undefined || tags.repeat_on !== undefined ) withLevels( props, tags );
+			add( 'transportation', feature, props );
+			continue;
+
+		}
+
+		if ( isPoint && tags.highway === 'elevator' ) {
+
+			const props = pruneTags( tags );
+			props.class = 'path';
+			props.subclass = 'elevator';
+			withLevels( props, tags );
 			add( 'transportation', feature, props );
 			continue;
 
@@ -383,7 +429,7 @@ async function main() {
 			license: 'ODbL 1.0',
 			osm_base: osm.osm3s?.timestamp_osm_base,
 			bbox: [ bbox[ 1 ], bbox[ 0 ], bbox[ 3 ], bbox[ 2 ] ], // west, south, east, north
-			query: 'demo/data/louvre.overpassql',
+			query: `demo/data/${ dataset }.overpassql`,
 		},
 		layers,
 	};
@@ -397,6 +443,19 @@ async function main() {
 	const roofs = layers.building.features.filter( f => f.properties[ 'roof:shape' ] ).length;
 	const hidden = layers.building.features.filter( f => f.properties.hide_3d ).length;
 	console.log( `building parts: ${ parts }, roof:shape: ${ roofs }, hidden outlines: ${ hidden }` );
+	if ( layers.indoor ) {
+
+		const byClass = {}, levels = new Set();
+		for ( const f of layers.indoor.features ) {
+
+			byClass[ f.properties.class ] = ( byClass[ f.properties.class ] ?? 0 ) + 1;
+			if ( f.properties.levels ) for ( const l of f.properties.levels.split( ';' ) ) levels.add( l );
+
+		}
+
+		console.log( `indoor: ${ Object.entries( byClass ).map( ( [ k, n ] ) => `${ k } ${ n }` ).join( ', ' ) }; levels ${ [ ...levels ].map( Number ).sort( ( a, b ) => a - b ).join( ' ' ) }` );
+
+	}
 
 }
 
