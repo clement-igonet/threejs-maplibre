@@ -154,9 +154,18 @@ in ground units:
 
 - one pointer drag pans by `2 * distance * tan(fov / 2) / clientHeight` meters
   per pixel (divided by `cos(pitch)` along the screen's vertical axis);
-- a wheel notch scales the distance by 0.95 and keeps the ground under the
-  cursor in place; a pinch does the same around the fingers' midpoint while
-  their motion pans and their twist turns;
+- wheel and trackpad zoom is MapLibre's `ScrollZoomHandler` ported: the
+  device is told apart by the deltas (multiples of 4.000244140625 are a
+  macOS mouse, values under 4 a trackpad, a pinch arrives as a trackpad
+  with ctrlKey) and by their timing (a lone event is a wheel, a run of
+  them a trackpad); a frame's deltas scale the map by
+  `2 / ( 1 + e^( -|delta| * rate ) )`, two at most, at 1/450 for a wheel and
+  1/100 for a trackpad; the target is approached over 200 ms; the ground
+  under the cursor stays in place; a touch pinch zooms around the fingers'
+  midpoint while their motion pans and their twist turns;
+- keys as MapLibre's `KeyboardHandler`: + and - a level (two with shift),
+  with cmd or ctrl as well, since the map is the page; arrows pan 100 px,
+  with shift they turn 15 and tilt 10 degrees;
 - two fingers sliding vertically together at a steady spread tilt the view
   (0.5 degree per pixel); on desktop, a right drag (or ctrl/shift + drag)
   turns (0.25 degree per pixel) and tilts;

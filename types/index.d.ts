@@ -366,7 +366,16 @@ export class MapControls {
 	minAltitude: number;
 	maxDistance: number;
 	maxPitch: number;
-	zoomFraction: number;
+	/** MapLibre's rate for a mouse wheel's delta (1/450): a frame's deltas scale the map by 2 / ( 1 + e^( -|delta| * rate ) ). */
+	wheelZoomRate: number;
+	/** The same for two-finger scroll and trackpad pinch pixels (1/100). */
+	trackpadZoomRate: number;
+	/** The zoom reaches its target over this long, in ms (200). */
+	zoomEaseMs: number;
+	/** Zoom levels per + or - key, doubled with shift. */
+	keyboardZoomStep: number;
+	/** Pixels per arrow key. */
+	keyboardPanPixels: number;
 	rotateDegPerPixel: number;
 	pitchDegPerPixel: number;
 	setView( view: MapView ): void;
@@ -376,8 +385,8 @@ export class MapControls {
 	zoomBy( factor: number, px?: number, py?: number ): void;
 	rotateBy( headingDeg: number, pitchDeg: number ): void;
 	getTarget( target: Vector3, up?: Vector3 | null ): Vector3;
-	/** Places the camera from the state; true when the view changed. */
-	update(): boolean;
+	/** Places the camera from the state, applying and easing the frame's wheel input; true when the view changed. */
+	update( now?: number ): boolean;
 	dispose(): void;
 }
 
