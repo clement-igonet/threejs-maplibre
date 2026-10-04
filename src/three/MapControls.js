@@ -232,10 +232,13 @@ export class MapControls {
 			const rate = w.type !== 'trackpad' && Math.abs( w.delta ) > 4.000244140625 ? this.wheelZoomRate : this.trackpadZoomRate;
 			let scale = 2 / ( 1 + Math.exp( - Math.abs( w.delta * rate ) ) );
 			if ( w.delta < 0 ) scale = 1 / scale;
+			// a fresh gesture eases from now; one in progress keeps its clock,
+			// so the frames that bring more deltas also apply some: the zoom
+			// follows the fingers, it does not wait for them to stop
+			if ( ease.remaining === 0 ) ease.time = now;
 			ease.remaining -= Math.log2( scale ); // the map's scale up is the distance down
 			ease.px = w.px;
 			ease.py = w.py;
-			ease.time = now; // the easing starts over from this frame
 			w.delta = 0;
 
 		}

@@ -219,6 +219,29 @@ describe( 'MapControls', () => {
 
 		} );
 
+		it( 'follows the fingers: a gesture spread over frames zooms while it lasts, not after', () => {
+
+			const { controls, wheel } = createPage();
+			const t0 = performance.now();
+			controls.update( t0 );
+			const seen = [];
+			for ( let frame = 1; frame <= 10; frame ++ ) {
+
+				wheel( { deltaY: 10 } ); // a trackpad event every frame
+				controls.update( t0 + frame * 16 );
+				seen.push( controls.distance );
+
+			}
+
+			// most of the zoom has happened by the time the fingers stop
+			expect( seen[ 0 ] ).toBeCloseTo( 1000, 6 ); // the first frame starts the clock
+			expect( seen[ 1 ] ).toBeGreaterThan( 1000 );
+			for ( let i = 2; i < seen.length; i ++ ) expect( seen[ i ] ).toBeGreaterThan( seen[ i - 1 ] );
+			controls.update( t0 + 10000 );
+			expect( seen[ 9 ] - 1000 ).toBeGreaterThan( 0.5 * ( controls.distance - 1000 ) );
+
+		} );
+
 		it( 'zooms a lone mouse wheel notch at MapLibre\'s wheel rate, whichever way the browser reports it', () => {
 
 			for ( const notch of [ { deltaY: 100 }, { deltaY: 3, deltaMode: 1 }, { deltaY: 4.000244140625 * 30 } ] ) {
