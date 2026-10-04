@@ -36,7 +36,8 @@
 		"budget": "node scripts/budget.mjs",
 		"bridge-check": "node scripts/bridge-check.mjs",
 		"underlay-check": "node scripts/underlay-check.mjs",
-		"types-check": "tsc -p types/tsconfig.json"
+		"types-check": "tsc -p types/tsconfig.json",
+		"wheel-check": "node scripts/wheel-check.mjs"
 	},
 	"keywords": [
 		"three",
