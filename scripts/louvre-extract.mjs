@@ -16,6 +16,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import osmtogeojson from 'osmtogeojson';
+import polygonClipping from 'polygon-clipping';
 
 const root = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '..' );
 const dataDir = path.join( root, 'demo', 'data' );
@@ -72,6 +73,33 @@ const HIGHWAY_CLASS = {
 	footway: 'path', path: 'path', pedestrian: 'path', steps: 'path', cycleway: 'path', bridleway: 'path', corridor: 'path',
 	track: 'track', raceway: 'raceway',
 };
+
+function asMulti( geometry ) {
+
+	return geometry.type === 'Polygon' ? [ geometry.coordinates ] : geometry.coordinates;
+
+}
+
+// Area in degrees squared, scaled so that a part and its outline compare;
+// only ratios of it are used.
+function geometryArea( geometry ) {
+
+	let area = 0;
+	for ( const polygon of asMulti( geometry ) ) {
+
+		polygon.forEach( ( ring, r ) => {
+
+			let a = 0;
+			for ( let i = 0; i < ring.length - 1; i ++ ) a += ring[ i ][ 0 ] * ring[ i + 1 ][ 1 ] - ring[ i + 1 ][ 0 ] * ring[ i ][ 1 ];
+			area += ( r === 0 ? 1 : - 1 ) * Math.abs( a / 2 );
+
+		} );
+
+	}
+
+	return area;
+
+}
 
 function ringCentroid( ring ) {
 
@@ -250,6 +278,7 @@ function convert( osm ) {
 	const parts = buildings.filter( f => f.properties[ 'building:part' ] && ! f.properties.building );
 	const outlines = buildings.filter( f => f.properties.building );
 	const HEIGHT_TAGS = [ 'height', 'building:levels', 'roof:levels' ];
+	const partsOf = new Map(); // outline -> its parts
 	let inherited = 0;
 	for ( const part of parts ) {
 
@@ -257,7 +286,8 @@ function convert( osm ) {
 		const centroid = ringCentroid( rings[ 0 ] );
 		const outline = outlines.find( o => pointInPolygon( centroid, o.geometry ) );
 		if ( ! outline ) continue;
-		outline.properties.hide_3d = true;
+		if ( ! partsOf.has( outline ) ) partsOf.set( outline, [] );
+		partsOf.get( outline ).push( part );
 
 		const from = outline.properties, into = part.properties;
 		const ownHeight = HEIGHT_TAGS.some( key => into[ key ] !== undefined );
@@ -286,6 +316,46 @@ function convert( osm ) {
 	}
 
 	console.log( `parts inheriting from their outline: ${ inherited }` );
+
+	// An outline with parts is hidden only when the parts cover it: the
+	// Palais du Louvre has 531 parts, pavilions and roofs, over 27% of its
+	// 47 000 m2, and hiding it lost the wings. OSM2World draws such an
+	// outline whole when the parts cover less than 90% (Building.java,
+	// "non-standard mapping"); F4Map draws the outline minus its parts.
+	// Subtracting is what keeps the parts' tops from fighting the outline's,
+	// so that is what happens here, and the remainder keeps the outline's
+	// own tags and height.
+	let subtracted = 0, hidden = 0;
+	for ( const [ outline, inside ] of partsOf ) {
+
+		const coverage = inside.reduce( ( sum, p ) => sum + geometryArea( p.geometry ), 0 ) / geometryArea( outline.geometry );
+		if ( coverage >= 0.9 ) {
+
+			outline.properties.hide_3d = true;
+			hidden ++;
+			continue;
+
+		}
+
+		let remainder;
+		try {
+
+			remainder = polygonClipping.difference( asMulti( outline.geometry ), ...inside.map( p => asMulti( p.geometry ) ) );
+
+		} catch {
+
+			remainder = null; // a part the clipper cannot take: the outline stays whole
+
+		}
+
+		if ( remainder === null || remainder.length === 0 ) continue;
+		outline.geometry = remainder.length === 1 ? { type: 'Polygon', coordinates: remainder[ 0 ] } : { type: 'MultiPolygon', coordinates: remainder };
+		delete outline.properties.hide_3d;
+		subtracted ++;
+
+	}
+
+	console.log( `outlines with parts: ${ partsOf.size }, hidden under them: ${ hidden }, drawn minus them: ${ subtracted }` );
 
 	return layers;
 

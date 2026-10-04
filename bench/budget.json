@@ -4,22 +4,22 @@
 		"district": {
 			"requests": 9,
 			"drawCalls": 9,
-			"triangles": 62490
+			"triangles": 62291
 		},
 		"louvre": {
 			"requests": 17,
-			"drawCalls": 9,
-			"triangles": 91922
+			"drawCalls": 10,
+			"triangles": 105434
 		},
 		"street": {
 			"requests": 6,
-			"drawCalls": 9,
-			"triangles": 44878
+			"drawCalls": 10,
+			"triangles": 53520
 		},
 		"fly": {
 			"requests": 8,
-			"drawCalls": 9,
-			"engineP95Ms": 1.1
+			"drawCalls": 10,
+			"engineP95Ms": 1.4
 		}
 	},
 	"louvre-planar": {
