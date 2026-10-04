@@ -81,6 +81,11 @@ const SHOTS = [
 	{ name: 'indoor-level-0', page: 'indoor', query: '&level=0' },
 	{ name: 'indoor-level-minus1', page: 'indoor', query: '&level=-1' },
 	{ name: 'indoor-exploded', page: 'indoor', query: '&level=all&explode=12&alt=900&pitch=55' },
+	// a route from a shop on level -1 to a cafe on level 1, through two
+	// climbs, drawn through the exploded levels; and the walker followed
+	// on the stairs
+	{ name: 'indoor-route', page: 'indoor', query: '&level=all&explode=12&alt=320&pitch=60&heading=300&from=Sephora&to=Paul%401&t=0&speed=0.001' },
+	{ name: 'indoor-walker', page: 'indoor', query: '&level=-1&from=Sephora&to=Ladur%C3%A9e&t=95&speed=0.001&follow=1' },
 ];
 
 // live shots on OpenFreeMap's Liberty style (SHOT_LIVE=0 skips them): the

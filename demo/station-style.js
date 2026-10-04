@@ -28,5 +28,20 @@ export const STATION_STYLE = {
 			metadata: { 'threejs-maplibre:indoor': 'wall', 'threejs-maplibre:level-height': 3, 'threejs-maplibre:wall-height': 2.5 },
 			paint: { 'fill-extrusion-color': '#f7f4ee', 'fill-extrusion-height': 0, 'fill-extrusion-base': 0 },
 		},
+		{
+			// stairs and escalators as the slopes they climb, lifts as shafts
+			id: 'indoor-steps', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'transportation',
+			minzoom: 14,
+			filter: [ 'all', [ '==', [ 'get', 'subclass' ], 'steps' ], [ 'has', 'levels' ] ],
+			metadata: { 'threejs-maplibre:indoor': 'steps', 'threejs-maplibre:level-height': 3 },
+			paint: { 'fill-extrusion-color': [ 'case', [ 'has', 'conveying' ], '#8fa8bf', '#c9b48a' ], 'fill-extrusion-height': 0, 'fill-extrusion-base': 0 },
+		},
+		{
+			id: 'indoor-lift', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'transportation',
+			minzoom: 14,
+			filter: [ 'all', [ '==', [ 'get', 'subclass' ], 'elevator' ], [ 'has', 'levels' ] ],
+			metadata: { 'threejs-maplibre:indoor': 'lift', 'threejs-maplibre:level-height': 3, 'threejs-maplibre:wall-height': 2.5 },
+			paint: { 'fill-extrusion-color': '#9fb3c8', 'fill-extrusion-height': 0, 'fill-extrusion-base': 0 },
+		},
 	],
 };

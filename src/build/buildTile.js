@@ -1,6 +1,6 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
-import { appendFloor, appendWallRun, featureLevels } from './buildIndoor.js';
+import { appendFloor, appendRamp, appendShaft, appendWallRun, featureLevels } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -117,12 +117,38 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 		const outline = type === 'fill' && layer.has( 'fill-outline-color' ) ? newBlock( layer, index, 'line' ) : null;
 		// roofs: a metadata key, so the style stays one MapLibre reads
 		const roofs = type === 'fill-extrusion' && layer.metadata && layer.metadata[ 'threejs-maplibre:roofs' ] ? { levelHeight: layer.metadata[ 'threejs-maplibre:level-height' ] ?? 2.5 } : null;
+		// tile units per meter at this tile, for roofs sized from their footprint and doors in meters
+		const unitsPerMeter = extent / ( 40075016.686 * Math.cos( tileCenterLatitude( y, z ) * Math.PI / 180 ) / ( 1 << z ) );
 		let glass = null; // translucent features go in a block of their own
 		// indoor: 'floor' or 'wall' from the metadata, built per level into a
 		// block per level, so levels can be shown one at a time
 		const indoor = type === 'fill-extrusion' && layer.metadata && layer.metadata[ 'threejs-maplibre:indoor' ] || null;
 		const levelHeight = layer.metadata && layer.metadata[ 'threejs-maplibre:level-height' ] || 3;
 		const wallHeight = layer.metadata && layer.metadata[ 'threejs-maplibre:wall-height' ] || levelHeight - 0.5;
+		// the doors of this source layer, per level, as openings for the walls:
+		// [ x, y, halfWidth ] in tile units (a door is 1.2 m unless tagged)
+		const doorsByLevel = new Map();
+		if ( indoor === 'wall' ) {
+
+			for ( let f = 0; f < sourceLayer.featureCount; f ++ ) {
+
+				if ( sourceLayer.types[ f ] !== 1 ) continue;
+				const props = sourceLayer.properties[ f ];
+				if ( props.class !== 'door' && props.class !== 'entrance' ) continue;
+				const r = sourceLayer.featureStart[ f ], v = sourceLayer.ringStart[ r ];
+				const width = parseFloat( props.width );
+				const half = ( Number.isFinite( width ) ? width : 1.2 ) / 2 * unitsPerMeter;
+				for ( const level of featureLevels( props ) ) {
+
+					if ( ! doorsByLevel.has( level ) ) doorsByLevel.set( level, [] );
+					doorsByLevel.get( level ).push( [ sourceLayer.positions[ 2 * v ], sourceLayer.positions[ 2 * v + 1 ], half ] );
+
+				}
+
+			}
+
+		}
+
 		const levelBlocks = new Map();
 		const levelBlock = level => {
 
@@ -138,8 +164,6 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 			return b;
 
 		};
-		// tile units per meter at this tile, for roofs sized from their footprint
-		const unitsPerMeter = extent / ( 40075016.686 * Math.cos( tileCenterLatitude( y, z ) * Math.PI / 180 ) / ( 1 << z ) );
 
 		// what is baked per vertex for this layer
 		const colorName = `${ type }-color`;
@@ -188,11 +212,51 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 			} else if ( indoor ) {
 
-				if ( feature.type === 1 ) continue;
 				const levels = featureLevels( feature.properties );
 				if ( levels.length === 0 ) continue;
 				const polygons = feature.type === 3 ? featurePolygons( sourceLayer, f, extent ) : null;
 				const runs = feature.type === 2 ? featureLines( sourceLayer, f, extent ) : null;
+
+				if ( indoor === 'steps' || indoor === 'lift' ) {
+
+					// a staircase climbs from its lowest level to its highest
+					// (down the way when incline=down), a lift shaft spans them;
+					// both are built into every level they serve, so each level
+					// shows its own way up
+					const lo = levels[ 0 ], hi = levels[ levels.length - 1 ];
+					if ( indoor === 'steps' && runs && hi > lo ) {
+
+						const down = feature.properties.incline === 'down';
+						for ( const run of runs ) {
+
+							for ( const level of levels ) {
+
+								const target = levelBlock( level );
+								const t = appendRamp( target, run.points, projection, rgba, 1.5 * unitsPerMeter, ( down ? hi : lo ) * levelHeight, ( down ? lo : hi ) * levelHeight );
+								if ( t > 0 ) { target.triangles += t; target.features ++; }
+
+							}
+
+						}
+
+					} else if ( indoor === 'lift' && feature.type === 1 ) {
+
+						const r = sourceLayer.featureStart[ f ], v = sourceLayer.ringStart[ r ];
+						for ( const level of levels ) {
+
+							const target = levelBlock( level );
+							const t = appendShaft( target, sourceLayer.positions[ 2 * v ], sourceLayer.positions[ 2 * v + 1 ], projection, rgba, 2 * unitsPerMeter, lo * levelHeight, hi * levelHeight + wallHeight );
+							if ( t > 0 ) { target.triangles += t; target.features ++; }
+
+						}
+
+					}
+
+					continue;
+
+				}
+
+				if ( feature.type === 1 ) continue;
 				for ( const level of levels ) {
 
 					const target = levelBlock( level );
@@ -204,8 +268,9 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 					} else if ( indoor === 'wall' ) {
 
-						if ( polygons ) for ( const polygon of polygons ) for ( const ring of polygon ) t += appendWallRun( target, ring, projection, rgba, base, base + wallHeight, true );
-						if ( runs ) for ( const run of runs ) t += appendWallRun( target, run.points, projection, rgba, base, base + wallHeight, false );
+						const openings = doorsByLevel.get( level ) ?? null;
+						if ( polygons ) for ( const polygon of polygons ) for ( const ring of polygon ) t += appendWallRun( target, ring, projection, rgba, base, base + wallHeight, true, openings );
+						if ( runs ) for ( const run of runs ) t += appendWallRun( target, run.points, projection, rgba, base, base + wallHeight, false, openings );
 
 					}
 
