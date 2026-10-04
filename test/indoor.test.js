@@ -4,7 +4,7 @@ import { PerspectiveCamera } from 'three';
 import { createGeoJSONVectorSource } from '../demo/geojson-vector-source.js';
 import { STATION_STYLE } from '../demo/station-style.js';
 import { buildTile } from '../src/build/buildTile.js';
-import { appendWallRun, featureLevels } from '../src/build/buildIndoor.js';
+import { appendRamp, appendWallRun, featureLevels } from '../src/build/buildIndoor.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { VectorTileMap } from '../src/three/VectorTileMap.js';
@@ -88,6 +88,54 @@ describe( 'indoor', () => {
 		map.explode( 0 );
 		expect( b.batch.position.y ).toBeCloseTo( 0, 9 );
 		map.dispose();
+
+	} );
+
+	it( 'cuts a wall where a door is, at a vertex or along an edge', () => {
+
+		const projection = { project( x, y, h, out ) { out[ 0 ] = x; out[ 1 ] = h; out[ 2 ] = y; return out; } };
+		const white = [ 255, 255, 255, 255 ];
+		const square = [ 0, 0, 10, 0, 10, 10, 0, 10 ];
+		const whole = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		appendWallRun( whole, square, projection, white, 0, 2.5, true );
+		// a door at the vertex (10, 0): both edges meeting there lose 0.6
+		const atVertex = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		expect( appendWallRun( atVertex, square, projection, white, 0, 2.5, true, [ [ 10, 0, 0.6 ] ] ) ).toBe( 16 ); // still 4 pieces
+		const xs = []; for ( let i = 0; i < atVertex.positions.length; i += 3 ) xs.push( atVertex.positions[ i ] );
+		expect( Math.max( ...xs.filter( ( x, i ) => atVertex.positions[ 3 * i + 2 ] === 0 ) ) ).toBeCloseTo( 9.4, 9 ); // the south wall stops short of the corner
+		// a door in the middle of the south wall: that edge becomes two pieces
+		const mid = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		expect( appendWallRun( mid, square, projection, white, 0, 2.5, true, [ [ 5, 0, 0.6 ] ] ) ).toBe( 20 );
+		// a door off the wall cuts nothing
+		const off = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		expect( appendWallRun( off, square, projection, white, 0, 2.5, true, [ [ 5, 3, 0.6 ] ] ) ).toBe( 16 );
+
+	} );
+
+	it( 'ramps a staircase from one level to the next', () => {
+
+		const projection = { project( x, y, h, out ) { out[ 0 ] = x; out[ 1 ] = h; out[ 2 ] = y; return out; } };
+		const out = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		expect( appendRamp( out, [ 0, 0, 6, 0, 12, 0 ], projection, [ 255, 255, 255, 255 ], 1.5, 0, 3 ) ).toBe( 8 );
+		const y = ys( out );
+		expect( Math.min( ...y ) ).toBe( 0 );
+		expect( Math.max( ...y ) ).toBe( 3 );
+		expect( y[ 2 ] ).toBeCloseTo( 1.5, 9 ); // the middle cross-section halfway up
+
+	} );
+
+	it( 'builds the station\'s stairs into both levels they join, and its lifts as shafts', () => {
+
+		const built = build( 16 );
+		const steps = built.blocks.filter( b => b.id === 'indoor-steps' );
+		expect( steps.length ).toBeGreaterThan( 3 );
+		const ground = steps.find( b => b.level === 0 );
+		expect( ground ).toBeDefined();
+		const y = ys( ground );
+		expect( Math.min( ...y ) ).toBeLessThan( 0 ); // a staircase down from the hall
+		expect( Math.max( ...y ) ).toBeGreaterThan( 0 ); // and one up
+		const lifts = built.blocks.filter( b => b.id === 'indoor-lift' );
+		expect( lifts.length ).toBeGreaterThan( 0 );
 
 	} );
 
