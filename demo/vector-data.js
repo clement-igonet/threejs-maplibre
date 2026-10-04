@@ -41,7 +41,15 @@ export async function loadVectorData( params ) {
 		maxZoom: 16,
 		attribution: `<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (${ meta.osm_base.slice( 0, 10 ) })`,
 	} );
-	const style = params.has( 'style' ) ? await Style.load( params.get( 'style' ) ) : new Style( LOUVRE_STYLE );
+	let json = LOUVRE_STYLE;
+	if ( params.get( 'roofs' ) === '0' ) {
+
+		// ?roofs=0: the flat tops fill-extrusion alone gives, for comparison
+		json = { ...json, layers: json.layers.map( layer => layer.type === 'fill-extrusion' ? { ...layer, metadata: undefined } : layer ) };
+
+	}
+
+	const style = params.has( 'style' ) ? await Style.load( params.get( 'style' ) ) : new Style( json );
 	return { source, style, view: LOUVRE, tile };
 
 }

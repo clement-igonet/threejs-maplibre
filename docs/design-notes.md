@@ -891,3 +891,75 @@ the way an application would and is compiled with `tsc --strict` on every
 CI run (`npm run types-check`), and `test/types.test.js` checks that every
 export of `src/index.js` is declared and nothing is declared that is not
 exported.
+
+## M4 Buildings and indoor
+
+### Roofs: Simple 3D Buildings from the tags
+
+A `fill-extrusion` is a footprint pulled up to a flat top. That is all
+MapLibre can draw and all OpenMapTiles carries (`render_height`,
+`render_min_height`, a colour), so the Pyramide du Louvre is a glass box
+on every MapLibre map, and was on this one. OSM says more: on the
+pyramid, `roof:shape=pyramidal`, `roof:height=21.65` of a `height=21.65`
+(all roof, no wall), `building:material=glass`. The extract behind the
+Louvre demo keeps those tags, 238 roofs with a shape among 2 229
+buildings (gabled 46, hipped 38, skillion 37, dome 35, mansard 18,
+pyramidal 17, cone 10, and so on), 531 building parts, 109 roof colours,
+and a three.js engine can draw them. This is where the engine stops
+matching MapLibre and starts doing what MapLibre's data model cannot
+express, which is the point of M4.
+
+Switched on by a key in the layer's `metadata`
+(`"threejs-maplibre:roofs": true`), which the style spec allows and
+MapLibre ignores, so the style stays one a MapLibre map loads. The build
+worker then reads the feature's own tags next to the layer's
+`fill-extrusion-height` and `-base`: walls up to the eave, the roof from
+the eave to the top (`src/build/buildRoofs.js`). The rules are
+OSM2World's, read in its source rather than assumed, since the north star
+names it:
+
+- `roof:height`; else `roof:angle` over the distance to the ridge (the
+  whole run for a skillion); else `roof:levels` at 2.5 m a level
+  (`BuildingDefaults.heightPerLevel`); else a dome's radius, else 5 m
+  (`DEFAULT_RIDGE_HEIGHT`); never more than the building.
+- The ridge runs along the longest wall, across it on
+  `roof:orientation=across`, or square to `roof:direction`, which is
+  snapped to the nearest wall when within tolerance, 45 degrees for a
+  compass point, 10 for a whole number, 0.5 for a decimal
+  (`Roof.snapDirection`): a roof is square to its walls more often than a
+  compass reading is right.
+- Shapes: pyramidal and cone to one apex over the centroid; dome and onion
+  the same in six rings on a quarter circle; gabled (and round) a ridge
+  out to the walls, so the end faces come out vertical, the gables
+  themselves; hipped, mansard, gambrel and the half and side variants the
+  ridge shortened by the half-width, one face per wall edge up to it,
+  which is OSM2World's "quasi-rectangular" model too (no straight
+  skeleton, which F4Map has); skillion one plane down towards
+  `roof:direction`, the walls following it; flat and anything unknown the
+  flat top as before.
+- Colours: `building:colour` (or `building:facade:colour`) on the walls,
+  `roof:colour` on the roof, baked per vertex; `building:material=glass`
+  makes the building translucent, `roof:material=glass` the roof alone,
+  in a batch of their own so they draw after the opaque ones.
+
+Parts inherit. A pavilion mapped as a bare `building:part` inside a
+palace has no height of its own; OSM2World (`inheritTags`) and F4Map give
+it the outline's tags, heights only when the part gives none. The extract
+does the same now, so the Louvre's pavilions stand as tall as their
+wings rather than at the 5 m default.
+
+Cost: on the Louvre budget scene, roofs are 4.6% more triangles than flat
+tops (91 922 to 96 163, under the 5% the budget allows) and one more draw
+call, the glass batch. Tests: the pyramid's apex, a gable's ridge out to
+both ends, a hip's shortened ridge, a skillion's slope and walls, a
+dome's rings, the untagged defaults, the direction snapping, the colours
+and the glass (`test/buildRoofs.test.js`).
+
+Not here: the straight skeleton for hipped roofs on L-shaped footprints
+(44 of the extract's 84 gabled and hipped footprints are four-sided, 27
+are nine-sided), `roof:ridge` and `roof:edge` ways (OSM2World's
+ComplexRoof), textures for materials, and a building cut by a tile edge
+gets a cut roof, since the roof is built from the tile's geometry.
+
+![The Pyramide du Louvre as fill-extrusion draws it](../evidence/m4/louvre-pyramid-flat.png)
+![The Pyramide du Louvre from its tags](../evidence/m4/louvre-pyramid.png)
