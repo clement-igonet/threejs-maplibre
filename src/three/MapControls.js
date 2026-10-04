@@ -8,10 +8,18 @@
 //
 // Gestures follow MapLibre's conventions:
 // - one pointer drag: pan
-// - wheel: zoom around the cursor
+// - wheel, or two fingers on a trackpad, or a trackpad pinch: zoom around
+//   the cursor, at MapLibre's own rates and with its easing, so the map
+//   feels like a maplibre-gl map under the same hand (ScrollZoomHandler:
+//   wheel and trackpad told apart by the deltas and their timing, the
+//   frame's deltas folded through 2 / ( 1 + e^( -|delta| * rate ) ), then
+//   eased over 200 ms)
 // - right drag, or ctrl/shift + left drag: heading (x) and pitch (y)
 // - two fingers: pinch to zoom, move to pan, twist to turn; both fingers
 //   sliding vertically together tilt the view instead
+// - keys: + and - zoom a level, with or without cmd/ctrl (the browser's own
+//   page zoom is taken over while the map is the page); arrows pan, with
+//   shift they turn and tilt
 
 import { Vector3 } from 'three';
 import { WGS84, latLonToEcef, localFrame, WGS84_RADIUS } from '../math/Ellipsoid.js';
@@ -64,7 +72,15 @@ export class MapControls {
 		// one (indoor, street level, a flight path) drives the map by being
 		// passed to update() like any other.
 		this.maxPitch = 85;
-		this.zoomFraction = 0.05; // distance change per wheel notch
+		// zoom from wheels and trackpads, MapLibre's numbers: a frame's deltas
+		// scale the map by 2 / ( 1 + e^( -|delta| * rate ) ), two at most
+		this.wheelZoomRate = 1 / 450; // per unit of a mouse wheel's delta (a notch is 100 or 120)
+		this.trackpadZoomRate = 1 / 100; // per pixel of two-finger scroll or pinch
+		this.zoomEaseMs = 200; // the zoom reaches its target over this long
+		this.keyboardZoomStep = 1; // levels per + or -, doubled with shift
+		this.keyboardPanPixels = 100; // per arrow key
+		this._wheel = { delta: 0, type: null, last: - Infinity, px: 0, py: 0 }; // this frame's wheel input
+		this._zoomEase = { remaining: 0, px: 0, py: 0, time: 0 }; // zoom levels still to apply
 		this.rotateDegPerPixel = 0.25;
 		this.pitchDegPerPixel = 0.5;
 
@@ -174,8 +190,9 @@ export class MapControls {
 	}
 
 	/** Place the camera from the state. Returns true when the view changed. */
-	update() {
+	update( now = performance.now() ) {
 
+		this._applyWheel( now );
 		if ( ! this._changed ) return false;
 		this._changed = false;
 
@@ -201,6 +218,40 @@ export class MapControls {
 		camera.lookAt( _target );
 		camera.updateMatrixWorld();
 		return true;
+
+	}
+
+	// The frame's wheel delta becomes a zoom target, MapLibre's way, and the
+	// target is approached over zoomEaseMs; while it is, the view keeps
+	// changing.
+	_applyWheel( now ) {
+
+		const w = this._wheel, ease = this._zoomEase;
+		if ( w.delta !== 0 ) {
+
+			const rate = w.type !== 'trackpad' && Math.abs( w.delta ) > 4.000244140625 ? this.wheelZoomRate : this.trackpadZoomRate;
+			let scale = 2 / ( 1 + Math.exp( - Math.abs( w.delta * rate ) ) );
+			if ( w.delta < 0 ) scale = 1 / scale;
+			ease.remaining -= Math.log2( scale ); // the map's scale up is the distance down
+			ease.px = w.px;
+			ease.py = w.py;
+			ease.time = now; // the easing starts over from this frame
+			w.delta = 0;
+
+		}
+
+		if ( ease.remaining !== 0 ) {
+
+			const dt = Math.max( 0, now - ease.time );
+			// 95% of the way in zoomEaseMs
+			const step = Math.abs( ease.remaining ) < 1e-4 ? ease.remaining : ease.remaining * ( 1 - Math.exp( - 3 * dt / this.zoomEaseMs ) );
+			this.zoomBy( Math.pow( 2, step ), ease.px, ease.py );
+			ease.remaining -= step;
+			this._changed = true;
+
+		}
+
+		ease.time = now;
 
 	}
 
@@ -275,15 +326,56 @@ export class MapControls {
 
 			if ( ! this.enabled ) return;
 			event.preventDefault();
-			const notches = event.deltaMode === 1 ? event.deltaY / 3 : event.deltaY / 100;
+			// deltaMode 0 is pixels, 1 lines (Firefox with a mouse, 3 a notch), 2 pages
+			const value = event.deltaMode === 1 ? event.deltaY * 40 : event.deltaMode === 2 ? event.deltaY * 800 : event.deltaY;
+			if ( value === 0 ) return;
+			// which device, decided as MapLibre decides it: a macOS mouse reports
+			// multiples of 4.000244140625, a trackpad small values many times a
+			// second (a pinch arrives the same way, with ctrlKey); anything else
+			// is a trackpad when events come thick and a wheel when they do not
+			const w = this._wheel;
+			const now = performance.now();
+			const sinceLast = now - w.last;
+			w.last = now;
+			if ( value % 4.000244140625 === 0 ) w.type = 'wheel';
+			else if ( Math.abs( value ) < 4 ) w.type = 'trackpad';
+			else if ( sinceLast > 400 ) w.type = null; // a lone event: a wheel, unless another follows
+			else if ( ! w.type ) w.type = Math.abs( sinceLast * value ) < 200 ? 'trackpad' : 'wheel';
+
+			// folded into the frame's delta, applied in update()
+			w.delta -= value;
 			const rect = element.getBoundingClientRect();
-			const px = event.clientX - rect.left - rect.width / 2;
-			const py = event.clientY - rect.top - rect.height / 2;
-			this.zoomBy( Math.pow( 1 - this.zoomFraction, - notches ), px, py );
+			w.px = event.clientX - rect.left - rect.width / 2;
+			w.py = event.clientY - rect.top - rect.height / 2;
+			this._changed = true;
+
+		};
+
+		const onKeyDown = event => {
+
+			if ( ! this.enabled ) return;
+			const target = event.target;
+			if ( target && ( target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable ) ) return;
+
+			switch ( event.key ) {
+
+				case '+': case '=': this.zoomBy( Math.pow( 2, - this.keyboardZoomStep * ( event.shiftKey ? 2 : 1 ) ) ); break;
+				case '-': case '_': this.zoomBy( Math.pow( 2, this.keyboardZoomStep * ( event.shiftKey ? 2 : 1 ) ) ); break;
+				case 'ArrowLeft': event.shiftKey ? this.rotateBy( - 15, 0 ) : this.panByPixels( this.keyboardPanPixels, 0 ); break;
+				case 'ArrowRight': event.shiftKey ? this.rotateBy( 15, 0 ) : this.panByPixels( - this.keyboardPanPixels, 0 ); break;
+				case 'ArrowUp': event.shiftKey ? this.rotateBy( 0, 10 ) : this.panByPixels( 0, this.keyboardPanPixels ); break;
+				case 'ArrowDown': event.shiftKey ? this.rotateBy( 0, - 10 ) : this.panByPixels( 0, - this.keyboardPanPixels ); break;
+				default: return;
+
+			}
+
+			// cmd/ctrl with + or - would zoom the page otherwise
+			event.preventDefault();
 
 		};
 
 		const onContextMenu = event => event.preventDefault();
+		const doc = element.ownerDocument ?? null;
 
 		element.addEventListener( 'pointerdown', onPointerDown );
 		element.addEventListener( 'pointermove', onPointerMove );
@@ -291,8 +383,11 @@ export class MapControls {
 		element.addEventListener( 'pointercancel', onPointerUp );
 		element.addEventListener( 'wheel', onWheel, { passive: false } );
 		element.addEventListener( 'contextmenu', onContextMenu );
+		if ( doc ) doc.addEventListener( 'keydown', onKeyDown );
 
 		this._unbind = () => {
+
+			if ( doc ) doc.removeEventListener( 'keydown', onKeyDown );
 
 			element.removeEventListener( 'pointerdown', onPointerDown );
 			element.removeEventListener( 'pointermove', onPointerMove );

@@ -163,4 +163,104 @@ describe( 'MapControls', () => {
 
 	} );
 
+	describe( 'wheels, trackpads and keys', () => {
+
+		// an element and a document that keep the handlers, so events can be
+		// handed to them here
+		function createPage() {
+
+			const listeners = {};
+			const doc = { addEventListener: ( type, fn ) => { listeners[ 'doc:' + type ] = fn; }, removeEventListener() {} };
+			const element = {
+				clientWidth: 800, clientHeight: 500, style: {}, ownerDocument: doc,
+				addEventListener: ( type, fn ) => { listeners[ type ] = fn; }, removeEventListener() {},
+				getBoundingClientRect: () => ( { left: 0, top: 0, width: 800, height: 500 } ),
+			};
+			const camera = new PerspectiveCamera( 60, 1.6, 10, 1e8 );
+			const controls = new MapControls( camera, element, { mode: 'planar' } );
+			controls.setView( { lat: PARIS.lat, lon: PARIS.lon, distance: 1000, heading: 0, pitch: 0 } );
+			controls.update( 0 );
+			const wheel = props => listeners.wheel( { deltaMode: 0, clientX: 400, clientY: 250, preventDefault() {}, ...props } );
+			const key = props => { const event = { shiftKey: false, prevented: false, preventDefault() { this.prevented = true; }, ...props }; listeners[ 'doc:keydown' ]( event ); return event; };
+			// the frame, then a second of easing: the whole target applied
+			const settle = () => { controls.update( performance.now() ); controls.update( performance.now() + 1000 ); };
+			return { controls, wheel, key, settle };
+
+		}
+
+		// MapLibre's ScrollZoomHandler: what a frame's delta scales the map by
+		const maplibreScale = ( delta, rate ) => 2 / ( 1 + Math.exp( - Math.abs( delta * rate ) ) );
+
+		it( 'zooms two-finger scroll and a pinch at MapLibre\'s trackpad rate, a frame at a time', () => {
+
+			const { controls, wheel, settle } = createPage();
+			for ( let i = 0; i < 12; i ++ ) wheel( { deltaY: 10 } ); // 120 px of small trackpad events in one frame
+			settle();
+			expect( controls.distance ).toBeCloseTo( 1000 * maplibreScale( 120, 1 / 100 ), 3 ); // 1537 m
+			for ( let i = 0; i < 6; i ++ ) wheel( { deltaY: - 20, ctrlKey: true } ); // a pinch out, 120 px
+			settle();
+			expect( controls.distance ).toBeCloseTo( 1000, 3 );
+
+		} );
+
+		it( 'eases the zoom over 200 ms rather than jumping', () => {
+
+			const { controls, wheel } = createPage();
+			const t0 = performance.now();
+			for ( let i = 0; i < 12; i ++ ) wheel( { deltaY: 10 } );
+			controls.update( t0 );
+			expect( controls.distance ).toBeCloseTo( 1000, 6 ); // nothing yet: no time has passed
+			controls.update( t0 + 100 );
+			const halfway = controls.distance;
+			expect( halfway ).toBeGreaterThan( 1000 );
+			expect( halfway ).toBeLessThan( 1536 );
+			controls.update( t0 + 2000 );
+			expect( controls.distance ).toBeCloseTo( 1537.05, 1 );
+
+		} );
+
+		it( 'zooms a lone mouse wheel notch at MapLibre\'s wheel rate, whichever way the browser reports it', () => {
+
+			for ( const notch of [ { deltaY: 100 }, { deltaY: 3, deltaMode: 1 }, { deltaY: 4.000244140625 * 30 } ] ) {
+
+				const { controls, wheel, settle } = createPage();
+				wheel( notch );
+				settle();
+				const value = notch.deltaMode === 1 ? notch.deltaY * 40 : notch.deltaY;
+				expect( controls.distance ).toBeCloseTo( 1000 * maplibreScale( value, 1 / 450 ), 3 );
+
+			}
+
+		} );
+
+		it( 'zooms a level on + and -, cmd or not, and keeps the browser from zooming the page', () => {
+
+			const { controls, key } = createPage();
+			expect( key( { key: '-' } ).prevented ).toBe( true );
+			expect( controls.distance ).toBeCloseTo( 2000, 6 );
+			expect( key( { key: '=', metaKey: true } ).prevented ).toBe( true ); // cmd + on a US keyboard
+			expect( controls.distance ).toBeCloseTo( 1000, 6 );
+			key( { key: '+', ctrlKey: true, shiftKey: true } ); // two levels with shift, as MapLibre
+			expect( controls.distance ).toBeCloseTo( 250, 6 );
+			// typing in a field is not a map gesture
+			expect( key( { key: '-', target: { tagName: 'INPUT' } } ).prevented ).toBe( false );
+			expect( controls.distance ).toBeCloseTo( 250, 6 );
+
+		} );
+
+		it( 'pans with the arrows and turns with shift', () => {
+
+			const { controls, key } = createPage();
+			const lon = controls.lon;
+			key( { key: 'ArrowLeft' } ); // the map slides right: the centre moves west
+			expect( controls.lon ).toBeLessThan( lon );
+			key( { key: 'ArrowRight', shiftKey: true } );
+			expect( controls.heading ).toBeCloseTo( 15, 9 );
+			key( { key: 'ArrowUp', shiftKey: true } );
+			expect( controls.pitch ).toBeCloseTo( 10, 9 );
+
+		} );
+
+	} );
+
 } );
