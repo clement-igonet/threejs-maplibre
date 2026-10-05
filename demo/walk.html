@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>threejs-maplibre walk: the streets of Saint-Lazare</title>
+		<style>
+			html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe6ec; }
+			canvas { display: block; }
+			#info { position: absolute; top: 8px; left: 8px; padding: 6px 10px; font: 13px/1.4 ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; white-space: pre; pointer-events: none; }
+			#help { position: absolute; bottom: 36px; left: 8px; padding: 6px 10px; font: 12px/1.7 system-ui, sans-serif; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 6px; pointer-events: none; }
+			#help kbd { display: inline-block; min-width: 14px; padding: 0 5px; margin: 0 1px; font: bold 11px ui-monospace, monospace; text-align: center; color: #222; background: #eee; border-radius: 3px; box-shadow: 0 1px 0 #999; }
+			#gait { position: absolute; left: 50%; bottom: 76px; transform: translateX( -50% ); padding: 6px 16px; font: bold 15px system-ui, sans-serif; color: #fff; background: rgba(20, 40, 60, 0.75); border-radius: 18px; pointer-events: none; transition: background 0.2s; }
+			#gait.run { background: #d9452b; }
+			#gait .hint { font-weight: normal; font-size: 12px; opacity: 0.85; margin-left: 8px; }
+			body.touch #gait .hint { display: none; }
+			#version { position: absolute; bottom: 8px; left: 8px; padding: 4px 8px; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; }
+			#attribution { position: absolute; bottom: 8px; right: 8px; padding: 2px 6px; font: 11px sans-serif; background: rgba(255, 255, 255, 0.8); }
+			#where { position: absolute; left: 50%; top: 52px; transform: translateX( -50% ); padding: 6px 14px; font: bold 15px system-ui, sans-serif; color: #fff; background: rgba(20, 40, 60, 0.75); border-radius: 18px; white-space: nowrap; pointer-events: none; max-width: calc( 100% - 32px ); overflow: hidden; text-overflow: ellipsis; }
+			#where .level { display: inline-block; margin-right: 8px; padding: 0 7px; border-radius: 9px; background: #d9452b; font-size: 13px; }
+			#where .sub { font-weight: normal; opacity: 0.8; margin-left: 6px; font-size: 13px; }
+			#labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+			#labels div { position: absolute; left: 0; top: 0; padding: 2px 7px; font: 12px system-ui, sans-serif; color: #222; background: rgba(255, 255, 255, 0.85); border-radius: 4px; white-space: nowrap; transform-origin: 50% 100%; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
+			#labels div.shop, #labels div.room { border-left: 3px solid #d9452b; }
+			#labels div.corridor, #labels div.area { background: rgba(230, 240, 250, 0.85); }
+			#edge { position: absolute; left: 50%; top: 30%; transform: translateX( -50% ); padding: 8px 14px; font: bold 14px ui-monospace, monospace; color: #fff; background: rgba(217, 69, 43, 0.85); border-radius: 6px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+			/* the touch controls: a joystick bottom left, a jump button bottom right */
+			#stick { position: absolute; left: 24px; bottom: 56px; width: 150px; height: 150px; border-radius: 50%; display: none; touch-action: none; user-select: none; -webkit-user-select: none;
+				background: radial-gradient( circle closest-side, rgba(255, 255, 255, 0.35) 0 52%, rgba(0, 0, 0, 0.35) 53% 79%, rgba(217, 69, 43, 0.75) 80% 100% ); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7) inset; }
+			#stick .knob { position: absolute; left: 47px; top: 47px; width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); pointer-events: none; }
+			#stick .label { position: absolute; left: 0; right: 0; top: 19px; text-align: center; font: bold 13px ui-monospace, monospace; color: #333; pointer-events: none; }
+			#stick.active .knob { background: #fff; }
+			#stick.run .knob { background: #d9452b; }
+			#stick.run .label { color: #fff; }
+			#stick-caption { position: absolute; left: 24px; bottom: 14px; width: 150px; text-align: center; display: none; font: 11px ui-monospace, monospace; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; }
+			#jump { position: absolute; right: 24px; bottom: 80px; width: 84px; height: 84px; border-radius: 50%; border: 0; display: none; font: bold 15px ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.5); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7) inset; touch-action: none; user-select: none; -webkit-user-select: none; }
+			body.touch #stick, body.touch #stick-caption, body.touch #jump { display: block; }
+			body.touch #help, body.touch #version { display: none; }
+			body.touch #info { font-size: 10px; white-space: normal; right: 8px; }
+		</style>
+	</head>
+	<body>
+		<div id="info"></div>
+		<div id="help"><kbd>W</kbd> walk &nbsp;<kbd>A</kbd><kbd>D</kbd> turn &nbsp;<kbd>S</kbd> back &nbsp;<kbd>Shift</kbd> or <kbd>R</kbd> run &nbsp;<kbd>Space</kbd> jump &nbsp;drag to look round</div>
+		<div id="gait">walking<span class="hint">Shift or R to run</span></div>
+		<div id="labels"></div>
+		<div id="where"></div>
+		<div id="edge">edge of the map: the data stops here</div>
+		<div id="stick"><div class="knob"><div class="label">walk</div></div></div>
+		<div id="stick-caption" style="z-index: 1">drag the dot to walk and turn, to the red rim to run</div>
+		<button id="jump">jump</button>
+		<div id="version"></div>
+		<div id="attribution"></div>
+		<script type="module">
+
+			// A walk on the streets around Gare Saint-Lazare and into it: the
+			// buildings, the hall's floors, walls and stairs are solid (one
+			// bounds tree per tile block, three-mesh-bvh), a CC0 robot by
+			// Quaternius walks, runs and idles, the camera follows over the
+			// shoulder. Levels are all shown; the character goes down
+			// the stairs to the Métro on its own feet.
+			//
+			//   ?lat=&lon=&y=   where to start (the rue de Rome by default)
+			//   ?heading=       the camera's, degrees clockwise from north
+
+
+			import { AnimationMixer, BufferAttribute, BufferGeometry, Clock, Color, DirectionalLight, DoubleSide, Group, HemisphereLight, Mesh, MeshBasicMaterial, MeshLambertMaterial, PerspectiveCamera, PlaneGeometry, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
+			import * as THREE_NS from 'three';
+			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+			import { AttributionControl, MAPLIBRE_FOV, Style, VectorTileMap, createFog, latitudeToNormalized, longitudeToNormalized, metersToNormalized, normalizedToLatitude, normalizedToLongitude, normalizedToMeters } from '../src/index.js';
+			import { Places } from '../src/game/Places.js';
+			import { featureLevels, stairwell, subtractConvex } from '../src/build/buildIndoor.js';
+			import { CharacterController } from '../src/game/CharacterController.js';
+			import { Input } from '../src/game/Input.js';
+			import { createGeoJSONVectorSource } from './geojson-vector-source.js';
+			import { STATION_STYLE } from './station-style.js';
+			import { LOUVRE_STYLE } from './louvre-style.js';
+
+			const params = new URLSearchParams( location.search );
+			const num = ( name, fallback ) => params.has( name ) ? parseFloat( params.get( name ) ) : fallback;
+
+			const response = await fetch( new URL( './data/saint-lazare.json', import.meta.url ) );
+			const { meta, layers } = await response.json();
+			const { source } = createGeoJSONVectorSource( layers, { maxZoom: 16, attribution: `<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors (${ meta.osm_base.slice( 0, 10 ) })` } );
+			// the station style plus the buildings, roofs and all, which the
+			// indoor demo leaves out to see inside
+			const buildings = LOUVRE_STYLE.layers.find( l => l.id === 'building-3d' );
+			const style = new Style( { ...STATION_STYLE, layers: [ ...STATION_STYLE.layers.filter( l => l.id !== 'building' ), buildings ] } );
+
+			const renderer = new WebGLRenderer( { antialias: true } );
+			renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.outputColorSpace = SRGBColorSpace;
+			document.body.appendChild( renderer.domElement );
+
+			const scene = new Scene();
+			scene.background = new Color( 0xdfe6ec );
+			scene.fog = createFog( style, { viewDistance: 900 } );
+			const camera = new PerspectiveCamera( 55, window.innerWidth / window.innerHeight, 0.1, 5000 );
+			scene.add( new HemisphereLight( 0xffffff, 0x8a8478, 1.0 ) );
+			const sun = new DirectionalLight( 0xffffff, 1.8 );
+			sun.position.set( 300, 600, 200 );
+			scene.add( sun );
+
+			const map = new VectorTileMap( source, style, { mode: 'planar', sourceId: 'openmaptiles', collision: true, doubleSided: true, viewDistance: 900 } );
+			// a floating origin for everything that is not the map's own batches
+			// (which have theirs): the planar frame is mercator meters, millions
+			// of them, and a skinned mesh or a camera that far from zero loses
+			// its shape to float32 on the GPU. The root is moved to the
+			// character, so the world around the player is near zero.
+			const root = new Group();
+			scene.add( root );
+			root.add( map, camera );
+
+			// the ground: the style's background, the land between what OSM
+			// maps as a polygon (a square, a yard, the space between two
+			// pavements). A map seen from above gets it as the clear colour;
+			// a camera at head height sees the sky colour there instead, which
+			// reads as water. A plane under the map, following the character,
+			// drawn first and pushed back so the fills on it win.
+			const land = style.backgroundLayer ? style.backgroundLayer.get( 'background-color', 16 ).rgb : [ 0.92, 0.9, 0.87 ];
+			const groundMaterial = new MeshLambertMaterial( { color: new Color().setRGB( land[ 0 ], land[ 1 ], land[ 2 ], SRGBColorSpace ), polygonOffset: true, polygonOffsetFactor: 4, polygonOffsetUnits: 4 } );
+			let ground = null; // built once the start is known, round the data
+			new AttributionControl( document.getElementById( 'attribution' ) ).addSource( source );
+
+			// the character
+			const toScene = ( lat, lon ) => { const [ mx, my ] = normalizedToMeters( longitudeToNormalized( lon ), latitudeToNormalized( lat ) ); return [ mx, - my ]; };
+			// the start: the station's entrance nearest the cour de Rome, a few
+			// meters outside it, unless the URL says where
+			let startLat = num( 'lat', NaN ), startLon = num( 'lon', NaN );
+			if ( ! Number.isFinite( startLat ) ) {
+
+				const entrances = layers.indoor.features.filter( f => f.properties.class === 'entrance' && ( f.properties.levels ?? '' ).split( ';' ).includes( '0' ) );
+				const near = entrances.sort( ( a, b ) => Math.hypot( a.geometry.coordinates[ 0 ] - 2.3245, a.geometry.coordinates[ 1 ] - 48.8762 ) - Math.hypot( b.geometry.coordinates[ 0 ] - 2.3245, b.geometry.coordinates[ 1 ] - 48.8762 ) )[ 0 ];
+				startLon = near.geometry.coordinates[ 0 ];
+				startLat = near.geometry.coordinates[ 1 ] - 0.00008; // 9 m south, on the forecourt
+
+			}
+
+			// the data's extent, 20 m in from its edge where features still run
+			// on outside it: the character stays inside, the edge drawn faintly
+			const [ west, south, east, north ] = meta.bbox;
+			const [ x0, z0 ] = toScene( north, west ), [ x1, z1 ] = toScene( south, east );
+			const bounds = { minX: x0 + 20, maxX: x1 - 20, minZ: z0 + 20, maxZ: z1 - 20 };
+			{
+
+				// the ground, 3 km round the data, with a hole over every staircase
+				// that goes down from level 0, as the street fills have: OSM maps
+				// the pavement over a Métro entrance unbroken
+				const gx = ( x0 + x1 ) / 2, gz = ( z0 + z1 ) / 2, half = 3000;
+				const k = 1 / Math.cos( ( north + south ) / 2 * Math.PI / 180 );
+				const quads = [];
+				for ( const f of layers.transportation.features ) {
+
+					const p = f.properties;
+					if ( p.subclass !== 'steps' || ! featureLevels( p ).slice( 1 ).includes( 0 ) || f.geometry.type !== 'LineString' ) continue;
+					const points = f.geometry.coordinates.flatMap( ( [ lon, lat ] ) => { const [ x, z ] = toScene( lat, lon ); return [ x - gx, z - gz ]; } );
+					quads.push( ...stairwell( points, 2 * k ) );
+
+				}
+
+				let pieces = [ [ [ - half, - half ], [ half, - half ], [ half, half ] ], [ [ - half, - half ], [ half, half ], [ - half, half ] ] ];
+				for ( const quad of quads ) pieces = pieces.flatMap( piece => subtractConvex( piece, quad ) );
+				const positions = [];
+				for ( const piece of pieces ) for ( let i = 1; i < piece.length - 1; i ++ ) {
+
+					// wound to face up, whichever way the piece came out
+					let a = piece[ 0 ], b = piece[ i ], c = piece[ i + 1 ];
+					if ( ( b[ 1 ] - a[ 1 ] ) * ( c[ 0 ] - a[ 0 ] ) - ( b[ 0 ] - a[ 0 ] ) * ( c[ 1 ] - a[ 1 ] ) < 0 ) [ b, c ] = [ c, b ];
+					for ( const [ x, z ] of [ a, b, c ] ) positions.push( x, 0, z );
+
+				}
+				const geometry = new BufferGeometry();
+				geometry.setAttribute( 'position', new BufferAttribute( new Float32Array( positions ), 3 ) );
+				geometry.setAttribute( 'normal', new BufferAttribute( new Float32Array( positions.length ).map( ( v, i ) => i % 3 === 1 ? 1 : 0 ), 3 ) );
+				ground = new Mesh( geometry, groundMaterial );
+				ground.position.set( gx, - 0.02, gz );
+				ground.renderOrder = - 1;
+				root.add( ground );
+
+			}
+			const [ sx, sz ] = toScene( startLat, startLon );
+			// the map's frame is Web Mercator meters, 1 / cos( latitude ) of a
+			// ground meter (1.52 here): speeds are given in ground meters and
+			// scaled, so a walk is a walk; heights are true meters already
+			const mercator = 1 / Math.cos( startLat * Math.PI / 180 );
+			const character = new CharacterController( map, { bounds, walkSpeed: 1.4 * mercator, runSpeed: 4.2 * mercator } ).place( sx, num( 'y', 0 ), sz );
+			{
+
+				// four translucent walls 2.5 m high, built round their own centre
+				// so float32 keeps them straight millions of meters out
+				const cx = ( bounds.minX + bounds.maxX ) / 2, cz = ( bounds.minZ + bounds.maxZ ) / 2;
+				const corners = [ [ bounds.minX, bounds.minZ ], [ bounds.maxX, bounds.minZ ], [ bounds.maxX, bounds.maxZ ], [ bounds.minX, bounds.maxZ ] ];
+				const positions = [];
+				for ( let i = 0; i < 4; i ++ ) {
+
+					const [ ax, az ] = corners[ i ], [ bx, bz ] = corners[ ( i + 1 ) % 4 ];
+					for ( const [ x, y, z ] of [ [ ax, 0, az ], [ bx, 0, bz ], [ bx, 2.5, bz ], [ ax, 0, az ], [ bx, 2.5, bz ], [ ax, 2.5, az ] ] ) positions.push( x - cx, y, z - cz );
+
+				}
+
+				const geometry = new BufferGeometry();
+				geometry.setAttribute( 'position', new BufferAttribute( new Float32Array( positions ), 3 ) );
+				const fence = new Mesh( geometry, new MeshBasicMaterial( { color: 0xd9452b, transparent: true, opacity: 0.22, side: DoubleSide, depthWrite: false } ) );
+				fence.position.set( cx, 0, cz );
+				root.add( fence );
+
+			}
+			character.heading = ( 90 - num( 'heading', 20 ) ) * Math.PI / 180; // facing where the camera looks
+			const stick = document.getElementById( 'stick' );
+			const input = new Input().attach( renderer.domElement ).joystick( stick, stick.querySelector( '.knob' ), stick.querySelector( '.label' ) ).button( document.getElementById( 'jump' ), 'jump' );
+			if ( navigator.maxTouchPoints > 0 ) document.body.classList.add( 'touch' );
+			let cameraHeading = ( 90 - num( 'heading', 20 ) ) * Math.PI / 180; // counterclockwise from +x
+			let cameraPitch = 10 * Math.PI / 180; // low enough to stay under a 3 m ceiling
+			// Quaternius's robot, the one three.js ships in its examples: CC0,
+			// 0.46 MB, walking, running and idling (demo/assets/ROBOT-README.md)
+			const gltf = await new GLTFLoader().loadAsync( new URL( './assets/robot.glb', import.meta.url ).href );
+			const figure = gltf.scene;
+			// the robot stands 1.8 m, whatever the file's units
+			{ const b = new THREE_NS.Box3().setFromObject( figure ); const h = b.max.y - b.min.y; if ( h > 0 ) figure.scale.setScalar( 1.8 / h ); }
+			root.add( figure );
+			window.__FIGURE = figure;
+			window.THREE_NS = THREE_NS;
+			window.__COLLIDE = ( await import( '../src/three/colliders.js' ) ).collideCapsule;
+			const mixer = new AnimationMixer( figure );
+			const clip = pattern => gltf.animations.find( c => pattern.test( c.name ) ) ?? gltf.animations[ 0 ];
+			const named = name => gltf.animations.find( c => c.name === name );
+			const actions = {
+				idle: mixer.clipAction( named( 'Idle' ) ?? clip( /idle/i ) ),
+				walk: mixer.clipAction( named( 'Walking' ) ?? clip( /^walk/i ) ),
+				run: mixer.clipAction( named( 'Running' ) ?? clip( /^run/i ) ),
+				jump: mixer.clipAction( named( 'Jump' ) ?? clip( /^jump/i ) ),
+			};
+			for ( const a of Object.values( actions ) ) { a.play(); a.setEffectiveWeight( 0 ); }
+			let current = actions.idle;
+			current.setEffectiveWeight( 1 );
+			function play( next ) {
+
+				if ( next === current ) return;
+				next.reset().setEffectiveWeight( 1 );
+				current.crossFadeTo( next, 0.25, false );
+				current = next;
+
+			}
+
+
+			const info = document.getElementById( 'info' );
+			const edge = document.getElementById( 'edge' );
+			const gaitBox = document.getElementById( 'gait' );
+
+			// where the character is, and the names around it
+			const places = new Places( layers );
+			const whereBox = document.getElementById( 'where' ), labelBox = document.getElementById( 'labels' );
+			const labelPool = [];
+			let nearbyLabels = [], lastPlaces = - Infinity;
+			const lonLatOf = p => { const [ nx, ny ] = metersToNormalized( p.x, - p.z ); return [ normalizedToLongitude( nx ), normalizedToLatitude( ny ) ]; };
+			const levelOf = y => Math.round( ( y - 0.15 ) / 3 );
+			const _label = new Vector3(), _eye = new Vector3();
+			function updatePlaces( now ) {
+
+				if ( now - lastPlaces < 300 ) return;
+				lastPlaces = now;
+				const [ lon, lat ] = lonLatOf( character.position );
+				const level = levelOf( character.position.y );
+				const w = places.where( lon, lat, level );
+				const name = w.space ?? ( w.indoor ? ( w.kind === 'corridor' ? 'corridor' : 'hall' ) : w.street ) ?? w.building ?? 'Saint-Lazare';
+				const sub = w.indoor && w.building && w.building !== name ? w.building : '';
+				whereBox.innerHTML = ( w.indoor ? `<span class="level">level ${ level }</span>` : '' ) + escape( name ) + ( sub ? `<span class="sub">${ escape( sub ) }</span>` : '' );
+				nearbyLabels = places.nearby( lon, lat, level, 35, 12 ).map( l => {
+
+					const [ x, z ] = toScene( l.lat, l.lon );
+					return { ...l, x, y: l.level * 3 + 2.6, z };
+
+				} );
+				// hidden behind a wall: the ray from the camera stops short of it
+				camera.getWorldPosition( _eye ).sub( root.position );
+				for ( const l of nearbyLabels ) {
+
+					_label.set( l.x, l.y, l.z ).sub( _eye );
+					const d = _label.length();
+					const hit = map.raycast( _eye, _label.normalize(), d );
+					l.hidden = hit !== null && hit < d - 1;
+
+				}
+
+			}
+
+			function drawLabels() {
+
+				while ( labelPool.length < nearbyLabels.length ) { const div = document.createElement( 'div' ); labelBox.appendChild( div ); labelPool.push( div ); }
+				const w = window.innerWidth, h = window.innerHeight;
+				labelPool.forEach( ( div, i ) => {
+
+					const l = nearbyLabels[ i ];
+					if ( ! l || l.hidden ) { div.style.display = 'none'; return; }
+					_label.set( l.x, l.y, l.z ).add( root.position ).project( camera );
+					if ( _label.z > 1 || Math.abs( _label.x ) > 1.1 || Math.abs( _label.y ) > 1.1 ) { div.style.display = 'none'; return; }
+					div.style.display = 'block';
+					if ( div.textContent !== l.text ) div.textContent = l.text;
+					div.className = l.kind;
+					const scale = Math.max( 0.7, Math.min( 1.2, 12 / Math.max( l.distance, 1 ) ) );
+					div.style.transform = `translate( ${ ( _label.x * 0.5 + 0.5 ) * w }px, ${ ( 0.5 - _label.y * 0.5 ) * h }px ) translate( -50%, -100% ) scale( ${ scale } )`;
+					div.style.opacity = Math.max( 0.35, 1 - l.distance / 40 );
+
+				} );
+
+			}
+
+			const escape = text => String( text ).replace( /[&<>"]/g, c => ( { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } )[ c ] );
+			const clock = new Clock();
+			let frames = 0, frameMs = 0, stableFrames = 0, started = false;
+			const eye = new Vector3(), look = new Vector3(), back = new Vector3();
+			renderer.setAnimationLoop( () => {
+
+				const real = clock.getDelta();
+				const dt = Math.min( real, 0.1 ); // a slow frame is not a teleport
+				frameMs += real * 1000; frames ++;
+				input.poll();
+				cameraHeading -= input.turn * 1.8 * dt + input.turnPixels * 0.005;
+				cameraPitch = Math.max( - 0.3, Math.min( 1.2, cameraPitch - input.look * 1.2 * dt + input.lookPixels * 0.005 ) );
+				const looking = input.turnPixels !== 0 || input.lookPixels !== 0 || input.turn !== 0;
+				input.turnPixels = 0;
+				input.lookPixels = 0;
+				// the character waits for the ground: until the tiles around it
+				// have landed there is nothing to stand on, and it would fall
+				// through the floor it starts on
+				if ( ! started ) started = map.stats.loading === 0 && map.stats.rendered > 0;
+				if ( started ) character.update( dt, input );
+				// the camera stays behind the character: left and right turn
+				// it, and the camera turns with it, so the way it goes is
+				// always ahead on the screen. A drag looks round; the camera
+				// comes back behind as soon as the character moves or turns
+				if ( ( character.speed > 0 || character.turning ) && ! looking ) {
+
+					let gap = character.heading - cameraHeading;
+					gap = Math.atan2( Math.sin( gap ), Math.cos( gap ) );
+					cameraHeading += gap * Math.min( 1, 6 * dt );
+
+				}
+
+				root.position.set( - Math.round( character.position.x / 50 ) * 50, 0, - Math.round( character.position.z / 50 ) * 50 );
+				root.updateMatrixWorld();
+
+				// the figure on the feet, facing its way; the models face +z
+				figure.position.copy( character.position );
+				figure.rotation.y = character.heading + Math.PI / 2;
+				play( ! character.onGround ? actions.jump : character.speed === 0 ? actions.idle : input.run ? actions.run : actions.walk );
+				const gait = character.speed === 0 ? 'standing' : input.run ? 'running' : 'walking';
+				if ( gaitBox.dataset.gait !== gait ) {
+
+					gaitBox.dataset.gait = gait;
+					gaitBox.classList.toggle( 'run', gait === 'running' );
+					gaitBox.firstChild.textContent = gait;
+					gaitBox.querySelector( '.hint' ).textContent = gait === 'running' ? ( input.runToggle ? 'R to walk' : 'release Shift to walk' ) : 'Shift or R to run';
+
+				}
+				mixer.update( dt );
+
+				// the camera behind the character, over its shoulder, pulled in
+				// to the first wall between the two so it never looks through one
+				look.set( character.position.x, character.position.y + 1.4, character.position.z );
+				back.set( - Math.cos( cameraHeading ) * Math.cos( cameraPitch ), Math.sin( cameraPitch ), Math.sin( cameraHeading ) * Math.cos( cameraPitch ) ).normalize();
+				const wall = map.raycast( look, back, 5.5 );
+				const d = Math.max( 0.8, wall === null ? 5.5 : wall - 0.6 );
+				eye.copy( look ).addScaledVector( back, d );
+				eye.y += 0.2;
+				camera.position.copy( eye );
+				camera.lookAt( look.add( root.position ) ); // lookAt takes a world point; the camera lives in the root
+				camera.updateMatrixWorld();
+
+				map.update( camera, renderer, dt * 1000 );
+				renderer.render( scene, camera );
+				if ( started ) { updatePlaces( performance.now() ); drawLabels(); }
+				const s = map.stats;
+				edge.style.opacity = character.atEdge ? 1 : 0;
+				const [ hereLon, hereLat ] = lonLatOf( character.position );
+				const facing = Math.round( ( 90 - character.heading * 180 / Math.PI + 720 ) % 360 );
+				info.textContent = `threejs-maplibre M5, a walk: Saint-Lazare | @ ${ hereLat.toFixed( 6 ) }, ${ hereLon.toFixed( 6 ) }, facing ${ facing }° | ${ character.onGround ? 'on the ground' : 'in the air' } at ${ character.position.y.toFixed( 2 ) } m | ${ input.gamepad ? 'gamepad' : input.touch ? 'touch' : 'keyboard' } | rendered ${ s.rendered } | loading ${ s.loading } | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles } | ${ ( frameMs / frames ).toFixed( 1 ) } ms/frame`;
+				stableFrames = s.loading === 0 && s.rendered > 0 ? stableFrames + 1 : 0;
+				window.__SHOT_READY = stableFrames > 30;
+
+			} );
+
+			window.addEventListener( 'resize', () => {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			} );
+
+			document.getElementById( 'version' ).textContent = `threejs-maplibre v${ __VERSION__ } (${ __BUILD__ })`;
+			window.__MAP = map;
+			window.__CHARACTER = character;
+			window.__INPUT = input;
+			window.__CAMERA_HEADING = () => cameraHeading;
+			window.__ANIMATIONS = gltf.animations.map( c => c.name );
+			window.__PLAYING = () => current.getClip().name;
+			window.THREE_Box3Probe = function ( object ) { const { Box3 } = THREE_NS; const b = new Box3().setFromObject( object ); this.size = b.getSize( new Vector3() ).toArray().map( v => Math.round( v * 100 ) / 100 ); this.min = b.min.toArray().map( v => Math.round( v * 100 ) / 100 ); };
+
+		</script>
+	</body>
+</html>

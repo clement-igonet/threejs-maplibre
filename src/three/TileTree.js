@@ -446,7 +446,7 @@ export class TileTree extends Group {
 			// no longer wanted, or evicted meanwhile: it re-queues if it comes back
 			if ( record.lastUsed !== this._frame || record.state !== 'ready' ) continue;
 
-			this._upload( record.content, renderer );
+			this._upload( record.content, renderer, record );
 			stats.uploaded ++;
 
 		}

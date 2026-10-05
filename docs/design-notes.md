@@ -1120,3 +1120,158 @@ it has them. The table is kept current.
 | indoor | rooms as walls, floor and ceiling; areas; walls; doors and windows on walls; lifts; level heights from `indoor=level` | floors, walls, doors as openings, stairs as ramps (none there), lifts; no ceilings, no windows, levels 3 m |
 | routing | none | a graph and A* |
 | roads in 3D, trees, power lines, LOD | yes | no, M5 |
+
+## M5 Gamification showcase
+
+### On the streets: a character, solid walls, a camera over the shoulder
+
+What a map renderer cannot do: someone walking the streets, bumping into
+the buildings, going down the stairs to the Métro. The pieces, each in
+its own module so the engine stays a map engine:
+
+- `src/three/colliders.js`: one bounds tree (three-mesh-bvh, MIT, 62 KB
+  gzipped, the one runtime dependency added) per extrusion block of a
+  built tile, buildings, roofs, indoor floors, walls, ramps and shafts
+  alike, built from the worker's own positions and indices in the block's
+  frame when the tile lands (`collision: true` on `VectorTileMap`; the
+  arrays stay in memory for it, so it is off by default) and dropped with
+  the tile. Two queries: `collideCapsule` pushes a capsule out of every
+  triangle it overlaps, the way the library's characterMovement example
+  does it (the closest point of the segment to the triangle moves away by
+  what is left of the radius, block by block); `groundBelow` casts a ray
+  down for the nearest floor or ramp.
+- `src/game/CharacterController.js`: a capsule, gravity, a jump, five
+  collided steps a frame as in three.js's games_fps; the ground is the
+  map's floors and ramps where there are any under the feet, the street
+  at 0 elsewhere. Steered by default: left and right turn the character,
+  forward walks the way it faces, backward steps back at half speed
+  without turning round, so a camera kept behind it always shows where it
+  is going (the first version walked sideways on left and right, which
+  turned the camera's view to the side of the way the character went).
+  `steering: false` keeps the camera-relative walk for a free camera.
+  `bounds` keeps it inside the data: past the extract's edge there is
+  empty ground, so the edge is a wall nothing gets over, walking, running
+  or jumping (`atEdge` says when it is pressed against it). The demo puts
+  it 20 m in from the extract's box, where features still run on outside
+  it, draws it as a faint red wall and says "edge of the map" when the
+  character reaches it. The box is the union of the dataset's queries,
+  not the first one's, which was the station's own small box.
+- `src/game/Input.js`: keyboard (WASD or arrows, Shift held or R toggled
+  to run, space, Q and E),
+  the first gamepad (sticks, A, a trigger) and a phone as one input,
+  polled a frame at a time as the Gamepad API wants. On a phone the one
+  control is a joystick drawn bottom left: the dot pushed up walks,
+  sideways turns, out to the red rim runs, its label saying which; a jump
+  button bottom right. A touch on the scene does nothing, and there is no
+  run button: the first version had a thumb anywhere on the left half as
+  an invisible stick and the right half turning the camera, and a thumb
+  that missed turned the view instead of walking.
+- `demo/walk.html`: the Saint-Lazare neighbourhood with its buildings,
+  roofs and all, and the station's interior, every face drawn on both
+  sides (`doubleSided: true`) since the camera goes indoors; a CC0 robot
+  by Quaternius, the one three.js ships in its examples
+  (`demo/assets/robot.glb`, 0.46 MB, licence beside it; KayKit's knight,
+  rogue and mage were tried and are 3.6 MB each)
+  idling, walking and running by `AnimationMixer.crossFadeTo`; the camera
+  behind, dragging or the sticks to turn. The start is the station's
+  forecourt entrance; the entrances cut the buildings' ground-floor walls
+  (`wallPieces`, shared with the indoor walls), so a street leads into the
+  hall and the hall's stairs lead down.
+
+The ground under the map is a plane in the style's background colour,
+following the character: a map seen from above gets the land between
+mapped polygons (a square, a yard, the space between two pavements) as
+its clear colour, but a camera at head height sees the sky colour there,
+and the first players read it as water.
+
+Stairwells. OSM maps the floor above a staircase as one area, and the
+pavement over a Métro entrance as unbroken street, so a ramp climbed into
+the slab and a player went down into the pavement. The tile builder cuts
+a hole 2 m wide along every staircase or escalator through each floor it
+climbs to (`appendFloorWithHoles`: the floor triangulated as usual, each
+triangle with the stairwells' convex quads taken out, a triangle minus a
+convex quad being a few convex pieces), and through the street fills
+over the ones that go down from level 0 (`appendFillWithHoles`); the
+demo's ground plane gets the same holes. The cut is in the geometry, so
+the collision follows: a test rides the escalator from the hall and ends
+on level 1 at 3.15 m.
+
+Zoom underground. The map takes its zoom for the style from where the
+camera's view meets the ground plane; a camera under the street (in the
+Métro mall, at level -1) looking down never meets it, the zoom came out
+NaN and every layer with a zoom range hid, the station vanishing round a
+player. The distance is now the plane's ahead, or the camera's height over
+or under it, and the zoom is held under 24, the spec's default maxzoom,
+since a camera at a character's shoulder is closer than any map zoom.
+
+Collision from detail only. A coarser tile is simplified (geojson-vt
+here, the tile generator anywhere), so a door can miss its wall line by a
+few tens of centimeters and the wall stays uncut; such a tile stays in
+memory as a parent behind the detailed ones, and colliding with it closed
+doors a player saw open (at one of the station's doors, the zoom 14 tile
+alone holds the robot back where zoom 16 lets it through). Bounds trees
+are built for the source's most detailed tiles only, which also halves
+what collision keeps in memory.
+
+Shared walls. The station is mapped as building parts side by side, and
+each part drawn as a closed box put a solid partition wherever two met,
+through the street-level mall among other places (5 929 building walls in
+the extract stand against a neighbour). A wall now asks which other
+extrusions of its layer stand a quarter meter off it, on either side, and
+draws only the spans none covers: nothing between two parts of one
+height, the upper wall over a lower neighbour. Probing beside the wall
+rather than matching edges catches parts that meet where one's corner
+sits along the other's wall. Walking from the middle of the mall in eight
+directions meets no building wall.
+
+Names. `src/game/Places.js` says where the character is and what is
+around it: the space it stands in on its level (from the walking
+graph), the named building round it, the nearest named street within
+25 m outdoors; and the names within 35 m on its level, the station's
+rooms and shops and the named points of interest. The demo shows the
+first as a banner ("level -1 · Pylones · Gare Saint-Lazare", "Rue de
+Rome") and the second as labels over the places, hidden when a wall
+stands between them and the camera (`map.raycast`).
+
+The map's frame is Web Mercator meters, 1.52 a ground meter at Paris;
+heights are true meters. Speeds are given in ground meters and scaled,
+so the walk is 1.4 m/s and the run 4.2 on the ground. And the character
+waits for the tiles under it before gravity starts: a slow load would
+drop it through the floor it starts on.
+
+Two things cost an hour each and are worth writing down. A skinned mesh
+or a camera millions of meters from the origin (the planar frame is
+mercator meters) loses its shape to float32 on the GPU, so everything but
+the map's own batches (which have their floating origin already) lives in
+a root group moved to the character, 50 m at a time. And `Object3D.lookAt`
+takes a world-space point: given the root-local one, the camera looked at
+the horizon, the map's zoom read 1.8 off the view centre, and every layer
+with a `minzoom` vanished.
+
+The camera stays behind the character, easing round as it turns (9
+degrees behind at most while turning on the VM's slow frames, under one
+walking straight); a drag looks round until the next step. It is pulled
+in to the first wall between the character and where it would be (`map.raycast`, the third query on the colliders), so
+it never looks through one.
+
+Measured: 189 tests, among them a capsule pushed out of a hall wall and
+clear on the second pass, the hall floor found under a point and nothing
+under the street, the controller walking north at 1.6 m/s in the camera's
+frame and settling on the hall slab. In headless Chrome, a held W key
+walks the character from the forecourt to the entrance wall. On the VM's
+software renderer the walk frames at 95 ms with 77 000 triangles in view;
+the real-GPU number is PR D's.
+
+Not here: the sky and the hour (PR B), the goal and the start screen
+(PR C), props and the budget (PR D), `conveying` direction, a capsule
+that climbs a kerb (steps under 20 cm are walked through by the push-out,
+higher ones stop it).
+
+![The forecourt](../evidence/m5/walk-street.png)
+![The hall, the escalators ahead](../evidence/m5/walk-hall.png)
+![At the top of the Métro escalators](../evidence/m5/walk-stairs.png)
+![On a phone: the joystick, its red rim to run, the jump button](../evidence/m5/walk-phone.png)
+![Halfway up the escalator, the opening into level 1 ahead](../evidence/m5/walk-escalator.png)
+![Down the stairs to the Métro, through the pavement](../evidence/m5/walk-down.png)
+![Where the character is, and the names around it](../evidence/m5/walk-labels.png)
+![Running, the indicator saying how to walk again](../evidence/m5/walk-run.png)

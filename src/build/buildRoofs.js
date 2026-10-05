@@ -1,6 +1,7 @@
 import { Earcut } from 'three/src/extras/Earcut.js';
 import { Color } from '@maplibre/maplibre-gl-style-spec';
 import { straightSkeleton } from './straightSkeleton.js';
+import { uncovered } from './buildPolygons.js';
 
 // Simple 3D Buildings roofs. A fill-extrusion is a footprint pulled up to a
 // flat top, which is all MapLibre can draw and all OpenMapTiles carries;
@@ -165,7 +166,7 @@ function parseMeters( value ) {
 // asked. out is { positions, colors, indices, vertexCount }. Returns the
 // triangle count. The projection's scale (tile units per meter) is what
 // turns the footprint's extent into a roof height when the tags give none.
-export function appendRoofedExtrusion( out, polygon, projection, colours, base, height, roof, unitsPerMeter ) {
+export function appendRoofedExtrusion( out, polygon, projection, colours, base, height, roof, unitsPerMeter, covered = null ) {
 
 	const ring = polygon[ 0 ];
 	const count = ring.length / 2;
@@ -240,13 +241,13 @@ export function appendRoofedExtrusion( out, polygon, projection, colours, base, 
 
 		};
 
-		if ( roof.walls !== false ) triangles += appendWalls( out, polygon, projection, colours.wall, base, zOf );
+		if ( roof.walls !== false ) triangles += appendWalls( out, polygon, projection, colours.wall, base, zOf, covered );
 		triangles += appendLiftedFill( out, polygon, projection, colours.roof, zOf );
 		return triangles;
 
 	}
 
-	if ( roof.walls !== false ) triangles += appendWalls( out, polygon, projection, colours.wall, base, () => eave );
+	if ( roof.walls !== false ) triangles += appendWalls( out, polygon, projection, colours.wall, base, () => eave, covered );
 	const roofRGBA = colours.roof;
 
 	if ( POINTED.has( roof.shape ) || ( RIDGED.has( roof.shape ) && E === 0 ) ) {
@@ -472,7 +473,7 @@ function appendDome( out, ring, projection, rgba, eave, top, c, steps = 6 ) {
 }
 
 // Wall quads from base to a top that may differ per vertex.
-function appendWalls( out, polygon, projection, rgba, base, topOf ) {
+function appendWalls( out, polygon, projection, rgba, base, topOf, covered = null ) {
 
 	let triangles = 0;
 	for ( const ring of polygon ) {
@@ -484,6 +485,9 @@ function appendWalls( out, polygon, projection, rgba, base, topOf ) {
 			const ax = ring[ 2 * i ], ay = ring[ 2 * i + 1 ];
 			const bx = ring[ 2 * j ], by = ring[ 2 * j + 1 ];
 			if ( ax === bx && ay === by ) continue;
+			// a wall a neighbour stands against all the way up is not drawn;
+			// a partial one is (the slope of a skillion makes the spans uneven)
+			if ( covered && uncovered( base, Math.max( topOf( ax, ay ), topOf( bx, by ) ), covered( ax, ay, bx, by ) ).length === 0 ) continue;
 			const start = out.vertexCount;
 			pushVertex( out, projection, ax, ay, base, rgba );
 			pushVertex( out, projection, bx, by, base, rgba );

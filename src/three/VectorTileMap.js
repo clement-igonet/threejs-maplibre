@@ -1,4 +1,5 @@
-import { BatchedMesh, BufferAttribute, BufferGeometry, Matrix4, MeshBasicMaterial, MeshLambertMaterial, Object3D, SRGBColorSpace, Vector3 } from 'three';
+import { BatchedMesh, BufferAttribute, BufferGeometry, DoubleSide, Matrix4, MeshBasicMaterial, MeshLambertMaterial, Object3D, SRGBColorSpace, Vector3 } from 'three';
+import { buildColliders, collideCapsule, groundBelow, raycastFirst } from './colliders.js';
 import { VectorTileLoader } from '../core/VectorTileLoader.js';
 import { EARTH_RADIUS, metersToNormalized, normalizedToLatitude } from '../math/WebMercator.js';
 import { geocentricHeight, rayEllipsoidIntersection } from '../math/Ellipsoid.js';
@@ -62,6 +63,15 @@ export class VectorTileMap extends TileTree {
 
 	constructor( source, style, {
 		sourceId = null,
+		// collision: keep a bounds tree (three-mesh-bvh) of every extrusion
+		// block, buildings and indoor geometry alike, so a character can be
+		// pushed out of walls and stand on floors (collideCapsule, groundBelow).
+		// The worker's arrays stay in memory for it, so it is off by default.
+		collision = false,
+		// doubleSided: draw the inside of walls and the underside of roofs
+		// too, for a camera that goes indoors; outward faces only by default,
+		// which is what a map seen from above needs
+		doubleSided = false,
 		workers = 2,
 		createWorker,
 		fadeDuration = 0, // vector tiles pop in, as in MapLibre
@@ -74,6 +84,8 @@ export class VectorTileMap extends TileTree {
 		super( source, { fadeDuration, maxScreenTexel, ...options } );
 
 		this.style = style;
+		this.collision = collision;
+		this.doubleSided = doubleSided;
 		this.sourceId = sourceId ?? Object.keys( style.sources )[ 0 ] ?? 'vector';
 		this.zoom = 0; // map zoom derived from the camera, for camera-kind properties
 
@@ -148,8 +160,13 @@ export class VectorTileMap extends TileTree {
 	// Copies the blocks into their layers' batches. The GPU upload of the
 	// written ranges happens at the next draw; what the budget meters is the
 	// copy and the batch growth.
-	_upload( built ) {
+	_upload( built, renderer, record ) {
 
+		// collision from the source's most detailed tiles only: a coarser
+		// tile is simplified, a door there can miss its wall by a few tens
+		// of centimeters and leave it uncut, and it stays in memory as a
+		// parent behind the detailed ones
+		if ( this.collision && ( ! record || record.z >= this.source.maxZoom ) ) built.colliders = buildColliders( built );
 		built.slots = built.blocks.map( block => {
 
 			const entry = this._entry( block );
@@ -231,6 +248,13 @@ export class VectorTileMap extends TileTree {
 	}
 
 	_disposeContent( built ) {
+
+		if ( built.colliders ) {
+
+			for ( const c of built.colliders ) c.geometry.dispose();
+			built.colliders = null;
+
+		}
 
 		if ( ! built.slots ) return;
 
@@ -319,7 +343,7 @@ export class VectorTileMap extends TileTree {
 
 			// flat faces shaded from the derivatives of the view position:
 			// no normal attribute to build, transfer or keep
-			material = new MeshLambertMaterial( { vertexColors: true, flatShading: true } );
+			material = new MeshLambertMaterial( { vertexColors: true, flatShading: true, side: this.doubleSided ? DoubleSide : 0 } );
 			// glass: the vertex alpha shows through, drawn after the opaque batch
 			if ( block.glass ) Object.assign( material, { transparent: true, depthWrite: false } );
 
@@ -351,6 +375,63 @@ export class VectorTileMap extends TileTree {
 		this._updateMaterial( entry );
 		if ( block.level !== undefined ) this._placeLevel( entry );
 		return entry;
+
+	}
+
+	// --- collision ---------------------------------------------------------
+
+	// Pushes a capsule (segment start to end, radius, in the map's local
+	// meters) out of every wall, floor and roof of the tiles loaded; see
+	// colliders.js. Writes the displacement into out and returns it, with
+	// out.onGround set when something pushed upwards.
+	collideCapsule( start, end, radius, out ) {
+
+		out.set( 0, 0, 0 );
+		out.onGround = false;
+		if ( ! this.collision ) return out;
+		for ( const record of this._records.values() ) {
+
+			if ( record.content && record.content.colliders && record.object ) collideCapsule( record.content.colliders, start, end, radius, out );
+
+		}
+
+		return out;
+
+	}
+
+	// The height of the nearest floor, ramp or roof under a point, within
+	// maxDistance down, or null when nothing is there (the street, then).
+	groundBelow( point, maxDistance = 100 ) {
+
+		if ( ! this.collision ) return null;
+		let best = null;
+		for ( const record of this._records.values() ) {
+
+			if ( ! record.content || ! record.content.colliders || ! record.object ) continue;
+			const y = groundBelow( record.content.colliders, point, maxDistance );
+			if ( y !== null && ( best === null || y > best ) ) best = y;
+
+		}
+
+		return best;
+
+	}
+
+	// The distance to the first wall, floor or roof along a ray from origin
+	// (map-local meters), within maxDistance, or null.
+	raycast( origin, direction, maxDistance = Infinity ) {
+
+		if ( ! this.collision ) return null;
+		let best = null;
+		for ( const record of this._records.values() ) {
+
+			if ( ! record.content || ! record.content.colliders || ! record.object ) continue;
+			const d = raycastFirst( record.content.colliders, origin, direction, maxDistance );
+			if ( d !== null && ( best === null || d < best ) ) best = d;
+
+		}
+
+		return best;
 
 	}
 
@@ -544,8 +625,12 @@ export class VectorTileMap extends TileTree {
 
 		if ( this.mode === 'planar' ) {
 
-			const t = _dir.y < 0 ? - _camPos.y / _dir.y : Infinity;
-			distance = Number.isFinite( t ) ? t : _camPos.y;
+			// the ground plane ahead, or, for a camera that does not look down
+			// at it (under the street, in a station, at the sky), its height
+			// over or under the plane: never a negative or no distance, which
+			// made the zoom NaN and every zoom-ranged layer hide underground
+			const t = _dir.y * _camPos.y < 0 ? - _camPos.y / _dir.y : Infinity;
+			distance = Math.max( Number.isFinite( t ) ? t : Math.abs( _camPos.y ), 0.5 );
 			_hit.copy( _camPos ).addScaledVector( _dir, Number.isFinite( t ) ? t : 0 );
 			const [ , ny ] = metersToNormalized( _hit.x, - _hit.z );
 			latitude = normalizedToLatitude( Math.min( Math.max( ny, 0 ), 1 ) );
@@ -573,7 +658,10 @@ export class VectorTileMap extends TileTree {
 		// planar units are Mercator meters already; ground meters on the globe
 		// stretch by 1 / cos( latitude ) in Mercator
 		const mercatorPerPixel = this.mode === 'planar' ? unitsPerPixel : unitsPerPixel / Math.cos( latitude * DEG2RAD );
-		return Math.log2( 2 * Math.PI * EARTH_RADIUS / ( mercatorPerPixel * 512 ) );
+		// a camera at a character's shoulder is closer than any map zoom; the
+		// style is evaluated as at the deepest zoom it can be written for
+		// (24, the spec's default maxzoom, exclusive)
+		return Math.min( Math.max( Math.log2( 2 * Math.PI * EARTH_RADIUS / ( mercatorPerPixel * 512 ) ), 0 ), 23.99 );
 
 	}
 
