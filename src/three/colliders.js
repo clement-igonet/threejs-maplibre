@@ -27,7 +27,7 @@ export function buildColliders( built ) {
 		geometry.setIndex( new BufferAttribute( block.indices, 1 ) );
 		geometry.computeBoundingBox();
 		const bvh = new MeshBVH( geometry );
-		colliders.push( { bvh, geometry, bounds: geometry.boundingBox, center: built.center, level: block.level, id: block.id } );
+		colliders.push( { bvh, geometry, bounds: geometry.boundingBox, center: built.center, level: block.level, id: block.id, kind: block.indoor ?? null, base: block.base ?? 0 } );
 
 	}
 
@@ -39,11 +39,20 @@ export function buildColliders( built ) {
 // in out (a Vector3, zeroed by the caller), out.onGround set when a push
 // pointed mostly up. start and end move with it, so one call resolves
 // against every collider in turn.
-export function collideCapsule( colliders, start, end, radius, out ) {
+//
+// With feet given (the height of the character's soles), indoor geometry
+// is met the way a person meets it, since its heights are guesses (level
+// times 3 m; a station with levels -1, -0.75 and -0.5 puts floors 0.75 m
+// apart where the real ones are not): a floor or a ramp is stood on and
+// never bumped into from below or from its edge, and a wall blocks only on
+// its own level, within 1.5 m of the feet.
+export function collideCapsule( colliders, start, end, radius, out, feet = null ) {
 
 	_capsuleBox.makeEmpty().expandByPoint( start ).expandByPoint( end ).expandByScalar( radius );
-	for ( const { bvh, center, bounds } of colliders ) {
+	for ( const { bvh, center, bounds, kind, base } of colliders ) {
 
+		if ( feet !== null && kind === 'wall' && Math.abs( feet - base ) > 1.5 ) continue;
+		const oneWay = feet !== null && ( kind === 'floor' || kind === 'steps' );
 		_box.copy( bounds ).translate( center );
 		if ( ! _box.intersectsBox( _capsuleBox ) ) continue;
 		_negCenter.copy( center ).negate();
@@ -60,6 +69,8 @@ export function collideCapsule( colliders, start, end, radius, out ) {
 					const depth = radius - distance;
 					_push.subVectors( _capsulePoint, _triPoint );
 					if ( _push.lengthSq() === 0 ) _push.set( 0, 1, 0 ); else _push.normalize();
+					// a one-way surface only holds the character up
+					if ( oneWay && _push.y < 0.7 ) return false;
 					_push.multiplyScalar( depth );
 					_segStart.add( _push );
 					_segEnd.add( _push );

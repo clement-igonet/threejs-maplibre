@@ -71,6 +71,8 @@ function finishBlock( block ) {
 		type: block.type,
 		glass: block.glass,
 		level: block.level,
+		indoor: block.indoor,
+		base: block.base,
 		features: block.features,
 		triangles: block.triangles,
 		vertices: block.vertexCount,
@@ -215,6 +217,8 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 				b = newBlock( layer, index, type );
 				b.level = level;
+				b.indoor = indoor; // floor, wall, steps or lift: how a character meets it
+				b.base = level * levelHeight; // where the level's floor is
 				levelBlocks.set( level, b );
 
 			}

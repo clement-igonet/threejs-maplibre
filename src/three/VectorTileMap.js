@@ -384,14 +384,14 @@ export class VectorTileMap extends TileTree {
 	// meters) out of every wall, floor and roof of the tiles loaded; see
 	// colliders.js. Writes the displacement into out and returns it, with
 	// out.onGround set when something pushed upwards.
-	collideCapsule( start, end, radius, out ) {
+	collideCapsule( start, end, radius, out, feet = null ) {
 
 		out.set( 0, 0, 0 );
 		out.onGround = false;
 		if ( ! this.collision ) return out;
 		for ( const record of this._records.values() ) {
 
-			if ( record.content && record.content.colliders && record.object ) collideCapsule( record.content.colliders, start, end, radius, out );
+			if ( record.content && record.content.colliders && record.object ) collideCapsule( record.content.colliders, start, end, radius, out, feet );
 
 		}
 

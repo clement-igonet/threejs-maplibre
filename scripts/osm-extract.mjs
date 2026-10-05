@@ -34,7 +34,9 @@ const dataset = process.argv.includes( '--dataset' ) ? process.argv[ process.arg
 const rawPath = path.join( dataDir, `${ dataset }.osm.json` );
 const outPath = path.join( dataDir, `${ dataset }.json` );
 const queryPath = path.join( dataDir, `${ dataset }.overpassql` );
-const ENDPOINT = process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter';
+// the public Overpass servers, tried in turn: each times out (504) or
+// turns a query away (429) often enough that one is not to be relied on
+const ENDPOINTS = process.env.OVERPASS_URL ? [ process.env.OVERPASS_URL ] : [ 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter' ];
 // Overpass answers 406 to a request without a User-Agent naming its sender
 const USER_AGENT = 'threejs-maplibre/0.1 (+https://github.com/clement-igonet/threejs-maplibre)';
 
@@ -423,9 +425,16 @@ async function main() {
 		for ( const part of parts ) {
 
 			const query = await readFile( path.join( dataDir, part ), 'utf8' );
-			const response = await fetch( ENDPOINT, { method: 'POST', headers: { 'User-Agent': USER_AGENT }, body: new URLSearchParams( { data: query } ) } );
-			if ( ! response.ok ) throw new Error( `Overpass: ${ response.status } ${ response.statusText } on ${ part }` );
-			const json = JSON.parse( await response.text() );
+			let json = null;
+			for ( const endpoint of [ ...ENDPOINTS, ...ENDPOINTS ] ) {
+
+				const response = await fetch( endpoint, { method: 'POST', headers: { 'User-Agent': USER_AGENT }, body: new URLSearchParams( { data: query } ) } ).catch( error => ( { ok: false, status: error.message, statusText: '' } ) );
+				if ( response.ok ) { json = JSON.parse( await response.text() ); break; }
+				console.log( `${ part }: ${ response.status } ${ response.statusText } from ${ new URL( endpoint ).host }, trying the next` );
+
+			}
+
+			if ( json === null ) throw new Error( `Overpass: every server failed on ${ part }` );
 			if ( merged === null ) merged = { ...json, elements: [] };
 			for ( const element of json.elements ) {
 

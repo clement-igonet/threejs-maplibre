@@ -1196,6 +1196,18 @@ demo's ground plane gets the same holes. The cut is in the geometry, so
 the collision follows: a test rides the escalator from the hall and ends
 on level 1 at 3.15 m.
 
+Indoor heights are guesses. Floors stand at level times 3 m, which is
+right for whole levels and wrong for the split levels a station like
+Chatelet-Les Halles maps (-1, -0.75, -0.5, 0): their floors come out
+0.75 m apart where they overlap, and the character, 1.7 m tall, hit its
+head on the next one up. So indoor geometry is met the way a person meets
+it: a floor or a ramp is stood on and never bumped into from below or
+from its edge (one-way, as platforms in a game), a wall blocks only on its
+own level, within 1.5 m of the feet, and the ground is looked for from
+knee height (the 0.5 m a step reaches), not from the head, so a slab at
+chest height does not lift the character onto it. Real heights would
+need `indoor=level` areas with `height=*`, which neither station tags.
+
 Zoom underground. The map takes its zoom for the style from where the
 camera's view meets the ground plane; a camera under the street (in the
 Métro mall, at level -1) looking down never meets it, the zoom came out
