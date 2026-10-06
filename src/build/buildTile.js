@@ -127,6 +127,10 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 		const indoor = type === 'fill-extrusion' && layer.metadata && layer.metadata[ 'threejs-maplibre:indoor' ] || null;
 		const levelHeight = layer.metadata && layer.metadata[ 'threejs-maplibre:level-height' ] || 3;
 		const wallHeight = layer.metadata && layer.metadata[ 'threejs-maplibre:wall-height' ] || levelHeight - 0.5;
+		// a floor drawn under the others: a level's whole outline, there to
+		// fill what lies between the mapped rooms, sits this many meters
+		// lower so the rooms' own floors show on top of it
+		const floorDrop = layer.metadata && layer.metadata[ 'threejs-maplibre:floor-drop' ] || 0;
 		// the doors of this source layer, per level, as openings for the walls:
 		// [ x, y, halfWidth ] in tile units (a door is 1.2 m unless tagged)
 		const doorsByLevel = new Map();
@@ -328,6 +332,8 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 					const base = level * levelHeight;
 					let t = 0;
 					if ( indoor === 'floor' && polygons ) {
+
+						const base = level * levelHeight - floorDrop;
 
 						const holes = holesByLevel.get( level );
 						for ( const polygon of polygons ) t += holes ? appendFloorWithHoles( target, polygon, projection, rgba, base, holes ) : appendFloor( target, polygon, projection, rgba, base );

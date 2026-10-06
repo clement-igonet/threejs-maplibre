@@ -1287,3 +1287,105 @@ higher ones stop it).
 ![Down the stairs to the Métro, through the pavement](../evidence/m5/walk-down.png)
 ![Where the character is, and the names around it](../evidence/m5/walk-labels.png)
 ![Running, the indicator saying how to walk again](../evidence/m5/walk-run.png)
+
+### Falling, and the floor between the rooms
+
+A jump off a balcony now falls to the floor below. The ground is the
+highest floor or ramp under the character's knee, however far down. The
+street, at 0, counts only for a character at or above it, since
+underground it is a ceiling. Before, the ground was searched 2.5 m down
+only, and the street stood in for anything further: a jump at level -1
+put the character back up at 0.
+
+A fall into nothing is caught. Only a floor under the feet counts as
+stood on; touching a wall's edge or a slab's rim on the way down does
+not. 40 m below the last floor stood on, the character is put back on it
+and `fell` is set. Counting rims as standing made a fall into a void at
+Saint-Lazare bounce between 13 and 59 m down.
+
+That void was ours. At level -1 by McDonald's, the strip a jump to the
+left lands on is covered by no room or corridor. It lies inside the
+outline of the whole level (`indoor=level`, OSM way 320530315), and no
+lower level is mapped under it. OSM says it is floor, but the floor
+layer drew rooms, corridors and areas only, so it was a hole down to the
+sky. The station style now draws level outlines too, as the
+`indoor-level` layer, 5 cm under the rooms
+(`threejs-maplibre:floor-drop`) so the rooms show on top. Saint-Lazare
+maps 11 level outlines, from level 2 down to the RER platforms at -7;
+Châtelet maps one, at -3. Stairwell holes are cut through them like any
+floor.
+
+A second hand-play report fell for ever at level -4 (48.875704,
+2.326286), 12 m under the street. The floor was mapped and built, but the
+tile tree never chose its tile. A tile's box stood on the street and
+reached `contentHeight` up, never down, so a camera underground was
+outside every box: the fine tiles around it were culled or taken as far,
+and a zoom 15 ancestor was drawn in their place. Colliders are built for
+the source's deepest zoom only, so under the robot nothing was solid; put
+back where it stood, it fell again. Tile boxes now reach `contentDepth`
+under the street, 60 m for a planar vector map, which is under the RER
+platforms at Saint-Lazare (level -7, 21 m down). The globe keeps 0: a
+deeper box there widened a straight-down view's selection from 4 tiles to
+9, and nothing walks under a globe yet. In headless Chrome at the
+reported spot, the robot now stands on level -4, and dropped under that
+floor it is caught once and stays.
+
+And whatever else takes a floor away, a fall from where the character
+was put back, before it stood anywhere, sends it to the start of the
+walk instead of round again.
+
+### A ledge, a ceiling, and the earth
+
+The same spot, once its tile was solid, gave three more reports in one
+screenshot: the robot stood a meter under the level -4 floor with its
+legs hidden, the corridor ended in nothing, and everything around was
+sky blue.
+
+The sunk robot: the two level -4 corridors there are two OSM polygons
+that do not touch, with a gap of 4 m between them that no level outline
+covers either. Running into the gap, the robot fell, and on the way down
+its head went up through the slab of the floor it had left. A floor is
+one-way (it pushes up only), and the slab's top face, found above the
+capsule's upper end, pushed it up by a hair and counted as ground. The
+robot hung from the ceiling, held by its head, "on the ground" at
+-12.85 m. A floor now holds the character only where it meets the feet,
+up to `FLOOR_REACH` (0.7 m) above them; met higher, it is a ceiling.
+
+The gap itself is the data's, and nothing drawn in it says there is a
+drop. So a walk stops at a ledge: a step whose landing has no ground
+within `ledge` (1 m) below the feet is not taken, the character stays
+at the edge with `atLedge` set, and the page says "a drop: jump to go
+down". A jump goes over, and falls to whatever is below, or into the
+void and back. Outdoors the street is always there, so the rule never
+fires on it; it does on a roof.
+
+The ledge rule's first version probed the ground under the centre of
+the feet, and stopped the robot on the Métro stairs: three OSM ways run
+side by side there, each built 1.5 m wide, with a slot between two of
+them that the robot stood astride, its soles on both and nothing under
+its centre. The ground is now the highest floor under any of five soles
+(the centre and four points at the capsule's edge), for the ledge rule
+and for standing alike, so a character with its centre just past a
+floor's edge still stands on it, as its capsule's radius says.
+
+The sky: the page's backdrop and the fog were the sky's colour, and
+underground, where OSM maps nothing, that is what showed through. Over
+the first 3 m of the camera's descent the walk page now blends both to
+an earth brown and closes the haze from 900 m to 160 m.
+
+Measured: 210 tests, among them a walk stopped at a ledge and a jump
+taken over it to a floor 6 m down, a walk along a slot between two
+floors, a run up the Métro stairs from level -4, a character with its head through a
+slab from below falling on, the street kept outdoors, a void caught, a
+floor gone from under the place the character was put back, the
+reported jump at Saint-Lazare landing 5 cm down on the level outline,
+and the deepest tile picked under a camera below the street (and not,
+with `contentDepth: 0`). In headless Chrome from the level -4 spot, five
+headings at a run never leave the floor; with a jump every 3 s, two
+headings fall into the gap and come back.
+
+![Level -4 before: a corridor into the sky](../evidence/m5/walk-deep-before.png)
+![After: earth around, haze closing in](../evidence/m5/walk-deep-after.png)
+
+![Level -1, facing the strip: before, a hole](../evidence/m5/walk-gap-before.png)
+![After, the level's floor](../evidence/m5/walk-gap-after.png)

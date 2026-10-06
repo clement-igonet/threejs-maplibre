@@ -23,6 +23,7 @@
 			#labels div { position: absolute; left: 0; top: 0; padding: 2px 7px; font: 12px system-ui, sans-serif; color: #222; background: rgba(255, 255, 255, 0.85); border-radius: 4px; white-space: nowrap; transform-origin: 50% 100%; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
 			#labels div.shop, #labels div.room { border-left: 3px solid #d9452b; }
 			#labels div.corridor, #labels div.area { background: rgba(230, 240, 250, 0.85); }
+			#ledge { position: absolute; left: 50%; top: 30%; transform: translateX( -50% ); padding: 8px 14px; font: bold 14px ui-monospace, monospace; color: #fff; background: rgba(20, 40, 60, 0.75); border-radius: 6px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 			#edge { position: absolute; left: 50%; top: 30%; transform: translateX( -50% ); padding: 8px 14px; font: bold 14px ui-monospace, monospace; color: #fff; background: rgba(217, 69, 43, 0.85); border-radius: 6px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 			/* the touch controls: a joystick bottom left, a jump button bottom right */
 			#stick { position: absolute; left: 24px; bottom: 56px; width: 150px; height: 150px; border-radius: 50%; display: none; touch-action: none; user-select: none; -webkit-user-select: none;
@@ -46,6 +47,7 @@
 		<div id="labels"></div>
 		<div id="where"></div>
 		<div id="edge">edge of the map: the data stops here</div>
+		<div id="ledge">a drop: jump to go down</div>
 		<div id="stick"><div class="knob"><div class="label">walk</div></div></div>
 		<div id="stick-caption" style="z-index: 1">drag the dot to walk and turn, to the red rim to run</div>
 		<button id="jump">jump</button>
@@ -105,6 +107,11 @@
 			const scene = new Scene();
 			scene.background = new Color( 0xdfe6ec );
 			scene.fog = createFog( style, { viewDistance: 900 } );
+			// under the street the sky is gone: what OSM leaves unmapped down
+			// there is earth, so the backdrop and the haze darken to it, and
+			// the haze closes in, over the first 3 m of the camera's descent
+			const sky = scene.fog.color.clone(), earth = new Color( 0x3b3632 );
+			const haze = { near: scene.fog.near, far: scene.fog.far };
 			const camera = new PerspectiveCamera( 55, window.innerWidth / window.innerHeight, 0.1, 5000 );
 			scene.add( new HemisphereLight( 0xffffff, 0x8a8478, 1.0 ) );
 			const sun = new DirectionalLight( 0xffffff, 1.8 );
@@ -278,6 +285,7 @@
 
 			const info = document.getElementById( 'info' );
 			const edge = document.getElementById( 'edge' );
+			const ledge = document.getElementById( 'ledge' );
 			const gaitBox = document.getElementById( 'gait' );
 
 			// where the character is, and the names around it
@@ -398,12 +406,18 @@
 				camera.position.copy( eye );
 				camera.lookAt( look.add( root.position ) ); // lookAt takes a world point; the camera lives in the root
 				camera.updateMatrixWorld();
+				const under = Math.min( Math.max( - eye.y / 3, 0 ), 1 );
+				scene.fog.color.lerpColors( sky, earth, under );
+				scene.background.copy( scene.fog.color );
+				scene.fog.near = haze.near + ( 25 - haze.near ) * under;
+				scene.fog.far = haze.far + ( 160 - haze.far ) * under;
 
 				map.update( camera, renderer, dt * 1000 );
 				renderer.render( scene, camera );
 				if ( started ) { updatePlaces( performance.now() ); drawLabels(); }
 				const s = map.stats;
 				edge.style.opacity = character.atEdge ? 1 : 0;
+				ledge.style.opacity = character.atLedge && ! character.atEdge ? 1 : 0;
 				const [ hereLon, hereLat ] = lonLatOf( character.position );
 				const facing = Math.round( ( 90 - character.heading * 180 / Math.PI + 720 ) % 360 );
 				info.textContent = `threejs-maplibre M5, a walk: ${ place.name } | @ ${ hereLat.toFixed( 6 ) }, ${ hereLon.toFixed( 6 ) }, facing ${ facing }° | ${ character.onGround ? 'on the ground' : 'in the air' } at ${ character.position.y.toFixed( 2 ) } m | ${ input.gamepad ? 'gamepad' : input.touch ? 'touch' : 'keyboard' } | rendered ${ s.rendered } | loading ${ s.loading } | draw calls ${ renderer.info.render.calls } | triangles ${ renderer.info.render.triangles } | ${ ( frameMs / frames ).toFixed( 1 ) } ms/frame`;

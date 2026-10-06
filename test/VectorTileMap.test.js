@@ -4,6 +4,7 @@ import { VectorTileMap } from '../src/three/VectorTileMap.js';
 import { VectorLineMaterial } from '../src/three/VectorLineMaterial.js';
 import { Style } from '../src/style/Style.js';
 import { latLonToEcef } from '../src/math/Ellipsoid.js';
+import { latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/math/WebMercator.js';
 import { createStubVectorSource } from '../demo/stub-vector-tiles.js';
 import { STUB_STYLE } from '../demo/stub-style.js';
 
@@ -248,6 +249,41 @@ describe( 'VectorTileMap', () => {
 		enough.update( cityCamera( 20000 ), rendererStub );
 		expect( enough.stats.selected ).toBe( far.stats.selected );
 		enough.dispose();
+
+	} );
+
+	it( 'asks for the deepest tiles around a camera under the street', () => {
+
+		// a walk's camera at -9 m, 4 m behind and over a character in a
+		// station, looking down at it: the tile boxes reach contentDepth under the street, so
+		// the tile under the character is the source's deepest one; boxes
+		// that start at the street left the camera outside all of them, and
+		// a coarse tile without colliders stood in under the character
+		const [ mx, my ] = normalizedToMeters( longitudeToNormalized( 2.3522 ), latitudeToNormalized( 48.8566 ) );
+		const camera = createCamera( new Vector3( mx, - 9, - my + 4 ), new Vector3( mx, - 12, - my ) );
+		const z = 16, x = Math.floor( longitudeToNormalized( 2.3522 ) * 2 ** z ), y = Math.floor( latitudeToNormalized( 48.8566 ) * 2 ** z );
+		// the tiles the walk picks to draw, read off its leaves
+		const leaves = map => {
+
+			const picked = new Set(), select = map._select.bind( map );
+			map._select = ( ...args ) => { const node = select( ...args ); if ( node && node.children === null ) picked.add( map._key( node.record.x, node.record.y, node.record.z ) ); return node; };
+			map.update( camera, rendererStub );
+			return picked;
+
+		};
+
+		const deep = createMap( { mode: 'planar' } );
+		expect( deep.contentDepth ).toBe( 60 );
+		expect( leaves( deep ).has( deep._key( x, y, z ) ) ).toBe( true );
+		deep.dispose();
+
+		const flat = createMap( { mode: 'planar', contentDepth: 0 } );
+		expect( leaves( flat ).has( flat._key( x, y, z ) ) ).toBe( false );
+		flat.dispose();
+
+		const globe = createMap();
+		expect( globe.contentDepth ).toBe( 0 ); // the globe's selection is as it was
+		globe.dispose();
 
 	} );
 

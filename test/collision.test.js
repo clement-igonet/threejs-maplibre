@@ -44,7 +44,8 @@ describe( 'colliders', () => {
 		const p = floor.positions;
 		const cx = ( p[ 3 * i[ 0 ] ] + p[ 3 * i[ 1 ] ] + p[ 3 * i[ 2 ] ] ) / 3 + built.center.x;
 		const cz = ( p[ 3 * i[ 0 ] + 2 ] + p[ 3 * i[ 1 ] + 2 ] + p[ 3 * i[ 2 ] + 2 ] ) / 3 + built.center.z;
-		const hall = groundBelow( colliders, new Vector3( cx, 5, cz ), 50 );
+		// from 2 m up: higher, the level 1 platforms' outline is overhead
+		const hall = groundBelow( colliders, new Vector3( cx, 2, cz ), 50 );
 		expect( hall ).not.toBeNull();
 		expect( hall ).toBeGreaterThanOrEqual( 0 );
 		expect( hall ).toBeLessThanOrEqual( 0.15 + 1e-6 );
@@ -136,7 +137,7 @@ describe( 'CharacterController', () => {
 		const i = floor.indices, p = floor.positions;
 		const hx = ( p[ 3 * i[ 0 ] ] + p[ 3 * i[ 1 ] ] + p[ 3 * i[ 2 ] ] ) / 3 + built.center.x;
 		const hz = ( p[ 3 * i[ 0 ] + 2 ] + p[ 3 * i[ 1 ] + 2 ] + p[ 3 * i[ 2 ] + 2 ] ) / 3 + built.center.z;
-		c.place( hx, 3, hz );
+		c.place( hx, 1, hz ); // head under the level 1 outline, its slab at 2.95 m
 		for ( let i = 0; i < 120; i ++ ) c.update( 1 / 60, { forward: 0, right: 0, run: false, jump: false }, 0 );
 		expect( c.position.y ).toBeGreaterThanOrEqual( 0 );
 		expect( c.position.y ).toBeLessThanOrEqual( 0.15 + 1e-3 );
@@ -277,6 +278,146 @@ describe( 'CharacterController', () => {
 		const up = new CharacterController( fakeMap ).place( 15, 2, 0 );
 		for ( let i = 0; i < 60; i ++ ) up.update( 1 / 60, { forward: 0, right: 0 } );
 		expect( up.position.y ).toBeCloseTo( 0.9, 3 );
+
+	} );
+
+	it( 'lands on the level outline between mapped rooms, where a jump at Saint-Lazare used to fall through', () => {
+
+		// the spot of a hand-play report: level -1 by McDonald's, a jump to
+		// the left over a strip no room or corridor covers, inside the
+		// outline of level -1 (OSM way 320530315) and over nothing else
+		const lat = 48.876152, lon = 2.326191, facing = 158;
+		const tx = Math.floor( longitudeToNormalized( lon ) * 2 ** z ), ty = Math.floor( latitudeToNormalized( lat ) * 2 ** z );
+		const cols = [];
+		for ( let dx = - 1; dx <= 1; dx ++ ) for ( let dy = - 1; dy <= 1; dy ++ ) cols.push( ...buildColliders( buildTile( decodeVectorTile( tile( z, tx + dx, ty + dy ) ), style, { sourceId: 'openmaptiles', x: tx + dx, y: ty + dy, z, mode: 'planar' } ) ) );
+		const here = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( cols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
+		const k = 1 / Math.cos( lat * Math.PI / 180 ), b = facing * Math.PI / 180;
+		const [ x0, z0 ] = scene( lat, lon );
+		const gap = new Vector3( x0 + Math.sin( b ) * 2.5 * k, - 2.4, z0 - Math.cos( b ) * 2.5 * k );
+		expect( groundBelow( cols, gap, 50 ) ).toBeCloseTo( - 2.9, 3 ); // 5 cm under the rooms' floors
+
+		const c = new CharacterController( here ).place( x0, - 2.85, z0 );
+		c.heading = ( 90 - facing ) * Math.PI / 180;
+		let lowest = 0;
+		for ( let i = 0; i < 4 * 60; i ++ ) {
+
+			c.update( 1 / 60, { forward: 1, right: 0, jump: i === 30 } );
+			lowest = Math.min( lowest, c.position.y );
+
+		}
+
+		expect( c.fell ).toBe( false );
+		expect( lowest ).toBeGreaterThan( - 3 );
+		expect( c.onGround ).toBe( true );
+
+	} );
+
+	it( 'runs up the Metro stairs at Saint-Lazare from level -4 to level -1, astride the slot between two of them', () => {
+
+		// a hand-play report: three stairs ways run side by side, bearing
+		// 349 degrees, and the robot stood on the slot between two of them
+		// with nothing under its centre, stopped there as at a ledge
+		const lat = 48.875772, lon = 2.326272;
+		const tx = Math.floor( longitudeToNormalized( lon ) * 2 ** z ), ty = Math.floor( latitudeToNormalized( lat ) * 2 ** z );
+		const cols = [];
+		for ( let dx = - 1; dx <= 1; dx ++ ) for ( let dy = - 1; dy <= 1; dy ++ ) cols.push( ...buildColliders( buildTile( decodeVectorTile( tile( z, tx + dx, ty + dy ) ), style, { sourceId: 'openmaptiles', x: tx + dx, y: ty + dy, z, mode: 'planar' } ) ) );
+		const here = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( cols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
+		const [ x0, z0 ] = scene( lat, lon );
+		const c = new CharacterController( here ).place( x0, - 10.19, z0 );
+		expect( groundBelow( cols, new Vector3( x0, - 9.69, z0 ), 1.5 ) ).toBeNull(); // the slot, under the centre
+		c.heading = ( 90 - 349 ) * Math.PI / 180;
+		let stopped = 0;
+		for ( let i = 0; i < 9 * 60; i ++ ) {
+
+			c.update( 1 / 60, { forward: 1, right: 0, run: true } );
+			if ( c.atLedge ) stopped ++;
+
+		}
+
+		expect( stopped ).toBe( 0 );
+		expect( c.position.y ).toBeCloseTo( - 2.85, 2 );
+		expect( c.onGround ).toBe( true );
+
+	} );
+
+	it( 'stops at a ledge, jumps off it to the floor below, keeps the street outdoors, and is caught by a void', () => {
+
+		const projection = { project( x, y, h, o ) { o[ 0 ] = x; o[ 1 ] = h; o[ 2 ] = y; return o; } };
+		const white = [ 255, 255, 255, 255 ];
+		const block = ( indoor, level, base, build ) => { const out = { positions: [], colors: [], indices: [], vertexCount: 0 }; build( out ); return { type: 'fill-extrusion', indoor, level, base, positions: new Float32Array( out.positions ), indices: new Uint32Array( out.indices ) }; };
+		// level -1 (top at -2.85) for x < 10 only, level -3 (top at -8.85) everywhere from x = -5 to 40
+		const fake = { center: new Vector3(), blocks: [
+			block( 'floor', - 1, - 3, out => appendFloor( out, [ [ - 5, - 5, 10, - 5, 10, 5, - 5, 5 ] ], projection, white, - 3 ) ),
+			block( 'floor', - 3, - 9, out => appendFloor( out, [ [ - 5, - 5, 40, - 5, 40, 5, - 5, 5 ] ], projection, white, - 9 ) ),
+		] };
+		const cols = buildColliders( fake );
+		const fakeMap = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( cols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
+
+		// the edge of level -1, six meters over level -3: a walk stops there
+		const c = new CharacterController( fakeMap ).place( 0, - 2.85, 0 );
+		c.heading = 0;
+		for ( let i = 0; i < 8 * 60; i ++ ) c.update( 1 / 60, { forward: 1, right: 0 } ); // 12.8 m at 1.6 m/s, were it free
+		expect( c.position.x ).toBeCloseTo( 10, 0 );
+		expect( c.position.y ).toBeCloseTo( - 2.85, 3 );
+		expect( c.atLedge ).toBe( true );
+		// a jump goes over, down to level -3, not up to the street
+		c.update( 1 / 60, { forward: 1, right: 0, jump: true } );
+		for ( let i = 0; i < 3 * 60; i ++ ) c.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( c.position.x ).toBeGreaterThan( 10 );
+		expect( c.position.y ).toBeCloseTo( - 8.85, 3 );
+		expect( c.atLedge ).toBe( false );
+		// astride a slot between two stairs, as at Saint-Lazare where three
+		// run side by side 1.5 m wide: the soles rest on both, the walk goes on
+		const slot = { center: new Vector3(), blocks: [
+			block( 'floor', - 1, - 3, out => appendFloor( out, [ [ - 5, 0.2, 40, 0.2, 40, 5, - 5, 5 ] ], projection, white, - 3 ) ),
+			block( 'floor', - 1, - 3, out => appendFloor( out, [ [ - 5, - 5, 40, - 5, 40, - 0.2, - 5, - 0.2 ] ], projection, white, - 3 ) ),
+		] };
+		const slotCols = buildColliders( slot );
+		const slotMap = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( slotCols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( slotCols, p, m ); } };
+		const astride = new CharacterController( slotMap ).place( 0, - 2.85, 0 );
+		astride.heading = 0;
+		for ( let i = 0; i < 3 * 60; i ++ ) astride.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( astride.position.x ).toBeGreaterThan( 4 );
+		expect( astride.atLedge ).toBe( false );
+		expect( astride.position.y ).toBeGreaterThan( - 3 );
+		// a kerb's worth of drop is walked off
+		const kerb = new CharacterController( fakeMap, { ledge: 6.5 } ).place( 0, - 2.85, 0 );
+		kerb.heading = 0;
+		for ( let i = 0; i < 8 * 60; i ++ ) kerb.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( kerb.position.y ).toBeCloseTo( - 8.85, 3 );
+
+		// on the street, nothing under it but the street
+		const street = new CharacterController( fakeMap ).place( 60, 0, 0 );
+		for ( let i = 0; i < 60; i ++ ) street.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( street.position.y ).toBe( 0 );
+
+		// underground over nothing: a fall, caught, put back where it stood
+		const lost = new CharacterController( fakeMap ).place( 60, - 5, 0 );
+		for ( let i = 0; i < 4 * 60 && ! lost.fell; i ++ ) lost.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( lost.fell ).toBe( true );
+		expect( lost.position.y ).toBeCloseTo( - 5, 2 ); // the substeps left in that frame fall a hair
+
+		// fallen past a floor, head up through its slab from below: the slab
+		// is a ceiling there, not ground, and the fall goes on
+		const under = new CharacterController( fakeMap ).place( 5, - 3.85, 0 ); // level -1's slab is -3 to -2.85, the head at -2.5
+		under.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( under.onGround ).toBe( false );
+		for ( let i = 0; i < 3 * 60; i ++ ) under.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( under.position.y ).toBeCloseTo( - 8.85, 3 );
+
+		// put back on a floor that is gone meanwhile (its tile no longer
+		// solid): a second fall before standing goes back to the start
+		const deep = fake.blocks.splice( 1, 1 );
+		const moved = new CharacterController( fakeMap ).place( 0, - 2.85, 0 );
+		moved.position.set( 30, - 8.85, 0 ); // walked over to level -3, stood there
+		moved.update( 1 / 60, { forward: 0, right: 0 } );
+		cols.length = 0;
+		cols.push( ...buildColliders( fake ) ); // and level -3 goes
+		for ( let i = 0; i < 8 * 60; i ++ ) moved.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( moved.position.x ).toBeCloseTo( 0, 3 );
+		expect( moved.position.y ).toBeCloseTo( - 2.85, 3 );
+		expect( moved.onGround ).toBe( true );
+		fake.blocks.push( ...deep );
 
 	} );
 

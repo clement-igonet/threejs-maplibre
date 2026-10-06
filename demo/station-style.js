@@ -15,6 +15,16 @@ export const STATION_STYLE = {
 	layers: [
 		...LOUVRE_STYLE.layers.filter( layer => layer.id !== 'building-3d' ),
 		{
+			// the outline of a whole level (indoor=level): the floor between
+			// the mapped rooms and corridors, so a strip OSM leaves unmapped
+			// inside a level is floor, not a hole, drawn 5 cm under the rooms
+			id: 'indoor-level', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'indoor',
+			minzoom: 14,
+			filter: [ '==', [ 'get', 'class' ], 'level' ],
+			metadata: { 'threejs-maplibre:indoor': 'floor', 'threejs-maplibre:level-height': 3, 'threejs-maplibre:floor-drop': 0.05 },
+			paint: { 'fill-extrusion-color': CLASS_COLOR, 'fill-extrusion-height': 0, 'fill-extrusion-base': 0 },
+		},
+		{
 			id: 'indoor-floor', type: 'fill-extrusion', source: 'openmaptiles', 'source-layer': 'indoor',
 			minzoom: 14,
 			filter: [ 'in', [ 'get', 'class' ], [ 'literal', [ 'room', 'corridor', 'area' ] ] ],

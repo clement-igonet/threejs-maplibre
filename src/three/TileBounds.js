@@ -27,7 +27,7 @@ export class OrientedBox {
 
 	// The tightest box with the given unit axes around the points, grown by
 	// "above" along the third axis for content standing on the surface.
-	setFromPoints( points, axes, above = 0 ) {
+	setFromPoints( points, axes, above = 0, below = 0 ) {
 
 		_min.setScalar( Infinity );
 		_max.setScalar( - Infinity );
@@ -40,6 +40,7 @@ export class OrientedBox {
 		}
 
 		_max.z += above;
+		_min.z -= below;
 
 		for ( let i = 0; i < 3; i ++ ) this.axes[ i ].copy( axes[ i ] );
 		_v.addVectors( _min, _max ).multiplyScalar( 0.5 );

@@ -13,11 +13,14 @@ import { Vector3 } from 'three';
 // character (the hall, the stairs down to the Métro), the street at 0
 // elsewhere. A fall is gravity; a jump is an upward speed.
 
+// where the soles rest, in radii from the centre: the centre and four
+// points at the capsule's edge
+const _SOLES = [ [ 0, 0 ], [ 0.8, 0 ], [ - 0.8, 0 ], [ 0, 0.8 ], [ 0, - 0.8 ] ];
 const _start = new Vector3(), _end = new Vector3(), _push = new Vector3(), _move = new Vector3();
 
 export class CharacterController {
 
-	constructor( map, { radius = 0.35, height = 1.7, walkSpeed = 1.6, runSpeed = 4.5, gravity = 30, jumpSpeed = 7, steps = 5, steering = true, turnSpeed = 2.4, bounds = null } = {} ) {
+	constructor( map, { radius = 0.35, height = 1.7, walkSpeed = 1.6, runSpeed = 4.5, gravity = 30, jumpSpeed = 7, steps = 5, steering = true, turnSpeed = 2.4, bounds = null, ledge = 1 } = {} ) {
 
 		this.map = map;
 		this.radius = radius;
@@ -30,6 +33,17 @@ export class CharacterController {
 		this.steering = steering;
 		this.turnSpeed = turnSpeed; // radians a second at full left or right
 		this.stepHeight = 0.5; // the highest kerb or step walked up without a jump
+		// the deepest drop walked off without a jump: past it the walk stops
+		// at the edge (atLedge), and only a jump goes over. Indoor data has
+		// gaps between polygons on the same level, and nothing drawn in them
+		// says there is a drop; Infinity to walk off anything
+		this.ledge = ledge;
+		this.atLedge = false;
+		this.fallDepth = 40; // a fall deeper than this below the last floor stood on is into nothing
+		this.lastSafe = new Vector3();
+		this.home = new Vector3(); // where place() put it: the way out if lastSafe fails too
+		this._caught = false; // put back, and not stood since
+		this.fell = false;
 		// where the character may go, { minX, maxX, minZ, maxZ } in the map's
 		// meters: the extent of the data, past which there is empty ground.
 		// Its edge is a wall nothing gets over, jumping or not.
@@ -47,6 +61,9 @@ export class CharacterController {
 	place( x, y, z ) {
 
 		this.position.set( x, y, z );
+		this.lastSafe.set( x, y, z );
+		this.home.set( x, y, z );
+		this._caught = false;
 		this.velocity.set( 0, 0, 0 );
 		return this;
 
@@ -92,15 +109,59 @@ export class CharacterController {
 
 		const step = dt / this.steps;
 		this.atEdge = false; // set by any step the edge stops
+		this.atLedge = false;
 		for ( let i = 0; i < this.steps; i ++ ) this._step( step );
 		return this;
 
 	}
 
+	// The ground under the feet: the highest floor, ramp or roof under the
+	// knee (what a step reaches, not what is over the head) within
+	// maxDistance down, under any of the soles (the centre and the edge of
+	// the capsule: a character stands astride a slot between two stairs,
+	// or with its centre just past a floor's edge); and the street, at 0,
+	// for a character at or above it only, since underground it is a
+	// ceiling. null when nothing is there: a void.
+	_groundUnder( maxDistance ) {
+
+		const knee = this.position.y + this.stepHeight;
+		let ground = null;
+		for ( const [ ox, oz ] of _SOLES ) {
+
+			_end.set( this.position.x + ox * this.radius, knee, this.position.z + oz * this.radius );
+			const g = this.map.groundBelow( _end, maxDistance );
+			if ( g !== null && ( ground === null || g > ground ) ) ground = g;
+
+		}
+
+		if ( knee >= 0 && ( ground === null || ground < 0 ) ) ground = 0;
+		return ground;
+
+	}
+
 	_step( dt ) {
 
+		const wasOnGround = this.onGround, x0 = this.position.x, z0 = this.position.z;
 		this.velocity.y -= this.gravity * dt;
 		this.position.addScaledVector( this.velocity, dt );
+
+		// a walk, not a jump, stops short of a drop deeper than the ledge:
+		// the ground under the knee where the step lands, as below, under
+		// the whole of the feet rather than their centre (a character stands
+		// astride a slot between two stairs, its soles on both)
+		if ( wasOnGround && this.velocity.y <= 0 && Number.isFinite( this.ledge ) ) {
+
+			const ground = this._groundUnder( this.stepHeight + this.ledge );
+			if ( ground === null || ground < this.position.y - this.ledge ) {
+
+				this.position.x = x0;
+				this.position.z = z0;
+				this.velocity.x = this.velocity.z = 0;
+				this.atLedge = true;
+
+			}
+
+		}
 
 		// the capsule, feet to head, pushed out of the map
 		const r = this.radius;
@@ -125,18 +186,36 @@ export class CharacterController {
 		let onGround = _push.onGround;
 		if ( onGround && this.velocity.y < 0 ) this.velocity.y = 0;
 
-		// the street, where no floor is under the feet
-		// the ground from knee height down: what a step can reach, not what
-		// is over the head (a floor slab of another level at chest height
-		// would lift the character onto it)
-		_end.set( this.position.x, this.position.y + this.stepHeight, this.position.z );
-		const floor = this.map.groundBelow( _end, this.stepHeight + 2 );
-		const ground = floor === null ? 0 : floor;
-		if ( this.position.y <= ground + 1e-3 && this.velocity.y <= 0 ) {
+		// the ground, however far down, so a jump off a balcony falls to the
+		// floor below. Nothing under at all is a void: the fall goes on, and
+		// fallDepth below the last floor stood on, the character is put back
+		// there. Only a floor under the feet counts as stood on: touching a
+		// wall's edge or a slab's rim on the way down does not.
+		const ground = this._groundUnder( 200 );
+		let stood = false;
+		if ( ground !== null && this.position.y <= ground + 1e-3 && this.velocity.y <= 0 ) {
 
 			this.position.y = ground;
 			this.velocity.y = 0;
-			onGround = true;
+			onGround = stood = true;
+
+		}
+
+		if ( stood ) {
+
+			this.lastSafe.copy( this.position );
+			this._caught = false;
+
+		} else if ( ! onGround && this.position.y < this.lastSafe.y - this.fallDepth ) {
+
+			// a second fall from where it was put back, before standing
+			// anywhere: that floor is gone (its tile no longer solid), so
+			// back to the start of the walk instead of falling for ever
+			if ( this._caught ) this.lastSafe.copy( this.home );
+			this._caught = true;
+			this.position.copy( this.lastSafe );
+			this.velocity.set( 0, 0, 0 );
+			this.fell = true; // for whoever wants to say so
 
 		}
 
