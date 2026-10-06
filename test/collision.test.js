@@ -343,6 +343,20 @@ describe( 'CharacterController', () => {
 		expect( lost.fell ).toBe( true );
 		expect( lost.position.y ).toBeCloseTo( - 5, 2 ); // the substeps left in that frame fall a hair
 
+		// put back on a floor that is gone meanwhile (its tile no longer
+		// solid): a second fall before standing goes back to the start
+		const deep = fake.blocks.splice( 1, 1 );
+		const moved = new CharacterController( fakeMap ).place( 0, - 2.85, 0 );
+		moved.position.set( 30, - 8.85, 0 ); // walked over to level -3, stood there
+		moved.update( 1 / 60, { forward: 0, right: 0 } );
+		cols.length = 0;
+		cols.push( ...buildColliders( fake ) ); // and level -3 goes
+		for ( let i = 0; i < 8 * 60; i ++ ) moved.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( moved.position.x ).toBeCloseTo( 0, 3 );
+		expect( moved.position.y ).toBeCloseTo( - 2.85, 3 );
+		expect( moved.onGround ).toBe( true );
+		fake.blocks.push( ...deep );
+
 	} );
 
 } );

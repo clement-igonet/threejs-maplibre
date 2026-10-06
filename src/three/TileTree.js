@@ -60,6 +60,10 @@ export class TileTree extends Group {
 		uploadBudgetMs = 2, // uploads per frame stop once this is spent (at least one)
 		backfillLevels = 4, // ancestors this many levels above a leaf are loaded to draw under it
 		contentHeight = 1000, // meters above the surface that content may reach, for culling
+		// meters below it: a station or a tunnel. Without it a camera
+		// underground is outside every tile's box, the tiles around it are
+		// culled or taken as far, and a coarse ancestor stands in for them
+		contentDepth = 0,
 		// How far the map is built at all, in meters from the camera to the
 		// nearest corner of a tile's content box (so a camera under
 		// contentHeight is inside the box of the tile below it, and that one
@@ -88,6 +92,7 @@ export class TileTree extends Group {
 		this.uploadBudgetMs = uploadBudgetMs;
 		this.backfillLevels = backfillLevels;
 		this.contentHeight = contentHeight;
+		this.contentDepth = contentDepth;
 		this.viewDistance = viewDistance;
 
 		this._cache = new LRUTileCache( {
@@ -214,7 +219,7 @@ export class TileTree extends Group {
 				// a box in the frame of the tile's center
 				const east = new Vector3(), north = new Vector3(), up = new Vector3();
 				localFrame( record.centerLat, normalizedToLongitude( ( record.x + 0.5 ) / ( 1 << record.z ) ), east, north, up );
-				record.bounds = new OrientedBox().setFromPoints( points, [ east, north, up ], this.contentHeight );
+				record.bounds = new OrientedBox().setFromPoints( points, [ east, north, up ], this.contentHeight, this.contentDepth );
 
 				// and the cone from the planet's center that holds every sample
 				const direction = center.clone().normalize();
@@ -225,7 +230,7 @@ export class TileTree extends Group {
 			} else {
 
 				// the plane is y = 0, content stands along +y
-				record.bounds = new OrientedBox().setFromPoints( points, [ WORLD_AXES[ 0 ], WORLD_AXES[ 2 ], WORLD_AXES[ 1 ] ], this.contentHeight );
+				record.bounds = new OrientedBox().setFromPoints( points, [ WORLD_AXES[ 0 ], WORLD_AXES[ 2 ], WORLD_AXES[ 1 ] ], this.contentHeight, this.contentDepth );
 
 			}
 

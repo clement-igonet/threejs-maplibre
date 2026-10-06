@@ -61,27 +61,33 @@ function usage( batch ) {
 
 export class VectorTileMap extends TileTree {
 
-	constructor( source, style, {
-		sourceId = null,
-		// collision: keep a bounds tree (three-mesh-bvh) of every extrusion
-		// block, buildings and indoor geometry alike, so a character can be
-		// pushed out of walls and stand on floors (collideCapsule, groundBelow).
-		// The worker's arrays stay in memory for it, so it is off by default.
-		collision = false,
-		// doubleSided: draw the inside of walls and the underside of roofs
-		// too, for a camera that goes indoors; outward faces only by default,
-		// which is what a map seen from above needs
-		doubleSided = false,
-		workers = 2,
-		createWorker,
-		fadeDuration = 0, // vector tiles pop in, as in MapLibre
-		// geometry has no texels to blur: a tile serves until its 512 texels
-		// span more than 2 px each, the zoom MapLibre would fetch it at
-		maxScreenTexel = 2,
-		...options
-	} = {} ) {
+	constructor( source, style, options = {} ) {
 
-		super( source, { fadeDuration, maxScreenTexel, ...options } );
+		const {
+			sourceId = null,
+			// collision: keep a bounds tree (three-mesh-bvh) of every extrusion
+			// block, buildings and indoor geometry alike, so a character can be
+			// pushed out of walls and stand on floors (collideCapsule, groundBelow).
+			// The worker's arrays stay in memory for it, so it is off by default.
+			collision = false,
+			// doubleSided: draw the inside of walls and the underside of roofs
+			// too, for a camera that goes indoors; outward faces only by default,
+			// which is what a map seen from above needs
+			doubleSided = false,
+			workers = 2,
+			createWorker,
+			fadeDuration = 0, // vector tiles pop in, as in MapLibre
+			// geometry has no texels to blur: a tile serves until its 512 texels
+			// span more than 2 px each, the zoom MapLibre would fetch it at
+			maxScreenTexel = 2,
+			// planar: indoor levels and stairs go down to the deepest station
+			// platforms (the RER at Saint-Lazare, 21 m under the street); the
+			// globe has no walk underground yet, and keeps its selection
+			contentDepth = options.mode === 'planar' ? 60 : 0,
+			...rest
+		} = options;
+
+		super( source, { fadeDuration, maxScreenTexel, contentDepth, ...rest } );
 
 		this.style = style;
 		this.collision = collision;

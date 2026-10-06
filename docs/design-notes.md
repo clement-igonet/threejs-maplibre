@@ -1315,9 +1315,30 @@ maps 11 level outlines, from level 2 down to the RER platforms at -7;
 Châtelet maps one, at -3. Stairwell holes are cut through them like any
 floor.
 
-Measured: 209 tests, among them a balcony fall to a floor 6 m down, the
-street kept outdoors, a void caught, and the reported jump at
-Saint-Lazare landing 5 cm down on the level outline.
+A second hand-play report fell for ever at level -4 (48.875704,
+2.326286), 12 m under the street. The floor was mapped and built, but the
+tile tree never chose its tile. A tile's box stood on the street and
+reached `contentHeight` up, never down, so a camera underground was
+outside every box: the fine tiles around it were culled or taken as far,
+and a zoom 15 ancestor was drawn in their place. Colliders are built for
+the source's deepest zoom only, so under the robot nothing was solid; put
+back where it stood, it fell again. Tile boxes now reach `contentDepth`
+under the street, 60 m for a planar vector map, which is under the RER
+platforms at Saint-Lazare (level -7, 21 m down). The globe keeps 0: a
+deeper box there widened a straight-down view's selection from 4 tiles to
+9, and nothing walks under a globe yet. In headless Chrome at the
+reported spot, the robot now stands on level -4, and dropped under that
+floor it is caught once and stays.
+
+And whatever else takes a floor away, a fall from where the character
+was put back, before it stood anywhere, sends it to the start of the
+walk instead of round again.
+
+Measured: 210 tests, among them a balcony fall to a floor 6 m down, the
+street kept outdoors, a void caught, a floor gone from under the place
+the character was put back, the reported jump at Saint-Lazare landing
+5 cm down on the level outline, and the deepest tile picked under a
+camera below the street (and not, with `contentDepth: 0`).
 
 ![Level -1, facing the strip: before, a hole](../evidence/m5/walk-gap-before.png)
 ![After, the level's floor](../evidence/m5/walk-gap-after.png)

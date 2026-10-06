@@ -32,6 +32,8 @@ export class CharacterController {
 		this.stepHeight = 0.5; // the highest kerb or step walked up without a jump
 		this.fallDepth = 40; // a fall deeper than this below the last floor stood on is into nothing
 		this.lastSafe = new Vector3();
+		this.home = new Vector3(); // where place() put it: the way out if lastSafe fails too
+		this._caught = false; // put back, and not stood since
 		this.fell = false;
 		// where the character may go, { minX, maxX, minZ, maxZ } in the map's
 		// meters: the extent of the data, past which there is empty ground.
@@ -51,6 +53,8 @@ export class CharacterController {
 
 		this.position.set( x, y, z );
 		this.lastSafe.set( x, y, z );
+		this.home.set( x, y, z );
+		this._caught = false;
 		this.velocity.set( 0, 0, 0 );
 		return this;
 
@@ -151,9 +155,18 @@ export class CharacterController {
 
 		}
 
-		if ( stood ) this.lastSafe.copy( this.position );
-		else if ( ! onGround && this.position.y < this.lastSafe.y - this.fallDepth ) {
+		if ( stood ) {
 
+			this.lastSafe.copy( this.position );
+			this._caught = false;
+
+		} else if ( ! onGround && this.position.y < this.lastSafe.y - this.fallDepth ) {
+
+			// a second fall from where it was put back, before standing
+			// anywhere: that floor is gone (its tile no longer solid), so
+			// back to the start of the walk instead of falling for ever
+			if ( this._caught ) this.lastSafe.copy( this.home );
+			this._caught = true;
 			this.position.copy( this.lastSafe );
 			this.velocity.set( 0, 0, 0 );
 			this.fell = true; // for whoever wants to say so
