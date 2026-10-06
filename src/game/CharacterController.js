@@ -30,6 +30,9 @@ export class CharacterController {
 		this.steering = steering;
 		this.turnSpeed = turnSpeed; // radians a second at full left or right
 		this.stepHeight = 0.5; // the highest kerb or step walked up without a jump
+		this.fallDepth = 40; // a fall deeper than this below the last floor stood on is into nothing
+		this.lastSafe = new Vector3();
+		this.fell = false;
 		// where the character may go, { minX, maxX, minZ, maxZ } in the map's
 		// meters: the extent of the data, past which there is empty ground.
 		// Its edge is a wall nothing gets over, jumping or not.
@@ -47,6 +50,7 @@ export class CharacterController {
 	place( x, y, z ) {
 
 		this.position.set( x, y, z );
+		this.lastSafe.set( x, y, z );
 		this.velocity.set( 0, 0, 0 );
 		return this;
 
@@ -125,18 +129,34 @@ export class CharacterController {
 		let onGround = _push.onGround;
 		if ( onGround && this.velocity.y < 0 ) this.velocity.y = 0;
 
-		// the street, where no floor is under the feet
-		// the ground from knee height down: what a step can reach, not what
-		// is over the head (a floor slab of another level at chest height
-		// would lift the character onto it)
-		_end.set( this.position.x, this.position.y + this.stepHeight, this.position.z );
-		const floor = this.map.groundBelow( _end, this.stepHeight + 2 );
-		const ground = floor === null ? 0 : floor;
-		if ( this.position.y <= ground + 1e-3 && this.velocity.y <= 0 ) {
+		// the ground: the highest floor or ramp under the knee (what a step
+		// reaches, not what is over the head: a slab of another level at
+		// chest height would lift the character onto it), however far down,
+		// so a jump off a balcony falls to the floor below; and the street,
+		// at 0, for a character at or above it only, since underground it is
+		// a ceiling. Nothing under at all is a void: the fall goes on, and
+		// fallDepth below the last floor stood on, the character is put back
+		// there. Only a floor under the feet counts as stood on: touching a
+		// wall's edge or a slab's rim on the way down does not.
+		const knee = this.position.y + this.stepHeight;
+		_end.set( this.position.x, knee, this.position.z );
+		let ground = this.map.groundBelow( _end, 200 );
+		if ( knee >= 0 && ( ground === null || ground < 0 ) ) ground = 0;
+		let stood = false;
+		if ( ground !== null && this.position.y <= ground + 1e-3 && this.velocity.y <= 0 ) {
 
 			this.position.y = ground;
 			this.velocity.y = 0;
-			onGround = true;
+			onGround = stood = true;
+
+		}
+
+		if ( stood ) this.lastSafe.copy( this.position );
+		else if ( ! onGround && this.position.y < this.lastSafe.y - this.fallDepth ) {
+
+			this.position.copy( this.lastSafe );
+			this.velocity.set( 0, 0, 0 );
+			this.fell = true; // for whoever wants to say so
 
 		}
 

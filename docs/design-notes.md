@@ -1287,3 +1287,37 @@ higher ones stop it).
 ![Down the stairs to the Métro, through the pavement](../evidence/m5/walk-down.png)
 ![Where the character is, and the names around it](../evidence/m5/walk-labels.png)
 ![Running, the indicator saying how to walk again](../evidence/m5/walk-run.png)
+
+### Falling, and the floor between the rooms
+
+A jump off a balcony now falls to the floor below. The ground is the
+highest floor or ramp under the character's knee, however far down. The
+street, at 0, counts only for a character at or above it, since
+underground it is a ceiling. Before, the ground was searched 2.5 m down
+only, and the street stood in for anything further: a jump at level -1
+put the character back up at 0.
+
+A fall into nothing is caught. Only a floor under the feet counts as
+stood on; touching a wall's edge or a slab's rim on the way down does
+not. 40 m below the last floor stood on, the character is put back on it
+and `fell` is set. Counting rims as standing made a fall into a void at
+Saint-Lazare bounce between 13 and 59 m down.
+
+That void was ours. At level -1 by McDonald's, the strip a jump to the
+left lands on is covered by no room or corridor. It lies inside the
+outline of the whole level (`indoor=level`, OSM way 320530315), and no
+lower level is mapped under it. OSM says it is floor, but the floor
+layer drew rooms, corridors and areas only, so it was a hole down to the
+sky. The station style now draws level outlines too, as the
+`indoor-level` layer, 5 cm under the rooms
+(`threejs-maplibre:floor-drop`) so the rooms show on top. Saint-Lazare
+maps 11 level outlines, from level 2 down to the RER platforms at -7;
+Châtelet maps one, at -3. Stairwell holes are cut through them like any
+floor.
+
+Measured: 209 tests, among them a balcony fall to a floor 6 m down, the
+street kept outdoors, a void caught, and the reported jump at
+Saint-Lazare landing 5 cm down on the level outline.
+
+![Level -1, facing the strip: before, a hole](../evidence/m5/walk-gap-before.png)
+![After, the level's floor](../evidence/m5/walk-gap-after.png)

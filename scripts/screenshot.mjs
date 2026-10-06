@@ -98,6 +98,9 @@ const SHOTS = [
 	{ name: 'walk-down', page: 'walk', query: '&lat=48.875694&lon=2.324192&y=-0.6&heading=34' },
 	{ name: 'walk-stairs', page: 'walk', query: '&lat=48.87621&lon=2.32513&y=0.15&heading=180' },
 	// at the foot of the escalators up to level 1, the hole in its floor ahead
+	// level -1 by McDonald's, facing the strip between the mapped rooms
+	// that a jump fell through before level outlines were floors
+	{ name: 'walk-gap', page: 'walk', query: '&lat=48.876152&lon=2.326191&y=-2.85&heading=158' },
 	{ name: 'walk-escalator', page: 'walk', query: '&lat=48.8761525&lon=2.325062&y=1.8&heading=279' },
 	{ name: 'indoor-walker', page: 'indoor', query: '&level=-1&from=Sephora&to=Ladur%C3%A9e&t=95&speed=0.001&follow=1' },
 ];
