@@ -45,7 +45,11 @@ export function buildColliders( built ) {
 // times 3 m; a station with levels -1, -0.75 and -0.5 puts floors 0.75 m
 // apart where the real ones are not): a floor or a ramp is stood on and
 // never bumped into from below or from its edge, and a wall blocks only on
-// its own level, within 1.5 m of the feet.
+// its own level, within 1.5 m of the feet. A floor holds the character up
+// only where it meets the feet, up to knee height: a slab met higher,
+// with the head through it from below, is a ceiling, not ground (that
+// held a fallen character hanging a meter under a floor, its legs hidden).
+export const FLOOR_REACH = 0.7; // meters above the feet a floor may touch and still hold
 export function collideCapsule( colliders, start, end, radius, out, feet = null ) {
 
 	_capsuleBox.makeEmpty().expandByPoint( start ).expandByPoint( end ).expandByScalar( radius );
@@ -70,7 +74,7 @@ export function collideCapsule( colliders, start, end, radius, out, feet = null 
 					_push.subVectors( _capsulePoint, _triPoint );
 					if ( _push.lengthSq() === 0 ) _push.set( 0, 1, 0 ); else _push.normalize();
 					// a one-way surface only holds the character up
-					if ( oneWay && _push.y < 0.7 ) return false;
+					if ( oneWay && ( _push.y < 0.7 || _triPoint.y + center.y > feet + FLOOR_REACH ) ) return false;
 					_push.multiplyScalar( depth );
 					_segStart.add( _push );
 					_segEnd.add( _push );

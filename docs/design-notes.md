@@ -1334,11 +1334,48 @@ And whatever else takes a floor away, a fall from where the character
 was put back, before it stood anywhere, sends it to the start of the
 walk instead of round again.
 
-Measured: 210 tests, among them a balcony fall to a floor 6 m down, the
-street kept outdoors, a void caught, a floor gone from under the place
-the character was put back, the reported jump at Saint-Lazare landing
-5 cm down on the level outline, and the deepest tile picked under a
-camera below the street (and not, with `contentDepth: 0`).
+### A ledge, a ceiling, and the earth
+
+The same spot, once its tile was solid, gave three more reports in one
+screenshot: the robot stood a meter under the level -4 floor with its
+legs hidden, the corridor ended in nothing, and everything around was
+sky blue.
+
+The sunk robot: the two level -4 corridors there are two OSM polygons
+that do not touch, with a gap of 4 m between them that no level outline
+covers either. Running into the gap, the robot fell, and on the way down
+its head went up through the slab of the floor it had left. A floor is
+one-way (it pushes up only), and the slab's top face, found above the
+capsule's upper end, pushed it up by a hair and counted as ground. The
+robot hung from the ceiling, held by its head, "on the ground" at
+-12.85 m. A floor now holds the character only where it meets the feet,
+up to `FLOOR_REACH` (0.7 m) above them; met higher, it is a ceiling.
+
+The gap itself is the data's, and nothing drawn in it says there is a
+drop. So a walk stops at a ledge: a step whose landing has no ground
+within `ledge` (1 m) below the feet is not taken, the character stays
+at the edge with `atLedge` set, and the page says "a drop: jump to go
+down". A jump goes over, and falls to whatever is below, or into the
+void and back. Outdoors the street is always there, so the rule never
+fires on it; it does on a roof.
+
+The sky: the page's backdrop and the fog were the sky's colour, and
+underground, where OSM maps nothing, that is what showed through. Over
+the first 3 m of the camera's descent the walk page now blends both to
+an earth brown and closes the haze from 900 m to 160 m.
+
+Measured: 210 tests, among them a walk stopped at a ledge and a jump
+taken over it to a floor 6 m down, a character with its head through a
+slab from below falling on, the street kept outdoors, a void caught, a
+floor gone from under the place the character was put back, the
+reported jump at Saint-Lazare landing 5 cm down on the level outline,
+and the deepest tile picked under a camera below the street (and not,
+with `contentDepth: 0`). In headless Chrome from the level -4 spot, five
+headings at a run never leave the floor; with a jump every 3 s, two
+headings fall into the gap and come back.
+
+![Level -4 before: a corridor into the sky](../evidence/m5/walk-deep-before.png)
+![After: earth around, haze closing in](../evidence/m5/walk-deep-after.png)
 
 ![Level -1, facing the strip: before, a hole](../evidence/m5/walk-gap-before.png)
 ![After, the level's floor](../evidence/m5/walk-gap-after.png)

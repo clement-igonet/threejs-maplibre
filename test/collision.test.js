@@ -312,7 +312,7 @@ describe( 'CharacterController', () => {
 
 	} );
 
-	it( 'falls off a balcony to the floor below, keeps the street outdoors, and is caught by a void', () => {
+	it( 'stops at a ledge, jumps off it to the floor below, keeps the street outdoors, and is caught by a void', () => {
 
 		const projection = { project( x, y, h, o ) { o[ 0 ] = x; o[ 1 ] = h; o[ 2 ] = y; return o; } };
 		const white = [ 255, 255, 255, 255 ];
@@ -325,12 +325,24 @@ describe( 'CharacterController', () => {
 		const cols = buildColliders( fake );
 		const fakeMap = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( cols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
 
-		// off the edge of level -1: down six meters to level -3, not up to the street
+		// the edge of level -1, six meters over level -3: a walk stops there
 		const c = new CharacterController( fakeMap ).place( 0, - 2.85, 0 );
 		c.heading = 0;
-		for ( let i = 0; i < 8 * 60; i ++ ) c.update( 1 / 60, { forward: 1, right: 0 } ); // 12.8 m at 1.6 m/s
+		for ( let i = 0; i < 8 * 60; i ++ ) c.update( 1 / 60, { forward: 1, right: 0 } ); // 12.8 m at 1.6 m/s, were it free
+		expect( c.position.x ).toBeCloseTo( 10, 0 );
+		expect( c.position.y ).toBeCloseTo( - 2.85, 3 );
+		expect( c.atLedge ).toBe( true );
+		// a jump goes over, down to level -3, not up to the street
+		c.update( 1 / 60, { forward: 1, right: 0, jump: true } );
+		for ( let i = 0; i < 3 * 60; i ++ ) c.update( 1 / 60, { forward: 1, right: 0 } );
 		expect( c.position.x ).toBeGreaterThan( 10 );
 		expect( c.position.y ).toBeCloseTo( - 8.85, 3 );
+		expect( c.atLedge ).toBe( false );
+		// a kerb's worth of drop is walked off
+		const kerb = new CharacterController( fakeMap, { ledge: 6.5 } ).place( 0, - 2.85, 0 );
+		kerb.heading = 0;
+		for ( let i = 0; i < 8 * 60; i ++ ) kerb.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( kerb.position.y ).toBeCloseTo( - 8.85, 3 );
 
 		// on the street, nothing under it but the street
 		const street = new CharacterController( fakeMap ).place( 60, 0, 0 );
@@ -342,6 +354,14 @@ describe( 'CharacterController', () => {
 		for ( let i = 0; i < 4 * 60 && ! lost.fell; i ++ ) lost.update( 1 / 60, { forward: 0, right: 0 } );
 		expect( lost.fell ).toBe( true );
 		expect( lost.position.y ).toBeCloseTo( - 5, 2 ); // the substeps left in that frame fall a hair
+
+		// fallen past a floor, head up through its slab from below: the slab
+		// is a ceiling there, not ground, and the fall goes on
+		const under = new CharacterController( fakeMap ).place( 5, - 3.85, 0 ); // level -1's slab is -3 to -2.85, the head at -2.5
+		under.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( under.onGround ).toBe( false );
+		for ( let i = 0; i < 3 * 60; i ++ ) under.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( under.position.y ).toBeCloseTo( - 8.85, 3 );
 
 		// put back on a floor that is gone meanwhile (its tile no longer
 		// solid): a second fall before standing goes back to the start

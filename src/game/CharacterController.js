@@ -17,7 +17,7 @@ const _start = new Vector3(), _end = new Vector3(), _push = new Vector3(), _move
 
 export class CharacterController {
 
-	constructor( map, { radius = 0.35, height = 1.7, walkSpeed = 1.6, runSpeed = 4.5, gravity = 30, jumpSpeed = 7, steps = 5, steering = true, turnSpeed = 2.4, bounds = null } = {} ) {
+	constructor( map, { radius = 0.35, height = 1.7, walkSpeed = 1.6, runSpeed = 4.5, gravity = 30, jumpSpeed = 7, steps = 5, steering = true, turnSpeed = 2.4, bounds = null, ledge = 1 } = {} ) {
 
 		this.map = map;
 		this.radius = radius;
@@ -30,6 +30,12 @@ export class CharacterController {
 		this.steering = steering;
 		this.turnSpeed = turnSpeed; // radians a second at full left or right
 		this.stepHeight = 0.5; // the highest kerb or step walked up without a jump
+		// the deepest drop walked off without a jump: past it the walk stops
+		// at the edge (atLedge), and only a jump goes over. Indoor data has
+		// gaps between polygons on the same level, and nothing drawn in them
+		// says there is a drop; Infinity to walk off anything
+		this.ledge = ledge;
+		this.atLedge = false;
 		this.fallDepth = 40; // a fall deeper than this below the last floor stood on is into nothing
 		this.lastSafe = new Vector3();
 		this.home = new Vector3(); // where place() put it: the way out if lastSafe fails too
@@ -100,6 +106,7 @@ export class CharacterController {
 
 		const step = dt / this.steps;
 		this.atEdge = false; // set by any step the edge stops
+		this.atLedge = false;
 		for ( let i = 0; i < this.steps; i ++ ) this._step( step );
 		return this;
 
@@ -107,8 +114,28 @@ export class CharacterController {
 
 	_step( dt ) {
 
+		const wasOnGround = this.onGround, x0 = this.position.x, z0 = this.position.z;
 		this.velocity.y -= this.gravity * dt;
 		this.position.addScaledVector( this.velocity, dt );
+
+		// a walk, not a jump, stops short of a drop deeper than the ledge:
+		// the ground under the knee where the step lands, as below
+		if ( wasOnGround && this.velocity.y <= 0 && Number.isFinite( this.ledge ) ) {
+
+			const knee = this.position.y + this.stepHeight;
+			_end.set( this.position.x, knee, this.position.z );
+			let ground = this.map.groundBelow( _end, this.stepHeight + this.ledge );
+			if ( knee >= 0 && ( ground === null || ground < 0 ) ) ground = 0;
+			if ( ground === null || ground < this.position.y - this.ledge ) {
+
+				this.position.x = x0;
+				this.position.z = z0;
+				this.velocity.x = this.velocity.z = 0;
+				this.atLedge = true;
+
+			}
+
+		}
 
 		// the capsule, feet to head, pushed out of the map
 		const r = this.radius;
