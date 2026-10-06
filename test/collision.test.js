@@ -312,6 +312,34 @@ describe( 'CharacterController', () => {
 
 	} );
 
+	it( 'runs up the Metro stairs at Saint-Lazare from level -4 to level -1, astride the slot between two of them', () => {
+
+		// a hand-play report: three stairs ways run side by side, bearing
+		// 349 degrees, and the robot stood on the slot between two of them
+		// with nothing under its centre, stopped there as at a ledge
+		const lat = 48.875772, lon = 2.326272;
+		const tx = Math.floor( longitudeToNormalized( lon ) * 2 ** z ), ty = Math.floor( latitudeToNormalized( lat ) * 2 ** z );
+		const cols = [];
+		for ( let dx = - 1; dx <= 1; dx ++ ) for ( let dy = - 1; dy <= 1; dy ++ ) cols.push( ...buildColliders( buildTile( decodeVectorTile( tile( z, tx + dx, ty + dy ) ), style, { sourceId: 'openmaptiles', x: tx + dx, y: ty + dy, z, mode: 'planar' } ) ) );
+		const here = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( cols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
+		const [ x0, z0 ] = scene( lat, lon );
+		const c = new CharacterController( here ).place( x0, - 10.19, z0 );
+		expect( groundBelow( cols, new Vector3( x0, - 9.69, z0 ), 1.5 ) ).toBeNull(); // the slot, under the centre
+		c.heading = ( 90 - 349 ) * Math.PI / 180;
+		let stopped = 0;
+		for ( let i = 0; i < 9 * 60; i ++ ) {
+
+			c.update( 1 / 60, { forward: 1, right: 0, run: true } );
+			if ( c.atLedge ) stopped ++;
+
+		}
+
+		expect( stopped ).toBe( 0 );
+		expect( c.position.y ).toBeCloseTo( - 2.85, 2 );
+		expect( c.onGround ).toBe( true );
+
+	} );
+
 	it( 'stops at a ledge, jumps off it to the floor below, keeps the street outdoors, and is caught by a void', () => {
 
 		const projection = { project( x, y, h, o ) { o[ 0 ] = x; o[ 1 ] = h; o[ 2 ] = y; return o; } };
@@ -338,6 +366,20 @@ describe( 'CharacterController', () => {
 		expect( c.position.x ).toBeGreaterThan( 10 );
 		expect( c.position.y ).toBeCloseTo( - 8.85, 3 );
 		expect( c.atLedge ).toBe( false );
+		// astride a slot between two stairs, as at Saint-Lazare where three
+		// run side by side 1.5 m wide: the soles rest on both, the walk goes on
+		const slot = { center: new Vector3(), blocks: [
+			block( 'floor', - 1, - 3, out => appendFloor( out, [ [ - 5, 0.2, 40, 0.2, 40, 5, - 5, 5 ] ], projection, white, - 3 ) ),
+			block( 'floor', - 1, - 3, out => appendFloor( out, [ [ - 5, - 5, 40, - 5, 40, - 0.2, - 5, - 0.2 ] ], projection, white, - 3 ) ),
+		] };
+		const slotCols = buildColliders( slot );
+		const slotMap = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( slotCols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( slotCols, p, m ); } };
+		const astride = new CharacterController( slotMap ).place( 0, - 2.85, 0 );
+		astride.heading = 0;
+		for ( let i = 0; i < 3 * 60; i ++ ) astride.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( astride.position.x ).toBeGreaterThan( 4 );
+		expect( astride.atLedge ).toBe( false );
+		expect( astride.position.y ).toBeGreaterThan( - 3 );
 		// a kerb's worth of drop is walked off
 		const kerb = new CharacterController( fakeMap, { ledge: 6.5 } ).place( 0, - 2.85, 0 );
 		kerb.heading = 0;

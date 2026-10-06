@@ -1359,13 +1359,23 @@ down". A jump goes over, and falls to whatever is below, or into the
 void and back. Outdoors the street is always there, so the rule never
 fires on it; it does on a roof.
 
+The ledge rule's first version probed the ground under the centre of
+the feet, and stopped the robot on the Métro stairs: three OSM ways run
+side by side there, each built 1.5 m wide, with a slot between two of
+them that the robot stood astride, its soles on both and nothing under
+its centre. The ground is now the highest floor under any of five soles
+(the centre and four points at the capsule's edge), for the ledge rule
+and for standing alike, so a character with its centre just past a
+floor's edge still stands on it, as its capsule's radius says.
+
 The sky: the page's backdrop and the fog were the sky's colour, and
 underground, where OSM maps nothing, that is what showed through. Over
 the first 3 m of the camera's descent the walk page now blends both to
 an earth brown and closes the haze from 900 m to 160 m.
 
 Measured: 210 tests, among them a walk stopped at a ledge and a jump
-taken over it to a floor 6 m down, a character with its head through a
+taken over it to a floor 6 m down, a walk along a slot between two
+floors, a run up the Métro stairs from level -4, a character with its head through a
 slab from below falling on, the street kept outdoors, a void caught, a
 floor gone from under the place the character was put back, the
 reported jump at Saint-Lazare landing 5 cm down on the level outline,

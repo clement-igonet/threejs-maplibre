@@ -13,6 +13,9 @@ import { Vector3 } from 'three';
 // character (the hall, the stairs down to the Métro), the street at 0
 // elsewhere. A fall is gravity; a jump is an upward speed.
 
+// where the soles rest, in radii from the centre: the centre and four
+// points at the capsule's edge
+const _SOLES = [ [ 0, 0 ], [ 0.8, 0 ], [ - 0.8, 0 ], [ 0, 0.8 ], [ 0, - 0.8 ] ];
 const _start = new Vector3(), _end = new Vector3(), _push = new Vector3(), _move = new Vector3();
 
 export class CharacterController {
@@ -112,6 +115,30 @@ export class CharacterController {
 
 	}
 
+	// The ground under the feet: the highest floor, ramp or roof under the
+	// knee (what a step reaches, not what is over the head) within
+	// maxDistance down, under any of the soles (the centre and the edge of
+	// the capsule: a character stands astride a slot between two stairs,
+	// or with its centre just past a floor's edge); and the street, at 0,
+	// for a character at or above it only, since underground it is a
+	// ceiling. null when nothing is there: a void.
+	_groundUnder( maxDistance ) {
+
+		const knee = this.position.y + this.stepHeight;
+		let ground = null;
+		for ( const [ ox, oz ] of _SOLES ) {
+
+			_end.set( this.position.x + ox * this.radius, knee, this.position.z + oz * this.radius );
+			const g = this.map.groundBelow( _end, maxDistance );
+			if ( g !== null && ( ground === null || g > ground ) ) ground = g;
+
+		}
+
+		if ( knee >= 0 && ( ground === null || ground < 0 ) ) ground = 0;
+		return ground;
+
+	}
+
 	_step( dt ) {
 
 		const wasOnGround = this.onGround, x0 = this.position.x, z0 = this.position.z;
@@ -119,13 +146,12 @@ export class CharacterController {
 		this.position.addScaledVector( this.velocity, dt );
 
 		// a walk, not a jump, stops short of a drop deeper than the ledge:
-		// the ground under the knee where the step lands, as below
+		// the ground under the knee where the step lands, as below, under
+		// the whole of the feet rather than their centre (a character stands
+		// astride a slot between two stairs, its soles on both)
 		if ( wasOnGround && this.velocity.y <= 0 && Number.isFinite( this.ledge ) ) {
 
-			const knee = this.position.y + this.stepHeight;
-			_end.set( this.position.x, knee, this.position.z );
-			let ground = this.map.groundBelow( _end, this.stepHeight + this.ledge );
-			if ( knee >= 0 && ( ground === null || ground < 0 ) ) ground = 0;
+			const ground = this._groundUnder( this.stepHeight + this.ledge );
 			if ( ground === null || ground < this.position.y - this.ledge ) {
 
 				this.position.x = x0;
@@ -160,19 +186,12 @@ export class CharacterController {
 		let onGround = _push.onGround;
 		if ( onGround && this.velocity.y < 0 ) this.velocity.y = 0;
 
-		// the ground: the highest floor or ramp under the knee (what a step
-		// reaches, not what is over the head: a slab of another level at
-		// chest height would lift the character onto it), however far down,
-		// so a jump off a balcony falls to the floor below; and the street,
-		// at 0, for a character at or above it only, since underground it is
-		// a ceiling. Nothing under at all is a void: the fall goes on, and
+		// the ground, however far down, so a jump off a balcony falls to the
+		// floor below. Nothing under at all is a void: the fall goes on, and
 		// fallDepth below the last floor stood on, the character is put back
 		// there. Only a floor under the feet counts as stood on: touching a
 		// wall's edge or a slab's rim on the way down does not.
-		const knee = this.position.y + this.stepHeight;
-		_end.set( this.position.x, knee, this.position.z );
-		let ground = this.map.groundBelow( _end, 200 );
-		if ( knee >= 0 && ( ground === null || ground < 0 ) ) ground = 0;
+		const ground = this._groundUnder( 200 );
 		let stood = false;
 		if ( ground !== null && this.position.y <= ground + 1e-3 && this.velocity.y <= 0 ) {
 
