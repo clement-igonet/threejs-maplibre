@@ -29,6 +29,7 @@ export class CharacterController {
 		this.steps = steps;
 		this.steering = steering;
 		this.turnSpeed = turnSpeed; // radians a second at full left or right
+		this.stepHeight = 0.5; // the highest kerb or step walked up without a jump
 		// where the character may go, { minX, maxX, minZ, maxZ } in the map's
 		// meters: the extent of the data, past which there is empty ground.
 		// Its edge is a wall nothing gets over, jumping or not.
@@ -105,7 +106,7 @@ export class CharacterController {
 		const r = this.radius;
 		_start.set( this.position.x, this.position.y + r, this.position.z );
 		_end.set( this.position.x, this.position.y + this.height - r, this.position.z );
-		this.map.collideCapsule( _start, _end, r, _push );
+		this.map.collideCapsule( _start, _end, r, _push, this.position.y );
 		this.position.x = _start.x;
 		this.position.z = _start.z;
 		this.position.y = _start.y - r;
@@ -125,7 +126,11 @@ export class CharacterController {
 		if ( onGround && this.velocity.y < 0 ) this.velocity.y = 0;
 
 		// the street, where no floor is under the feet
-		const floor = this.map.groundBelow( _end, this.height + 2 );
+		// the ground from knee height down: what a step can reach, not what
+		// is over the head (a floor slab of another level at chest height
+		// would lift the character onto it)
+		_end.set( this.position.x, this.position.y + this.stepHeight, this.position.z );
+		const floor = this.map.groundBelow( _end, this.stepHeight + 2 );
 		const ground = floor === null ? 0 : floor;
 		if ( this.position.y <= ground + 1e-3 && this.velocity.y <= 0 ) {
 

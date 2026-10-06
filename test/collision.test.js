@@ -7,6 +7,7 @@ import { buildTile } from '../src/build/buildTile.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { buildColliders, collideCapsule, groundBelow, raycastFirst } from '../src/three/colliders.js';
+import { appendFloor, appendWallRun } from '../src/build/buildIndoor.js';
 import { CharacterController } from '../src/game/CharacterController.js';
 import { latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/math/WebMercator.js';
 
@@ -250,6 +251,32 @@ describe( 'CharacterController', () => {
 		}
 
 		m.dispose();
+
+	} );
+
+	it( 'walks under the floor of a fractional level, and is held by walls of its own level only', () => {
+
+		// a floor at level 0 everywhere, a slab of level 0.25 (0.75 m up) over
+		// the middle of the way, and a wall of level 1 (3 m up) across the way
+		const projection = { project( x, y, h, o ) { o[ 0 ] = x; o[ 1 ] = h; o[ 2 ] = y; return o; } };
+		const block = ( indoor, level, base, build ) => { const out = { positions: [], colors: [], indices: [], vertexCount: 0 }; build( out ); return { type: 'fill-extrusion', indoor, level, base, positions: new Float32Array( out.positions ), indices: new Uint32Array( out.indices ) }; };
+		const white = [ 255, 255, 255, 255 ];
+		const fake = { center: new Vector3(), blocks: [
+			block( 'floor', 0, 0, out => appendFloor( out, [ [ - 5, - 5, 40, - 5, 40, 5, - 5, 5 ] ], projection, white, 0 ) ),
+			block( 'floor', 0.25, 0.75, out => appendFloor( out, [ [ 10, - 5, 20, - 5, 20, 5, 10, 5 ] ], projection, white, 0.75 ) ),
+			block( 'wall', 1, 3, out => appendWallRun( out, [ 25, - 5, 25, 5 ], projection, white, 3, 5.5 ) ),
+		] };
+		const cols = buildColliders( fake );
+		const fakeMap = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( cols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
+		const c = new CharacterController( fakeMap ).place( 0, 0.15, 0 );
+		c.heading = 0; // east, +x
+		for ( let i = 0; i < 25 * 60; i ++ ) c.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( c.position.x ).toBeGreaterThan( 30 ); // under the slab and past the level 1 wall
+		expect( c.position.y ).toBeCloseTo( 0.15, 3 ); // never lifted onto the slab
+		// standing on the slab from above still works
+		const up = new CharacterController( fakeMap ).place( 15, 2, 0 );
+		for ( let i = 0; i < 60; i ++ ) up.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( up.position.y ).toBeCloseTo( 0.9, 3 );
 
 	} );
 
