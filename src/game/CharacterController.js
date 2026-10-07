@@ -20,7 +20,7 @@ const _start = new Vector3(), _end = new Vector3(), _push = new Vector3(), _move
 
 export class CharacterController {
 
-	constructor( map, { radius = 0.35, height = 1.7, walkSpeed = 1.6, runSpeed = 4.5, gravity = 30, jumpSpeed = 7, steps = 5, steering = true, turnSpeed = 2.4, bounds = null, ledge = 1 } = {} ) {
+	constructor( map, { radius = 0.35, height = 1.7, walkSpeed = 1.6, runSpeed = 4.5, gravity = 30, jumpSpeed = 7, steps = 5, steering = true, turnSpeed = 2.4, bounds = null, ledge = 1, street = null } = {} ) {
 
 		this.map = map;
 		this.radius = radius;
@@ -39,6 +39,10 @@ export class CharacterController {
 		// says there is a drop; Infinity to walk off anything
 		this.ledge = ledge;
 		this.atLedge = false;
+		// where the street is: ( x, z ) => true when the ground at 0 is
+		// there, false over a stairwell cut into it, so a character walks
+		// down the stairs rather than over the hole on air. null: everywhere
+		this.street = street;
 		this.fallDepth = 40; // a fall deeper than this below the last floor stood on is into nothing
 		this.lastSafe = new Vector3();
 		this.home = new Vector3(); // where place() put it: the way out if lastSafe fails too
@@ -134,7 +138,7 @@ export class CharacterController {
 
 		}
 
-		if ( knee >= 0 && ( ground === null || ground < 0 ) ) ground = 0;
+		if ( knee >= 0 && ( ground === null || ground < 0 ) && ( this.street === null || this.street( this.position.x, this.position.z ) ) ) ground = 0;
 		return ground;
 
 	}

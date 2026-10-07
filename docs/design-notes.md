@@ -1423,6 +1423,16 @@ Chrome at Saint-Lazare: the start screen, Start by Enter, the way drawn
 in one frame (256 s, 8 points), and the character placed on the platform
 seen as arrived within 2.5 s, the time shown.
 
+Playing it, the first thing found was that the stairs down from the
+street could not be taken: at the top of the Métro escalators the robot
+stood on the street and the ramp a meter under it was never the ground.
+The street at 0 counted everywhere for a character at or above it,
+over the stairwell holes included, since the controller knew nothing of
+the holes. It now takes a `street( x, z )` predicate, and the walk page
+gives it the stairwell quads it cuts the ground mesh with: over a hole
+there is no street, the ground is the ramp below, and a jump over a
+hole falls onto it.
+
 The recorded walk: the robot driven along the route in headless Chrome
 (a frame every 3 s of walk time, the way shown), from the forecourt to
 the platform in 3 min 7 s.

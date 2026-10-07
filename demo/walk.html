@@ -226,14 +226,33 @@
 			const [ west, south, east, north ] = meta.bbox;
 			const [ x0, z0 ] = toScene( north, west ), [ x1, z1 ] = toScene( south, east );
 			const bounds = { minX: x0 + 20, maxX: x1 - 20, minZ: z0 + 20, maxZ: z1 - 20 };
+			// the stairwells cut into the ground, round its centre, for the
+			// ground mesh and for the character (no street over a hole)
+			const gx = ( x0 + x1 ) / 2, gz = ( z0 + z1 ) / 2;
+			const quads = [];
+			const inQuad = ( px, pz, q ) => {
+
+				let sign = 0;
+				for ( let i = 0; i < 4; i ++ ) {
+
+					const [ ax, az ] = q[ i ], [ bx, bz ] = q[ ( i + 1 ) % 4 ];
+					const cross = ( bx - ax ) * ( pz - az ) - ( bz - az ) * ( px - ax );
+					if ( cross === 0 ) continue;
+					if ( sign === 0 ) sign = Math.sign( cross ); else if ( Math.sign( cross ) !== sign ) return false;
+
+				}
+
+				return true;
+
+			};
+			const streetAt = ( x, z ) => { const px = x - gx, pz = z - gz; return ! quads.some( q => inQuad( px, pz, q ) ); };
 			{
 
 				// the ground, 3 km round the data, with a hole over every staircase
 				// that goes down from level 0, as the street fills have: OSM maps
 				// the pavement over a Métro entrance unbroken
-				const gx = ( x0 + x1 ) / 2, gz = ( z0 + z1 ) / 2, half = 3000;
+				const half = 3000;
 				const k = 1 / Math.cos( ( north + south ) / 2 * Math.PI / 180 );
-				const quads = [];
 				for ( const f of layers.transportation.features ) {
 
 					const p = f.properties;
@@ -270,7 +289,7 @@
 			// ground meter (1.52 here): speeds are given in ground meters and
 			// scaled, so a walk is a walk; heights are true meters already
 			const mercator = 1 / Math.cos( startLat * Math.PI / 180 );
-			const character = new CharacterController( map, { bounds, walkSpeed: 1.4 * mercator, runSpeed: 4.2 * mercator } ).place( sx, num( 'y', 0 ), sz );
+			const character = new CharacterController( map, { bounds, walkSpeed: 1.4 * mercator, runSpeed: 4.2 * mercator, street: streetAt } ).place( sx, num( 'y', 0 ), sz );
 			{
 
 				// four translucent walls 2.5 m high, built round their own centre

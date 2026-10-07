@@ -7,7 +7,7 @@ import { buildTile } from '../src/build/buildTile.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { buildColliders, collideCapsule, groundBelow, raycastFirst } from '../src/three/colliders.js';
-import { appendFloor, appendWallRun } from '../src/build/buildIndoor.js';
+import { appendFloor, appendRamp, appendWallRun } from '../src/build/buildIndoor.js';
 import { CharacterController } from '../src/game/CharacterController.js';
 import { latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/math/WebMercator.js';
 
@@ -337,6 +337,36 @@ describe( 'CharacterController', () => {
 		expect( stopped ).toBe( 0 );
 		expect( c.position.y ).toBeCloseTo( - 2.85, 2 );
 		expect( c.onGround ).toBe( true );
+
+	} );
+
+	it( 'walks down a staircase cut into the street, and over it where the street is whole', () => {
+
+		// a ramp from the street down to level -1, x from 2 to 14, under a
+		// stairwell: the street is not there over it (the walk page cuts a
+		// hole in the ground for every staircase down from level 0)
+		const projection = { project( x, y, h, o ) { o[ 0 ] = x; o[ 1 ] = h; o[ 2 ] = y; return o; } };
+		const white = [ 255, 255, 255, 255 ];
+		const out = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		appendRamp( out, [ 2, 0, 14, 0 ], projection, white, 2, 0.15, - 2.85 );
+		const fake = { center: new Vector3(), blocks: [ { type: 'fill-extrusion', indoor: 'steps', level: 0, base: 0, positions: new Float32Array( out.positions ), indices: new Uint32Array( out.indices ) } ] };
+		const cols = buildColliders( fake );
+		const fakeMap = { collideCapsule( a, b, r, o, feet ) { o.set( 0, 0, 0 ); o.onGround = false; return collideCapsule( cols, a, b, r, o, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
+		const hole = ( x, z ) => ! ( x > 2 && x < 14 && Math.abs( z ) < 1 );
+
+		const down = new CharacterController( fakeMap, { street: hole } ).place( 0, 0, 0 );
+		down.heading = 0;
+		for ( let i = 0; i < 10 * 60; i ++ ) down.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( down.position.x ).toBeGreaterThan( 12 );
+		expect( down.position.y ).toBeLessThan( - 2 );
+		expect( down.onGround ).toBe( true );
+
+		// the same ramp under an unbroken street: walked over at 0
+		const over = new CharacterController( fakeMap ).place( 0, 0, 0 );
+		over.heading = 0;
+		for ( let i = 0; i < 10 * 60; i ++ ) over.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( over.position.x ).toBeGreaterThan( 12 );
+		expect( over.position.y ).toBe( 0 );
 
 	} );
 
