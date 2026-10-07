@@ -252,6 +252,33 @@ describe( 'VectorTileMap', () => {
 
 	} );
 
+	it( 'has its fills and extrusions cast and receive shadows when asked, lines and glass never', async () => {
+
+		const lit = createMap( { shadows: true } );
+		await settle( lit, cityCamera( 500 ) );
+		const batches = [ ...lit._materials.values() ];
+		expect( batches.length ).toBeGreaterThan( 1 );
+		for ( const { batch, type, glass } of batches ) {
+
+			const expected = type !== 'line' && ! glass;
+			expect( batch.castShadow ).toBe( expected );
+			expect( batch.receiveShadow ).toBe( expected );
+
+		}
+
+		// fills are lit then, and the lines take the day's brightness
+		expect( batches.find( e => e.type === 'fill' ).material.isMeshLambertMaterial ).toBe( true );
+		lit.setBrightness( 0.4 );
+		for ( const { material, type } of batches ) if ( type === 'line' ) expect( material.brightness ).toBe( 0.4 );
+		expect( batches.some( e => e.type === 'line' ) ).toBe( true );
+		lit.dispose();
+		const plain = createMap();
+		await settle( plain, cityCamera( 500 ) );
+		for ( const { batch, material, type } of plain._materials.values() ) { expect( batch.castShadow ).toBe( false ); if ( type === 'fill' ) expect( material.isMeshBasicMaterial ).toBe( true ); }
+		plain.dispose();
+
+	} );
+
 	it( 'asks for the deepest tiles around a camera under the street', () => {
 
 		// a walk's camera at -9 m, 4 m behind and over a character in a

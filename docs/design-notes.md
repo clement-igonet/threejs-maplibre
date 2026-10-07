@@ -1578,3 +1578,56 @@ at the top.
 
 ![The Métro stairs before: a ramp](../evidence/m5/walk-steps-before.png)
 ![After: steps](../evidence/m5/walk-steps-after.png)
+
+### The sky and the hour
+
+The sun is where it is. `sunPosition( date, latitude, longitude )`
+(src/game/sun.js) is the NOAA solar position: Julian century, mean
+longitude and anomaly, the equation of centre, apparent longitude,
+obliquity, declination, the equation of time, the hour angle, then the
+altitude and the azimuth from the zenith triangle; a tenth of a degree
+this century, which a sky and a shadow do not notice. `dateAtHour`
+turns "14:00 in Paris" into UTC through Intl, daylight saving and all.
+
+The walk takes the hour from Paris's clock (or `?hour=`, `[` and `]`
+by half an hour) and `DayNight` (demo/day-night.js) does the rest:
+three's Sky (the Preetham model) with the sun's direction in its
+uniform, a directional light from the sun with one 2048 shadow map in a
+220 m box round the character, a hemisphere light for the rest, and
+colours for the fog and the backdrop that follow the sun down: full day
+with the sun 10 degrees up, gone 6 degrees under (civil twilight), eased
+between, a dusk tint while it is low, a night that keeps 0.7 of the
+hemisphere light in a blue-grey, a city's glow, so the streets stay
+readable (a true night would show nothing, and the demo opens at the
+real hour, which in Paris is night half the time). Underground the sky is
+hidden and the sun fades out with the earth tint (its shadows down
+there would be the buildings' above), and the station's own light
+comes up instead, the hemisphere light brightened to 1.6 and whitened,
+so the halls read as well as the street: the first build left them in
+the dark, the sun gone and nothing in its place.
+
+The map's batches cast and receive the shadows when the map is made
+with `shadows: true` (fills and extrusions; glass casts none), the
+ground mesh receives them, the robot casts. Lambert with flat shading,
+which the extrusions have had since M2, takes shadow maps as it is;
+the fills were unlit, the style's colours as a map draws them, and the
+first night shot had the pavements shining white in the dark: with
+`shadows` on they are Lambert too, and darken with the night and take
+a building's shadow. The lines (roads, casings, paths) are a shader of
+their own that no scene light reaches, so they take a `brightness`
+uniform, which `map.setBrightness` sets from the daylight, 1 by day
+and a quarter by night.
+
+Not here yet: post-processing (GTAO, SMAA, bloom) and lit windows at
+night; the frame cost on a real GPU is read off the HUD by hand, the
+VM's software renderer says nothing useful about it.
+
+Measured: 225 tests, among them the solstice sun 64 degrees up over
+Paris at noon and due south, the equinox sun at 90 minus the latitude,
+midnight well under the horizon, morning east and evening west, Paris
+hours in summer and winter, the day module's noon and night, and the
+batches' shadow flags on and off.
+
+![The rue de Rome at 08:00](../evidence/m5/walk-08.png)
+![At 14:00](../evidence/m5/walk-14.png)
+![At 22:00](../evidence/m5/walk-22.png)

@@ -19,6 +19,7 @@ attribute vec4 lineColor;
 uniform float pixelScale;  // local units per pixel at unit depth
 uniform vec3 propScale;    // uniform width, gap, offset (px)
 uniform vec3 diffuse;
+uniform float brightness;
 
 varying vec4 vColor;
 varying float vSide;
@@ -53,7 +54,7 @@ void main() {
 
 	gl_Position = projectionMatrix * mvPosition;
 	vSide = lineSide.x;
-	vColor = vec4( lineColor.rgb * diffuse, lineColor.a );
+	vColor = vec4( lineColor.rgb * diffuse * brightness, lineColor.a );
 
 	// the chunk reads mvPosition, which here is the extruded vertex
 	#include <fog_vertex>
@@ -94,6 +95,7 @@ export class VectorLineMaterial extends ShaderMaterial {
 				pixelScale: { value: 0.001 },
 				propScale: { value: new Vector3( 1, 1, 1 ) },
 				diffuse: { value: new Color( 1, 1, 1 ) },
+				brightness: { value: 1 }, // the day's light on a line, which no light reaches: 1 by day, less by night
 				opacity: { value: 1 },
 			} ] ),
 			vertexShader,
@@ -111,6 +113,18 @@ export class VectorLineMaterial extends ShaderMaterial {
 	get color() {
 
 		return this.uniforms.diffuse.value;
+
+	}
+
+	set brightness( value ) {
+
+		this.uniforms.brightness.value = value;
+
+	}
+
+	get brightness() {
+
+		return this.uniforms.brightness.value;
 
 	}
 

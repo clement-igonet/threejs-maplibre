@@ -86,34 +86,38 @@ const SHOTS = [
 	// on the stairs
 	{ name: 'indoor-route', page: 'indoor', query: '&level=all&explode=12&alt=320&pitch=60&heading=300&from=Sephora&to=Paul%401&t=0&speed=0.001' },
 	// the walk: on the rue de Rome, in the hall, and on the stairs down
-	{ name: 'walk-start', page: 'walk', query: '' },
-	{ name: 'walk-street', page: 'walk', query: '&go=1' },
-	{ name: 'walk-hall', page: 'walk', query: '&lat=48.8762&lon=2.3253&heading=250' },
+	{ name: 'walk-start', page: 'walk', query: '&hour=14' },
+	{ name: 'walk-street', page: 'walk', query: '&go=1&hour=14' },
+	// the same street at three hours: the sun, its shadows, the night
+	{ name: 'walk-08', page: 'walk', query: '&go=1&hour=8' },
+	{ name: 'walk-14', page: 'walk', query: '&go=1&hour=14' },
+	{ name: 'walk-22', page: 'walk', query: '&go=1&hour=22' },
+	{ name: 'walk-hall', page: 'walk', query: '&lat=48.8762&lon=2.3253&heading=250&hour=14' },
 	// the robot going down the stairs on the cour de Rome side, as a player saw it
 	// the names: in the mall on level -1, and on a street
-	{ name: 'walk-labels', page: 'walk', query: '&lat=48.87614&lon=2.32531&y=-2.85&heading=280' },
+	{ name: 'walk-labels', page: 'walk', query: '&lat=48.87614&lon=2.32531&y=-2.85&heading=280&hour=14' },
 	// a shop door in the street-level mall, as a player met it
 	// Chatelet-Les Halles: the start, at an entrance of the Forum
-	{ name: 'walk-chatelet', page: 'walk', query: '&place=chatelet&go=1' },
+	{ name: 'walk-chatelet', page: 'walk', query: '&place=chatelet&go=1&hour=14' },
 	// inside the lift's car at level 1, facing its doorway and the room beyond
-	{ name: 'walk-lift-car', page: 'walk', query: '&lat=48.876167&lon=2.326060&y=3.15&heading=3' },
+	{ name: 'walk-lift-car', page: 'walk', query: '&lat=48.876167&lon=2.326060&y=3.15&heading=3&hour=14' },
 	// level 1 of Saint-Lazare, facing the lift's car: its doorway
-	{ name: 'walk-lift-door', page: 'walk', query: '&lat=48.876178&lon=2.326061&y=3.15&heading=168' },
+	{ name: 'walk-lift-door', page: 'walk', query: '&lat=48.876178&lon=2.326061&y=3.15&heading=168&hour=14' },
 	// the rue Pierre Lescot northward: the Forum's facade on the left, where a
 	// room's wall on the building's line flickered
-	{ name: 'walk-facade', page: 'walk', query: '&place=chatelet&lat=48.861906&lon=2.348178&y=0&heading=12' },
+	{ name: 'walk-facade', page: 'walk', query: '&place=chatelet&lat=48.861906&lon=2.348178&y=0&heading=12&hour=14' },
 	// the rue Pierre Lescot from the Porte Lescot: the shops' labels along it
-	{ name: 'walk-shops', page: 'walk', query: '&place=chatelet&lat=48.86165&lon=2.34778&y=0&heading=70' },
-	{ name: 'walk-door', page: 'walk', query: '&lat=48.8761957&lon=2.3248466&y=0.15&heading=335' },
-	{ name: 'walk-down', page: 'walk', query: '&lat=48.875694&lon=2.324192&y=-0.6&heading=34' },
-	{ name: 'walk-stairs', page: 'walk', query: '&lat=48.87621&lon=2.32513&y=0.15&heading=180' },
+	{ name: 'walk-shops', page: 'walk', query: '&place=chatelet&lat=48.86165&lon=2.34778&y=0&heading=70&hour=14' },
+	{ name: 'walk-door', page: 'walk', query: '&lat=48.8761957&lon=2.3248466&y=0.15&heading=335&hour=14' },
+	{ name: 'walk-down', page: 'walk', query: '&lat=48.875694&lon=2.324192&y=-0.6&heading=34&hour=14' },
+	{ name: 'walk-stairs', page: 'walk', query: '&lat=48.87621&lon=2.32513&y=0.15&heading=180&hour=14' },
 	// at the foot of the escalators up to level 1, the hole in its floor ahead
 	// level -1 by McDonald's, facing the strip between the mapped rooms
 	// that a jump fell through before level outlines were floors
-	{ name: 'walk-gap', page: 'walk', query: '&lat=48.876152&lon=2.326191&y=-2.85&heading=158' },
+	{ name: 'walk-gap', page: 'walk', query: '&lat=48.876152&lon=2.326191&y=-2.85&heading=158&hour=14' },
 	// level -4, at a gap between two corridor polygons: earth around, not sky
-	{ name: 'walk-deep', page: 'walk', query: '&lat=48.875704&lon=2.326286&y=-11.85&heading=118' },
-	{ name: 'walk-escalator', page: 'walk', query: '&lat=48.8761525&lon=2.325062&y=1.8&heading=279' },
+	{ name: 'walk-deep', page: 'walk', query: '&lat=48.875704&lon=2.326286&y=-11.85&heading=118&hour=14' },
+	{ name: 'walk-escalator', page: 'walk', query: '&lat=48.8761525&lon=2.325062&y=1.8&heading=279&hour=14' },
 	{ name: 'indoor-walker', page: 'indoor', query: '&level=-1&from=Sephora&to=Ladur%C3%A9e&t=95&speed=0.001&follow=1' },
 ];
 
