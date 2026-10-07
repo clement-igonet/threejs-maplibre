@@ -9,6 +9,7 @@ import { Style } from '../src/style/Style.js';
 import { buildColliders, collideCapsule, groundBelow, raycastFirst } from '../src/three/colliders.js';
 import { appendFloor, appendRail, appendRamp, appendShaft, appendWallRun } from '../src/build/buildIndoor.js';
 import { CharacterController } from '../src/game/CharacterController.js';
+import { pointInRing } from '../src/indoor/IndoorGraph.js';
 import { latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/math/WebMercator.js';
 
 const { layers } = JSON.parse( readFileSync( new URL( '../demo/data/saint-lazare.json', import.meta.url ) ) );
@@ -375,6 +376,29 @@ describe( 'CharacterController', () => {
 		for ( let i = 0; i < 10 * 60; i ++ ) along.update( 1 / 60, { forward: 1, right: 0 } );
 		expect( along.position.x ).toBeGreaterThan( 12 );
 		expect( along.position.y ).toBeLessThan( - 2 );
+
+	} );
+
+	it( 'walks into the glass bubble over the Cour de Rome escalators, where a footway enters it', () => {
+
+		// a hand-play report: the Lentille (building 64046222, glass, no
+		// entrance node in OSM) was a closed shell; two footways cross its
+		// outline, and an opening is cut where they do
+		const lat = 48.875604, lon = 2.324175;
+		const tx = Math.floor( longitudeToNormalized( lon ) * 2 ** z ), ty = Math.floor( latitudeToNormalized( lat ) * 2 ** z );
+		const cols = [];
+		for ( let dx = - 1; dx <= 1; dx ++ ) for ( let dy = - 1; dy <= 1; dy ++ ) cols.push( ...buildColliders( buildTile( decodeVectorTile( tile( z, tx + dx, ty + dy ) ), style, { sourceId: 'openmaptiles', x: tx + dx, y: ty + dy, z, mode: 'planar' } ) ) );
+		const here = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( cols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
+		const [ x0, z0 ] = scene( lat, lon );
+		const k = 1 / Math.cos( lat * Math.PI / 180 );
+		const c = new CharacterController( here ).place( x0, 0, z0 );
+		c.heading = ( 90 - 354 ) * Math.PI / 180;
+		for ( let i = 0; i < 10 * 60; i ++ ) c.update( 1 / 60, { forward: 1, right: 0 } );
+		const walked = Math.hypot( c.position.x - x0, c.position.z - z0 ) / k;
+		expect( walked ).toBeGreaterThan( 10 ); // the bubble's wall is about 8 m away
+		const dome = layers.building.features.find( f => f.id === 64046222 ).geometry.coordinates[ 0 ].flat();
+		const lonNow = lon + ( c.position.x - x0 ) / k / ( 111320 * Math.cos( lat * Math.PI / 180 ) ), latNow = lat - ( c.position.z - z0 ) / k / 111320;
+		expect( pointInRing( lonNow, latNow, dome ) || c.position.y < - 0.5 ).toBe( true ); // inside it, or already down its escalator
 
 	} );
 

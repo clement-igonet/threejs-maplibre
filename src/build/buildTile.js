@@ -177,6 +177,57 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 		}
 
+		// and a footway that crosses a building's outline at street level
+		// enters it, whether or not OSM marks the entrance: an opening 2 m
+		// wide where it crosses (the glass bubble over the Cour de Rome
+		// escalators at Saint-Lazare has footways in and no entrance node)
+		if ( type === 'fill-extrusion' && ! indoor && tile.layers.transportation ) {
+
+			const ways = tile.layers.transportation;
+			const segments = [];
+			for ( let f = 0; f < ways.featureCount; f ++ ) {
+
+				const props = ways.properties[ f ];
+				if ( ways.types[ f ] !== 2 || props.class !== 'path' ) continue;
+				const levels = featureLevels( props );
+				if ( levels.length > 0 && ! levels.includes( 0 ) ) continue;
+				for ( const run of featureLines( ways, f, extent ) ) {
+
+					const p = run.points;
+					for ( let i = 0; i + 3 < p.length; i += 2 ) segments.push( [ p[ i ], p[ i + 1 ], p[ i + 2 ], p[ i + 3 ] ] );
+
+				}
+
+			}
+
+			if ( segments.length > 0 ) for ( let f = 0; f < sourceLayer.featureCount; f ++ ) {
+
+				if ( sourceLayer.types[ f ] !== 3 ) continue;
+				for ( const polygon of featurePolygons( sourceLayer, f, extent ) ) {
+
+					const ring = polygon[ 0 ];
+					let minX = Infinity, minY = Infinity, maxX = - Infinity, maxY = - Infinity;
+					for ( let i = 0; i < ring.length; i += 2 ) { minX = Math.min( minX, ring[ i ] ); maxX = Math.max( maxX, ring[ i ] ); minY = Math.min( minY, ring[ i + 1 ] ); maxY = Math.max( maxY, ring[ i + 1 ] ); }
+					for ( const [ ax, ay, bx, by ] of segments ) {
+
+						if ( Math.max( ax, bx ) < minX || Math.min( ax, bx ) > maxX || Math.max( ay, by ) < minY || Math.min( ay, by ) > maxY ) continue;
+						const n = ring.length / 2;
+						for ( let i = 0; i < n; i ++ ) {
+
+							const j = ( i + 1 ) % n;
+							const hit = segmentCrossing( ax, ay, bx, by, ring[ 2 * i ], ring[ 2 * i + 1 ], ring[ 2 * j ], ring[ 2 * j + 1 ] );
+							if ( hit ) ( entrances ??= [] ).push( [ hit[ 0 ], hit[ 1 ], 1.0 * unitsPerMeter, 2.5 ] );
+
+						}
+
+					}
+
+				}
+
+			}
+
+		}
+
 		// the stairwells of the tile: every floor a staircase or escalator
 		// climbs to gets a hole along it, 2 m wide, so it comes up through
 		const holesByLevel = new Map();
@@ -502,6 +553,19 @@ function tileCenterLatitude( y, z ) {
 // The extrusions of a layer in a tile, for asking which stand at a point:
 // their polygons in tile units with their [ base, height ], in a 16 x 16
 // grid of the tile so a query looks at a handful.
+// Where two segments cross, [ x, y ], or null when they do not
+function segmentCrossing( ax, ay, bx, by, cx, cy, dx, dy ) {
+
+	const r1x = bx - ax, r1y = by - ay, r2x = dx - cx, r2y = dy - cy;
+	const den = r1x * r2y - r1y * r2x;
+	if ( Math.abs( den ) < 1e-12 ) return null;
+	const t = ( ( cx - ax ) * r2y - ( cy - ay ) * r2x ) / den;
+	const u = ( ( cx - ax ) * r1y - ( cy - ay ) * r1x ) / den;
+	if ( t < 0 || t > 1 || u < 0 || u > 1 ) return null;
+	return [ ax + r1x * t, ay + r1y * t ];
+
+}
+
 function indexExtrusions( sourceLayer, layer, zoom, extent ) {
 
 	const cells = 16, size = extent / cells, grid = new Map();
