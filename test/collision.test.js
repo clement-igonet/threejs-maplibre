@@ -6,8 +6,8 @@ import { STATION_STYLE } from '../demo/station-style.js';
 import { buildTile } from '../src/build/buildTile.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
-import { buildColliders, collideCapsule, groundBelow, raycastFirst } from '../src/three/colliders.js';
-import { appendFloor, appendRail, appendRamp, appendShaft, appendWallRun } from '../src/build/buildIndoor.js';
+import { buildColliders, collideCapsule, conveyorAt, groundBelow, raycastFirst } from '../src/three/colliders.js';
+import { appendFloor, appendRail, appendRamp, appendShaft, appendSteps, appendWallRun } from '../src/build/buildIndoor.js';
 import { CharacterController } from '../src/game/CharacterController.js';
 import { pointInRing } from '../src/indoor/IndoorGraph.js';
 import { latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/math/WebMercator.js';
@@ -376,6 +376,47 @@ describe( 'CharacterController', () => {
 		for ( let i = 0; i < 10 * 60; i ++ ) along.update( 1 / 60, { forward: 1, right: 0 } );
 		expect( along.position.x ).toBeGreaterThan( 12 );
 		expect( along.position.y ).toBeLessThan( - 2 );
+
+	} );
+
+	it( 'climbs a staircase of steps and walks down it, and is carried by an escalator', () => {
+
+		const projection = { project( x, y, h, o ) { o[ 0 ] = x; o[ 1 ] = h; o[ 2 ] = y; return o; } };
+		const white = [ 255, 255, 255, 255 ];
+		// steps from (0, 0) at 0.15 up to (6, 0) at 3.15, a landing beyond
+		const out = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		appendSteps( out, [ 0, 0, 6, 0 ], projection, white, 2, 0.15, 3.15 );
+		appendFloor( out, [ [ 6, - 1, 10, - 1, 10, 1, 6, 1 ] ], projection, white, 3 );
+		const cols = buildColliders( { center: new Vector3(), blocks: [ { type: 'fill-extrusion', indoor: 'steps', level: 0, base: 0, positions: new Float32Array( out.positions ), indices: new Uint32Array( out.indices ) } ] } );
+		const map = { collideCapsule( a, b, r, o, feet ) { o.set( 0, 0, 0 ); o.onGround = false; return collideCapsule( cols, a, b, r, o, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
+		const up = new CharacterController( map ).place( - 1, 0, 0 );
+		up.heading = 0;
+		for ( let i = 0; i < 8 * 60; i ++ ) up.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( up.position.x ).toBeGreaterThan( 7 );
+		expect( up.position.y ).toBeCloseTo( 3.15, 2 );
+		const down = new CharacterController( map ).place( 8, 3.15, 0 );
+		down.heading = Math.PI;
+		for ( let i = 0; i < 8 * 60; i ++ ) down.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( down.position.x ).toBeLessThan( - 0.5 );
+		expect( down.position.y ).toBe( 0 );
+
+		// an escalator along +x at street level: standing still, carried at
+		// the belt's pace; one going the way one faces carries either way
+		const runs = [ { positions: [ 0, 0, 0, 10, 0, 0 ], halfWidth: 1, direction: 1 } ];
+		const belt = new Vector3();
+		expect( conveyorAt( runs, new Vector3(), new Vector3( 5, 0, 0.5 ), 1, 0, belt ) ).toBe( true );
+		expect( belt.x ).toBeCloseTo( 1, 9 );
+		expect( conveyorAt( runs, new Vector3(), new Vector3( 5, 0, 1.5 ), 1, 0, belt ) ).toBe( false ); // beside it
+		expect( conveyorAt( runs, new Vector3(), new Vector3( 5, 3, 0 ), 1, 0, belt ) ).toBe( false ); // over it
+		const either = [ { positions: [ 0, 0, 0, 10, 0, 0 ], halfWidth: 1, direction: 0 } ];
+		conveyorAt( either, new Vector3(), new Vector3( 5, 0, 0 ), - 1, 0, belt );
+		expect( belt.x ).toBeCloseTo( - 1, 9 );
+		const street = { collideCapsule( a, b, r, o ) { o.set( 0, 0, 0 ); o.onGround = false; return o; }, groundBelow() { return null; }, conveyorAt( p, fx, fz, o ) { return conveyorAt( runs, new Vector3(), p, fx, fz, o ); } };
+		const rider = new CharacterController( street, { beltSpeed: 0.5 } ).place( 2, 0, 0 );
+		for ( let i = 0; i < 4 * 60; i ++ ) rider.update( 1 / 60, { forward: 0, right: 0 } );
+		expect( rider.position.x ).toBeCloseTo( 4, 1 ); // 0.5 m/s for 4 s
+		expect( rider.conveyed ).toBe( true );
+		expect( rider.speed ).toBe( 0 ); // standing, as a rider does
 
 	} );
 

@@ -1525,3 +1525,47 @@ the platform in 3 min 7 s.
 ![And after](../evidence/m5/walk-rails-after.png)
 ![The way, from the forecourt](../evidence/m5/walk-way.png)
 ![Arrived on the Métro 13 platform](../evidence/m5/walk-done.png)
+
+### Into the bubble, steps on the stairs, escalators that carry
+
+Three more hand-play reports on the public demo, the day it went out.
+
+The glass bubble over the Cour de Rome escalators (the Lentille,
+building 64046222: `building:material=glass`, `roof:shape=dome`, 6 m)
+was drawn right, translucent, and could not be entered: OSM has two
+footways running into it and no entrance node on its outline. A path at
+street level that crosses a building's outline now cuts an opening 2 m
+wide where it does, as a mapped entrance does; the glass shell has its
+two ways in, and the walk down to the Métro begins where the footways
+say.
+
+Stairs are steps. A staircase was a smooth ramp, which reads as a slide;
+`appendSteps` builds it as risers 17 cm high (`STEP_RISER`) and the
+treads between, along the way from its lower end to its upper, both
+faces of each. The character climbs them as kerbs, under its step
+height, and walks down them as small drops, under the ledge; the rails
+and the stairwell are as before. A long flight is a few hundred
+triangles; the budget is measured on the Louvre, which has none.
+
+Escalators move. A staircase with `conveying=*` keeps the smooth ramp,
+and the built tile now carries its runs (`built.escalators`: the way's
+points with their heights in the tile's frame, a half width, a
+direction: 1 along the way for `forward`, -1 for `backward`, 0 for
+`reversible`, whichever way the rider faces). `conveyorAt` finds the run
+under a point, within its half width and 1.5 m of its height, and gives
+the belt's direction; the controller adds the belt's pace (0.5 m/s, an
+escalator's) to its velocity while standing on one, walking on it adds
+to that. Standing still the gait reads "on the escalator".
+
+Measured: 224 tests, among them the walk into the bubble from the rue
+de Rome, steps built with 17 cm risers over 3 m (18 of them, 19
+heights and nothing between) and climbed and walked down, the
+station's escalators recorded with their directions, the belt found
+under a point and not beside or over it, and a standing character
+carried 2 m in 4 s. In headless Chrome on the Cour de Rome escalator,
+standing still for 8 s: carried 4.2 m and 0.9 m up to the level 1
+landing, the gait reading "on the escalator" on the way and "standing"
+at the top.
+
+![The Métro stairs before: a ramp](../evidence/m5/walk-steps-before.png)
+![After: steps](../evidence/m5/walk-steps-after.png)

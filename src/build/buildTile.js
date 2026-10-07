@@ -1,7 +1,7 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
 import { pointInRing, ringCentroid } from '../indoor/IndoorGraph.js';
-import { FLOOR_THICKNESS, LIFT_DOOR_HEIGHT, LIFT_DOOR_WIDTH, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, appendFillWithHoles, insetRing, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
+import { FLOOR_THICKNESS, LIFT_DOOR_HEIGHT, LIFT_DOOR_WIDTH, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, appendFillWithHoles, insetRing, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendSteps, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -104,6 +104,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 	const t0 = performance.now();
 	const blocks = [];
+	const escalators = []; // the moving stairs, for the walk: runs in the built frame
 	const stats = { features: 0, vertices: 0, triangles: 0, buildMs: 0 };
 	let projection = null;
 
@@ -353,13 +354,34 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 					if ( indoor === 'steps' && runs && hi > lo ) {
 
 						const down = feature.properties.incline === 'down';
+						// an escalator (conveying=*) is a smooth ramp that moves the
+						// character (see escalators below); stairs are steps
+						const conveying = feature.properties.conveying;
+						const escalator = conveying !== undefined && conveying !== 'no';
 						for ( const run of runs ) {
+
+							const z0 = ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, z1 = ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS;
+							if ( escalator ) {
+
+								// the run in the built frame, with its heights, its half
+								// width in that frame, and which way the belt goes:
+								// 1 along the way, -1 against it, 0 whichever way one faces
+								const p = run.points, positions = [], v = [ 0, 0, 0 ];
+								const lengths = [ 0 ];
+								for ( let i = 2; i < p.length; i += 2 ) lengths.push( lengths[ lengths.length - 1 ] + Math.hypot( p[ i ] - p[ i - 2 ], p[ i + 1 ] - p[ i - 1 ] ) );
+								const total = lengths[ lengths.length - 1 ] || 1;
+								for ( let i = 0; i < p.length; i += 2 ) { projection.project( p[ i ], p[ i + 1 ], z0 + ( z1 - z0 ) * lengths[ i / 2 ] / total, v ); positions.push( v[ 0 ], v[ 1 ], v[ 2 ] ); }
+								projection.project( p[ 0 ], p[ 1 ], 0, v ); const ax = v[ 0 ], az = v[ 2 ];
+								projection.project( p[ 0 ] + unitsPerMeter, p[ 1 ], 0, v );
+								const scenePerMeter = Math.hypot( v[ 0 ] - ax, v[ 2 ] - az ) || 1;
+								escalators.push( { positions, halfWidth: STAIR_WIDTH / 2 * scenePerMeter, direction: conveying === 'forward' ? 1 : conveying === 'backward' ? - 1 : 0 } );
+
+							}
 
 							for ( const level of levels ) {
 
 								const target = levelBlock( level );
-								const z0 = ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, z1 = ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS;
-								const t = appendRamp( target, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1 );
+								const t = escalator ? appendRamp( target, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1 ) : appendSteps( target, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1 );
 								if ( t > 0 ) { target.triangles += t; target.features ++; }
 								// the balustrades, in a block of their own: solid from
 								// every side, where the ramp holds from above only
@@ -521,7 +543,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 	}
 
 	stats.buildMs = performance.now() - t0;
-	return { blocks, stats, center: projection ? projection.center : null };
+	return { blocks, stats, center: projection ? projection.center : null, escalators };
 
 }
 
