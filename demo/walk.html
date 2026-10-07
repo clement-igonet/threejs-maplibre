@@ -24,6 +24,23 @@
 			#labels div.shop, #labels div.room { border-left: 3px solid #d9452b; }
 			#labels div.corridor, #labels div.area { background: rgba(230, 240, 250, 0.85); }
 			#ledge { position: absolute; left: 50%; top: 30%; transform: translateX( -50% ); padding: 8px 14px; font: bold 14px ui-monospace, monospace; color: #fff; background: rgba(20, 40, 60, 0.75); border-radius: 6px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+			#start, #done { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(12, 20, 28, 0.72); z-index: 3; }
+			#start .card, #done .card { max-width: 440px; margin: 16px; padding: 22px 26px; font: 15px/1.5 system-ui, sans-serif; color: #fff; background: rgba(20, 40, 60, 0.92); border-radius: 12px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); }
+			#start h1, #done h1 { margin: 0 0 6px; font-size: 22px; }
+			#start .goal, #done .time { margin: 10px 0; padding: 10px 12px; border-radius: 8px; background: rgba(217, 69, 43, 0.85); font-weight: bold; }
+			#start .keys { margin: 8px 0; color: #dde; font-size: 13px; }
+			#start .keys kbd { display: inline-block; min-width: 14px; padding: 0 5px; margin: 0 1px; font: bold 11px ui-monospace, monospace; text-align: center; color: #222; background: #eee; border-radius: 3px; box-shadow: 0 1px 0 #999; }
+			#start button, #done button { margin-top: 10px; padding: 10px 22px; font: bold 16px system-ui, sans-serif; color: #fff; background: #d9452b; border: 0; border-radius: 8px; cursor: pointer; }
+			#start button:disabled { background: #666; cursor: wait; }
+			#start .places, #done .places { margin-top: 12px; font-size: 13px; color: #cde; }
+			#start .places a, #done .places a { color: #fff; }
+			#goal { position: absolute; top: 48px; right: 8px; padding: 6px 12px; font: 13px/1.5 system-ui, sans-serif; color: #fff; background: rgba(20, 40, 60, 0.75); border-radius: 8px; pointer-events: none; text-align: right; }
+			#goal b { color: #ffb199; }
+			#way { position: absolute; top: 104px; right: 8px; padding: 5px 10px; font: 12px system-ui, sans-serif; color: #fff; background: rgba(20, 40, 60, 0.75); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 6px; cursor: pointer; }
+			#way.on { background: #d9452b; }
+			body.touch #goal { top: 48px; font-size: 12px; }
+			body.touch #way { top: 100px; }
+			.hidden { display: none !important; }
 			#edge { position: absolute; left: 50%; top: 30%; transform: translateX( -50% ); padding: 8px 14px; font: bold 14px ui-monospace, monospace; color: #fff; background: rgba(217, 69, 43, 0.85); border-radius: 6px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 			/* the touch controls: a joystick bottom left, a jump button bottom right */
 			#stick { position: absolute; left: 24px; bottom: 56px; width: 150px; height: 150px; border-radius: 50%; display: none; touch-action: none; user-select: none; -webkit-user-select: none;
@@ -51,6 +68,24 @@
 		<div id="stick"><div class="knob"><div class="label">walk</div></div></div>
 		<div id="stick-caption" style="z-index: 1">drag the dot to walk and turn, to the red rim to run</div>
 		<button id="jump">jump</button>
+		<div id="goal"></div>
+		<button id="way">show the way (H)</button>
+		<div id="start"><div class="card">
+			<h1>A walk: <span class="place"></span></h1>
+			<div>Real OpenStreetMap streets, a real station, every wall and stair solid. Find your way in and down.</div>
+			<div class="goal">Goal: reach <span class="target"></span></div>
+			<div class="keys keyboard"><kbd>W</kbd> walk &nbsp;<kbd>A</kbd><kbd>D</kbd> turn &nbsp;<kbd>S</kbd> back &nbsp;<kbd>Shift</kbd> run &nbsp;<kbd>Space</kbd> jump &nbsp;<kbd>H</kbd> show the way &nbsp;drag to look round</div>
+			<div class="keys touch">Drag the dot to walk and turn, to its red rim to run. Tap jump to jump. "Show the way" draws the route.</div>
+			<button id="play" disabled>loading the streets…</button>
+			<div class="places">Elsewhere: <span class="links"></span></div>
+		</div></div>
+		<div id="done" class="hidden"><div class="card">
+			<h1>You made it</h1>
+			<div><span class="target"></span>, from the street.</div>
+			<div class="time">Your time: <span class="clock"></span></div>
+			<button id="again">walk again</button>
+			<div class="places">Elsewhere: <span class="links"></span></div>
+		</div></div>
 		<div id="version"></div>
 		<div id="attribution"></div>
 		<script type="module">
@@ -64,11 +99,21 @@
 			//
 			//   ?lat=&lon=&y=   where to start (the rue de Rome by default)
 			//   ?heading=       the camera's, degrees clockwise from north
+			//   ?place=         saint-lazare (default) or chatelet
+			//   ?go=1           no start screen (a URL with lat= skips it too)
+			//
+			// The game: a goal per place, a platform deep under the station,
+			// to reach from the street; the time it takes; the way there drawn
+			// on request from the indoor graph (M4) as a line through the
+			// floors, from where the character stands.
 
 
 			import { AnimationMixer, BufferAttribute, BufferGeometry, Clock, Color, DirectionalLight, DoubleSide, Group, HemisphereLight, Mesh, MeshBasicMaterial, MeshLambertMaterial, PerspectiveCamera, PlaneGeometry, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
 			import * as THREE_NS from 'three';
 			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+			import { Line2 } from 'three/addons/lines/Line2.js';
+			import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+			import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 			import { AttributionControl, MAPLIBRE_FOV, Style, VectorTileMap, createFog, latitudeToNormalized, longitudeToNormalized, metersToNormalized, normalizedToLatitude, normalizedToLongitude, normalizedToMeters } from '../src/index.js';
 			import { Places } from '../src/game/Places.js';
 			import { featureLevels, stairwell, subtractConvex } from '../src/build/buildIndoor.js';
@@ -84,8 +129,8 @@
 			// the places to walk: an extract each (scripts/osm-extract.mjs), a
 			// name, and where to start, near the entrance closest to a point
 			const PLACES = {
-				'saint-lazare': { name: 'Saint-Lazare', data: new URL( './data/saint-lazare.json', import.meta.url ), near: [ 2.3245, 48.8762 ], heading: 20 },
-				'chatelet': { name: 'Châtelet-Les Halles', data: new URL( './data/chatelet.json', import.meta.url ), near: [ 2.3469, 48.8619 ], heading: 0 },
+				'saint-lazare': { name: 'Saint-Lazare', data: new URL( './data/saint-lazare.json', import.meta.url ), near: [ 2.3245, 48.8762 ], heading: 20, goal: { name: 'Métro 13: Châtillon-Montrouge', level: - 4, text: 'the Métro 13 platform towards Châtillon-Montrouge, four levels down' } },
+				'chatelet': { name: 'Châtelet-Les Halles', data: new URL( './data/chatelet.json', import.meta.url ), near: [ 2.347777, 48.861623 ], heading: 0, goal: { name: 'Quai 1', level: - 5, text: 'RER platform 1, five levels down' } },
 			};
 			const placeKey = PLACES[ params.get( 'place' ) ] ? params.get( 'place' ) : 'saint-lazare';
 			const place = PLACES[ placeKey ];
@@ -218,6 +263,8 @@
 				root.add( ground );
 
 			}
+			const lonLatOf = p => { const [ nx, ny ] = metersToNormalized( p.x, - p.z ); return [ normalizedToLongitude( nx ), normalizedToLatitude( ny ) ]; };
+			const levelOf = y => Math.round( ( y - 0.15 ) / 3 );
 			const [ sx, sz ] = toScene( startLat, startLon );
 			// the map's frame is Web Mercator meters, 1 / cos( latitude ) of a
 			// ground meter (1.52 here): speeds are given in ground meters and
@@ -246,6 +293,51 @@
 
 			}
 			character.heading = ( 90 - num( 'heading', startHeading ) ) * Math.PI / 180; // facing where the camera looks
+
+			// --- the game: a goal, a clock, the way there on request -------------
+			const graph = places.graph;
+			const goalNode = graph.nodes.find( n => n.kind === 'space' && n.name === place.goal.name && n.level === place.goal.level ) ?? null;
+			const goal = { ...place.goal, node: goalNode, x: 0, z: 0, reached: false, startedAt: 0, seconds: 0 };
+			if ( goalNode ) { const { lon, lat } = graph.toLonLat( goalNode.x, goalNode.y ); [ goal.x, goal.z ] = toScene( lat, lon ); }
+			const startBox = document.getElementById( 'start' ), doneBox = document.getElementById( 'done' ), goalBox = document.getElementById( 'goal' ), wayButton = document.getElementById( 'way' ), playButton = document.getElementById( 'play' );
+			for ( const el of document.querySelectorAll( '#start .place' ) ) el.textContent = place.name;
+			for ( const el of document.querySelectorAll( '.target' ) ) el.textContent = goal.text;
+			for ( const el of document.querySelectorAll( '.links' ) ) el.innerHTML = Object.entries( PLACES ).filter( ( [ key ] ) => key !== placeKey ).map( ( [ key, p ] ) => `<a href="?place=${ key }">${ p.name }</a>` ).join( ', ' );
+			let playing = params.get( 'go' ) === '1' || params.has( 'lat' );
+			if ( playing ) startBox.classList.add( 'hidden' );
+			const startGame = () => { if ( playing ) return; playing = true; startBox.classList.add( 'hidden' ); goal.startedAt = performance.now(); };
+			playButton.addEventListener( 'click', startGame );
+			window.addEventListener( 'keydown', e => { if ( ( e.key === 'Enter' || e.key === ' ' ) && ! playButton.disabled && ! playing ) { e.preventDefault(); startGame(); } } );
+			document.getElementById( 'again' ).addEventListener( 'click', () => { location.href = location.pathname + ( placeKey === 'saint-lazare' ? '' : `?place=${ placeKey }` ); } );
+			const clockText = ms => { const s = Math.floor( ms / 1000 ); return `${ Math.floor( s / 60 ) }:${ String( s % 60 ).padStart( 2, '0' ) }`; };
+
+			// the way: the graph's route from the character to the goal, a
+			// line 40 cm over the floors, through the stairwells; drawn in the
+			// root so it moves with the floating origin
+			const wayMaterial = new LineMaterial( { color: 0xd9452b, linewidth: 5, depthTest: false, transparent: true, opacity: 0.9, resolution: new THREE_NS.Vector2( window.innerWidth, window.innerHeight ) } );
+			let wayLine = null, way = null;
+			function showWay( on ) {
+
+				if ( wayLine ) { root.remove( wayLine ); wayLine.geometry.dispose(); wayLine = null; way = null; }
+				wayButton.classList.toggle( 'on', on );
+				if ( ! on || ! goalNode ) return;
+				const [ lon, lat ] = lonLatOf( character.position );
+				const from = graph.toMeters( lon, lat );
+				way = graph.route( { x: from.x, y: from.y, level: levelOf( character.position.y ) }, { x: goalNode.x, y: goalNode.y, level: goalNode.level } );
+				if ( ! way ) { wayButton.classList.remove( 'on' ); return; }
+				const positions = way.path.flatMap( p => { const { lon, lat } = graph.toLonLat( p.x, p.y ); const [ x, z ] = toScene( lat, lon ); return [ x, p.level * 3 + 0.4, z ]; } );
+				const geometry = new LineGeometry();
+				geometry.setPositions( positions );
+				wayLine = new Line2( geometry, wayMaterial );
+				wayLine.computeLineDistances();
+				wayLine.renderOrder = 1000;
+				root.add( wayLine );
+
+			}
+
+			wayButton.addEventListener( 'click', () => showWay( ! wayLine ) );
+			window.addEventListener( 'keydown', e => { if ( e.key === 'h' || e.key === 'H' ) showWay( ! wayLine ); } );
+			wayButton.classList.toggle( 'hidden', ! goalNode );
 			const stick = document.getElementById( 'stick' );
 			const input = new Input().attach( renderer.domElement ).joystick( stick, stick.querySelector( '.knob' ), stick.querySelector( '.label' ) ).button( document.getElementById( 'jump' ), 'jump' );
 			if ( navigator.maxTouchPoints > 0 ) document.body.classList.add( 'touch' );
@@ -292,8 +384,6 @@
 			const whereBox = document.getElementById( 'where' ), labelBox = document.getElementById( 'labels' );
 			const labelPool = [];
 			let nearbyLabels = [], lastPlaces = - Infinity;
-			const lonLatOf = p => { const [ nx, ny ] = metersToNormalized( p.x, - p.z ); return [ normalizedToLongitude( nx ), normalizedToLatitude( ny ) ]; };
-			const levelOf = y => Math.round( ( y - 0.15 ) / 3 );
 			const _label = new Vector3(), _eye = new Vector3();
 			function updatePlaces( now ) {
 
@@ -302,6 +392,23 @@
 				const [ lon, lat ] = lonLatOf( character.position );
 				const level = levelOf( character.position.y );
 				const w = places.where( lon, lat, level );
+				if ( goalNode ) {
+
+					const away = Math.hypot( character.position.x - goal.x, character.position.z - goal.z ) / mercator;
+					const levels = level - goal.level;
+					if ( ! goal.reached && playing ) goal.seconds = ( now - goal.startedAt ) / 1000;
+					goalBox.innerHTML = `<b>${ escape( goal.name ) }</b> · level ${ goal.level }<br>${ Math.round( away ) } m away${ levels > 0 ? `, ${ levels } level${ levels > 1 ? 's' : '' } down` : levels < 0 ? `, ${ - levels } level${ levels < - 1 ? 's' : '' } up` : '' } · ${ clockText( goal.seconds * 1000 ) }${ way ? `<br>the way: ${ Math.round( way.seconds / 60 ) } min ${ Math.round( way.seconds % 60 ) } s` : '' }`;
+					if ( ! goal.reached && playing && w.space === goal.name && level === goal.level ) {
+
+						goal.reached = true;
+						doneBox.querySelector( '.clock' ).textContent = clockText( goal.seconds * 1000 );
+						doneBox.classList.remove( 'hidden' );
+						showWay( false );
+
+					}
+
+				}
+
 				const name = w.space ?? ( w.indoor ? ( w.kind === 'corridor' ? 'corridor' : 'hall' ) : w.street ) ?? w.building ?? place.name;
 				const sub = w.indoor && w.building && w.building !== name ? w.building : '';
 				whereBox.innerHTML = ( w.indoor ? `<span class="level">level ${ level }</span>` : '' ) + escape( name ) + ( sub ? `<span class="sub">${ escape( sub ) }</span>` : '' );
@@ -364,7 +471,8 @@
 				// have landed there is nothing to stand on, and it would fall
 				// through the floor it starts on
 				if ( ! started ) started = map.stats.loading === 0 && map.stats.rendered > 0;
-				if ( started ) character.update( dt, input );
+				if ( started && playButton.disabled ) { playButton.disabled = false; playButton.textContent = 'Start'; }
+				if ( started && playing && ! goal.reached ) character.update( dt, input );
 				// the camera stays behind the character: left and right turn
 				// it, and the camera turns with it, so the way it goes is
 				// always ahead on the screen. A drag looks round; the camera
@@ -431,6 +539,7 @@
 				camera.aspect = window.innerWidth / window.innerHeight;
 				camera.updateProjectionMatrix();
 				renderer.setSize( window.innerWidth, window.innerHeight );
+				wayMaterial.resolution.set( window.innerWidth, window.innerHeight );
 
 			} );
 
@@ -439,6 +548,11 @@
 			window.__CHARACTER = character;
 			window.__INPUT = input;
 			window.__CAMERA_HEADING = () => cameraHeading;
+			window.__GOAL = goal;
+			window.__PLAY = startGame;
+			window.__WAY = () => ( { line: wayLine, way, show: showWay } );
+			window.__GRAPH = () => graph;
+			window.__TOSCENE = toScene;
 			window.__ANIMATIONS = gltf.animations.map( c => c.name );
 			window.__PLAYING = () => current.getClip().name;
 			window.THREE_Box3Probe = function ( object ) { const { Box3 } = THREE_NS; const b = new Box3().setFromObject( object ); this.size = b.getSize( new Vector3() ).toArray().map( v => Math.round( v * 100 ) / 100 ); this.min = b.min.toArray().map( v => Math.round( v * 100 ) / 100 ); };

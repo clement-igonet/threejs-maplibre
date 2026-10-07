@@ -7,6 +7,35 @@ const places = new Places( layers );
 
 describe( 'Places', () => {
 
+	it( 'routes from the walk demo\'s start to its goal, at both places', () => {
+
+		// the demo's goals (demo/walk.html): a platform deep under each
+		// station, routed from the spot 8 m outside the entrance it starts at
+		const walks = [
+			{ data: 'saint-lazare', start: [ 2.324587, 48.875896 ], goal: [ 'Métro 13: Châtillon-Montrouge', - 4 ] },
+			// Porte Lescot: the Lego store's own door, nearer the old start, joins no corridor in the data
+			{ data: 'chatelet', start: [ 2.347777, 48.861695 ], goal: [ 'Quai 1', - 5 ] },
+		];
+		for ( const { data, start, goal } of walks ) {
+
+			const p = data === 'saint-lazare' ? places : new Places( JSON.parse( readFileSync( new URL( `../demo/data/${ data }.json`, import.meta.url ) ) ).layers );
+			const g = p.graph;
+			const target = g.nodes.find( n => n.kind === 'space' && n.name === goal[ 0 ] && n.level === goal[ 1 ] );
+			expect( target, `${ data }: ${ goal[ 0 ] }` ).toBeTruthy();
+			const from = g.toMeters( start[ 0 ], start[ 1 ] );
+			const route = g.route( { x: from.x, y: from.y, level: 0 }, { x: target.x, y: target.y, level: target.level } );
+			expect( route, `${ data }: a route` ).not.toBeNull();
+			expect( route.path[ route.path.length - 1 ].level ).toBe( goal[ 1 ] );
+			expect( route.seconds ).toBeGreaterThan( 120 );
+			expect( route.seconds ).toBeLessThan( 600 );
+			// standing at the goal's centre is being there
+			const { lon, lat } = g.toLonLat( target.x, target.y );
+			expect( p.where( lon, lat, goal[ 1 ] ).space ).toBe( goal[ 0 ] );
+
+		}
+
+	} );
+
 	it( 'names the space a character stands in, with its building', () => {
 
 		// Sephora, on level -1 of the station's mall

@@ -1389,3 +1389,45 @@ headings fall into the gap and come back.
 
 ![Level -1, facing the strip: before, a hole](../evidence/m5/walk-gap-before.png)
 ![After, the level's floor](../evidence/m5/walk-gap-after.png)
+
+### The game: a goal, a clock, the way there
+
+The walk is now something to finish. A start screen names the place and
+the goal, a platform deep under the station: at Saint-Lazare the Métro
+13 platform towards Châtillon-Montrouge, four levels down; at
+Châtelet-Les Halles RER platform 1, five levels down. The streets load
+behind the screen and Start comes on when they have landed, so the
+first step is on solid ground. From then a clock runs and a box keeps
+the goal in view: its name, its level, the distance as the crow flies,
+the levels still to go down. Standing in the goal's space on its level
+ends the walk with the time, and a button to walk again.
+
+The way there is drawn on request (H, or the button): M4's indoor graph
+routed with A* from where the character stands, through the entrance,
+the hall, the stairs, to the platform, as a line 40 cm over the floors
+in the floating-origin root. At Saint-Lazare the graph says 4 min 16 s
+on foot, through levels 0, -1 and -2 to -4; the line is the proof that
+the route the walker takes and the floors the character walks are the
+same data.
+
+Châtelet's start moved to the Porte Lescot. The entrance nearest the
+old start is the Lego store's own door, and its room joins no corridor
+in the data: the station's walking graph there has 110 components, and
+the Lego store is in one of 13 nodes. Porte Lescot joins the big one
+(645 nodes, levels -5 to 0), and from 8 m outside it the graph routes to
+platform 1 in 206 s.
+
+Measured: 212 tests, among them the route from each place's start to
+its goal and the goal's space found under its centre. In headless
+Chrome at Saint-Lazare: the start screen, Start by Enter, the way drawn
+in one frame (256 s, 8 points), and the character placed on the platform
+seen as arrived within 2.5 s, the time shown.
+
+The recorded walk: the robot driven along the route in headless Chrome
+(a frame every 3 s of walk time, the way shown), from the forecourt to
+the platform in 3 min 7 s.
+
+![The recorded walk](../evidence/m5/walk-recorded.gif)
+![The start screen](../evidence/m5/walk-start.png)
+![The way, from the forecourt](../evidence/m5/walk-way.png)
+![Arrived on the Métro 13 platform](../evidence/m5/walk-done.png)

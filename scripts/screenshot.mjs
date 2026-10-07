@@ -86,14 +86,15 @@ const SHOTS = [
 	// on the stairs
 	{ name: 'indoor-route', page: 'indoor', query: '&level=all&explode=12&alt=320&pitch=60&heading=300&from=Sephora&to=Paul%401&t=0&speed=0.001' },
 	// the walk: on the rue de Rome, in the hall, and on the stairs down
-	{ name: 'walk-street', page: 'walk', query: '' },
+	{ name: 'walk-start', page: 'walk', query: '' },
+	{ name: 'walk-street', page: 'walk', query: '&go=1' },
 	{ name: 'walk-hall', page: 'walk', query: '&lat=48.8762&lon=2.3253&heading=250' },
 	// the robot going down the stairs on the cour de Rome side, as a player saw it
 	// the names: in the mall on level -1, and on a street
 	{ name: 'walk-labels', page: 'walk', query: '&lat=48.87614&lon=2.32531&y=-2.85&heading=280' },
 	// a shop door in the street-level mall, as a player met it
 	// Chatelet-Les Halles: the start, at an entrance of the Forum
-	{ name: 'walk-chatelet', page: 'walk', query: '&place=chatelet' },
+	{ name: 'walk-chatelet', page: 'walk', query: '&place=chatelet&go=1' },
 	{ name: 'walk-door', page: 'walk', query: '&lat=48.8761957&lon=2.3248466&y=0.15&heading=335' },
 	{ name: 'walk-down', page: 'walk', query: '&lat=48.875694&lon=2.324192&y=-0.6&heading=34' },
 	{ name: 'walk-stairs', page: 'walk', query: '&lat=48.87621&lon=2.32513&y=0.15&heading=180' },
