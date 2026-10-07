@@ -4,7 +4,7 @@ import { PerspectiveCamera } from 'three';
 import { createGeoJSONVectorSource } from '../demo/geojson-vector-source.js';
 import { STATION_STYLE } from '../demo/station-style.js';
 import { buildTile } from '../src/build/buildTile.js';
-import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex } from '../src/build/buildIndoor.js';
+import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex, STAIR_WIDTH, STAIRWELL_WIDTH } from '../src/build/buildIndoor.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { VectorTileMap } from '../src/three/VectorTileMap.js';
@@ -145,6 +145,9 @@ describe( 'indoor', () => {
 		expect( rails0[ 0 ].triangles ).toBe( 2 * steps0[ 0 ].triangles ); // two walls of as many quads as the ramp
 		const ry = ys( rails0[ 0 ] );
 		expect( Math.max( ...ry ) - Math.max( ...y ) ).toBeCloseTo( 1.1, 6 );
+		// the hole above a staircase is 10 cm wider than the stairs and no
+		// more, so nothing beside the rails is open to the floor below
+		expect( STAIRWELL_WIDTH - STAIR_WIDTH ).toBeCloseTo( 0.1, 9 );
 
 	} );
 

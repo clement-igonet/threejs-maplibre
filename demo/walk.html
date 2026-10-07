@@ -116,7 +116,7 @@
 			import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 			import { AttributionControl, MAPLIBRE_FOV, Style, VectorTileMap, createFog, latitudeToNormalized, longitudeToNormalized, metersToNormalized, normalizedToLatitude, normalizedToLongitude, normalizedToMeters } from '../src/index.js';
 			import { Places } from '../src/game/Places.js';
-			import { featureLevels, stairwell, subtractConvex } from '../src/build/buildIndoor.js';
+			import { STAIRWELL_WIDTH, featureLevels, stairwell, subtractConvex } from '../src/build/buildIndoor.js';
 			import { CharacterController } from '../src/game/CharacterController.js';
 			import { Input } from '../src/game/Input.js';
 			import { createGeoJSONVectorSource } from './geojson-vector-source.js';
@@ -258,7 +258,7 @@
 					const p = f.properties;
 					if ( p.subclass !== 'steps' || ! featureLevels( p ).slice( 1 ).includes( 0 ) || f.geometry.type !== 'LineString' ) continue;
 					const points = f.geometry.coordinates.flatMap( ( [ lon, lat ] ) => { const [ x, z ] = toScene( lat, lon ); return [ x - gx, z - gz ]; } );
-					quads.push( ...stairwell( points, 2 * k ) );
+					quads.push( ...stairwell( points, STAIRWELL_WIDTH * k ) );
 
 				}
 

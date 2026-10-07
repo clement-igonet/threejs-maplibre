@@ -1,6 +1,6 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
-import { FLOOR_THICKNESS, appendFillWithHoles, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
+import { FLOOR_THICKNESS, STAIR_WIDTH, STAIRWELL_WIDTH, appendFillWithHoles, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -188,7 +188,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 				if ( ways.types[ f ] !== 2 || props.subclass !== 'steps' ) continue;
 				const levels = featureLevels( props );
 				if ( levels.length < 2 ) continue;
-				const quads = featureLines( ways, f, extent ).flatMap( run => stairwell( run.points, 2 * unitsPerMeter ) );
+				const quads = featureLines( ways, f, extent ).flatMap( run => stairwell( run.points, STAIRWELL_WIDTH * unitsPerMeter ) );
 				for ( const level of levels.slice( 1 ) ) {
 
 					if ( ! holesByLevel.has( level ) ) holesByLevel.set( level, [] );
@@ -307,12 +307,12 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 								const target = levelBlock( level );
 								const z0 = ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, z1 = ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS;
-								const t = appendRamp( target, run.points, projection, rgba, 1.5 * unitsPerMeter, z0, z1 );
+								const t = appendRamp( target, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1 );
 								if ( t > 0 ) { target.triangles += t; target.features ++; }
 								// the balustrades, in a block of their own: solid from
 								// every side, where the ramp holds from above only
 								const rails = levelBlock( level, 'rail' );
-								const tr = appendRail( rails, run.points, projection, rgba, 1.5 * unitsPerMeter, z0, z1, RAIL_HEIGHT );
+								const tr = appendRail( rails, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1, RAIL_HEIGHT );
 								if ( tr > 0 ) { rails.triangles += tr; rails.features ++; }
 
 							}

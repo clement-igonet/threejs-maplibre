@@ -28,6 +28,14 @@ export function featureLevels( properties ) {
 
 }
 
+// A staircase or an escalator is built this wide, in meters, and the
+// stairwell cut in the floors above it a little wider: the rails up the
+// ramp's edges stand at the hole's edge, and no strip of hole is left
+// beside them to fall through (2 m holes beside 1.5 m ramps left one,
+// 0.25 m beside each, a meter where two escalators ran side by side)
+export const STAIR_WIDTH = 1.5;
+export const STAIRWELL_WIDTH = 1.6;
+
 export function appendFloor( out, polygon, projection, rgba, base ) {
 
 	return appendExtrusion( out, polygon, projection, rgba, base, base + FLOOR_THICKNESS );

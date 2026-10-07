@@ -1446,6 +1446,15 @@ character from above only, the rail is solid from every side at any
 height, as a wall is only on its own level. The rails fence the
 stairwell cut in the floor above as well.
 
+The third: from the top of the escalators on level 1 a jump still got
+down. The stairwell cut in a floor was 2 m wide over a 1.5 m ramp, so
+a 25 cm strip of hole ran beside each rail, and where two escalators
+run side by side the strips added up to a meter of nothing between the
+rails: a running jump north-east from the landing fell through to
+level 0. The hole is now 10 cm wider than the stairs (`STAIRWELL_WIDTH`
+over `STAIR_WIDTH`, in the walk page's ground too), so the rails stand
+at the hole's edge and the floor between two escalators is floor.
+
 The recorded walk: the robot driven along the route in headless Chrome
 (a frame every 3 s of walk time, the way shown), from the forecourt to
 the platform in 3 min 7 s.
