@@ -421,11 +421,46 @@ export function insetRing( ring, distance ) {
 
 // A lift shaft: four walls of a square of the given side (run units)
 // around a point, from the lowest level served to the top of the highest.
-export function appendShaft( out, x, y, projection, rgba, side, z0, z1 ) {
+// With an opening, one side (0 north, 1 east, 2 south, 3 west, in tile
+// axes where y grows south) is the doorway: two jambs the full height
+// and, over a door doorHeight tall at every level served, a lintel up
+// to the next level's floor. The character walks into the car and rides.
+export const LIFT_DOOR_WIDTH = 1.1; // meters
+export const LIFT_DOOR_HEIGHT = 2.2;
+export function appendShaft( out, x, y, projection, rgba, side, z0, z1, opening = null ) {
 
 	const h = side / 2;
 	const ring = [ x - h, y - h, x + h, y - h, x + h, y + h, x - h, y + h ];
-	return appendWallRun( out, ring, projection, rgba, z0, z1, true );
+	if ( opening === null ) return appendWallRun( out, ring, projection, rgba, z0, z1, true );
+	const { side: s, levels, levelHeight, doorWidth, doorHeight } = opening;
+	let triangles = 0;
+	// the three whole sides: the run from the doorway's far end round to its near end
+	const run = [];
+	for ( let k = 1; k <= 4; k ++ ) { const i = ( s + k ) % 4; run.push( ring[ 2 * i ], ring[ 2 * i + 1 ] ); }
+	triangles += appendWallRun( out, run, projection, rgba, z0, z1, false );
+	// the doorway's side, from a to b, the door centred on it
+	const ax = ring[ 2 * s ], ay = ring[ 2 * s + 1 ], bx = ring[ ( 2 * s + 2 ) % 8 ], by = ring[ ( 2 * s + 3 ) % 8 ];
+	const len = Math.hypot( bx - ax, by - ay ), ux = ( bx - ax ) / len, uy = ( by - ay ) / len;
+	const jamb = Math.max( 0, ( len - doorWidth ) / 2 );
+	const p = ( t ) => [ ax + ux * t, ay + uy * t ];
+	const [ j1x, j1y ] = p( jamb ), [ j2x, j2y ] = p( len - jamb );
+	if ( jamb > 0 ) {
+
+		triangles += appendWallRun( out, [ ax, ay, j1x, j1y ], projection, rgba, z0, z1, false );
+		triangles += appendWallRun( out, [ j2x, j2y, bx, by ], projection, rgba, z0, z1, false );
+
+	}
+
+	const sorted = [ ...levels ].sort( ( a, b ) => a - b );
+	for ( let i = 0; i < sorted.length; i ++ ) {
+
+		const top = sorted[ i ] * levelHeight + doorHeight;
+		const next = i + 1 < sorted.length ? sorted[ i + 1 ] * levelHeight : z1;
+		if ( next > top ) triangles += appendWallRun( out, [ j1x, j1y, j2x, j2y ], projection, rgba, top, Math.min( next, z1 ), false );
+
+	}
+
+	return triangles;
 
 }
 

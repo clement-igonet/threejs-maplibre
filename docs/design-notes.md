@@ -1417,14 +1417,19 @@ the Lego store is in one of 13 nodes. Porte Lescot joins the big one
 (645 nodes, levels -5 to 0), and from 8 m outside it the graph routes to
 platform 1 in 206 s.
 
-Measured: 214 tests, among them the route from each place's start to
+Measured: 220 tests, among them the route from each place's start to
 its goal and the goal's space found under its centre, a staircase cut
 into the street walked down and walked over where the street is whole,
-and on a railed ramp a step and a jump across stopped by the rail while
-the walk along it goes down. In headless
-Chrome at Saint-Lazare: the start screen, Start by Enter, the way drawn
-in one frame (256 s, 8 points), and the character placed on the platform
-seen as arrived within 2.5 s, the time shown.
+on a railed ramp a step and a jump across stopped by the rail while the
+walk along it goes down, the shops labelled round the Porte Lescot, a
+ring moved inward and a door cutting an edge from just past its end,
+the lift by the Métro 13 corridor with its five levels, a shaft's
+doorway built with its jambs and lintels, and a walk into the car
+through it and not through its walls. In headless Chrome at
+Saint-Lazare: from the lift room on level 1 the panel shows dimmed,
+the walk to the car ends inside it and the panel lights, the ride to
+level -3 sets the robot down at -8.85 m in the hall of level -3, and it
+walks back out to where it stood.
 
 Playing it, the first thing found was that the stairs down from the
 street could not be taken: at the top of the Métro escalators the robot
@@ -1491,9 +1496,17 @@ levels, the current one marked, as the panel in a lift does; PageUp and
 PageDown take the next level. The ride carries the character straight
 up or down where it stands, eased, 1.2 s a level, the controller held
 still meanwhile, and sets it down on the floor of the level chosen,
-which the lift room has on every level it is on. The shaft itself
-stays solid: it is the car's well in OSM's eyes, the room round it is
-where one stands.
+which the lift room has on every level it is on.
+
+Then the shaft got its doorway, since a lift one rides from outside
+the car is no lift. OSM maps the elevator as a point, so the car's
+2 m square and its door are the engine's to place: the doorway, 1.1 m
+wide and 2.2 m high at every level served, faces the middle of the room
+the point stands in (its space, as a rule a room tagged elevator), or
+north when it stands in none; two jambs run the shaft's height and a
+lintel closes the door from its top to the next level's floor. The
+panel shows within 2.5 m, dimmed with "step into the car", and the
+levels can be picked from inside the car, within 0.9 m of the point.
 
 The recorded walk: the robot driven along the route in headless Chrome
 (a frame every 3 s of walk time, the way shown), from the forecourt to
@@ -1502,6 +1515,8 @@ the platform in 3 min 7 s.
 ![The recorded walk](../evidence/m5/walk-recorded.gif)
 ![The start screen](../evidence/m5/walk-start.png)
 ![In the lift at level -3: the panel](../evidence/m5/walk-lift.png)
+![Inside the car before: a closed well](../evidence/m5/walk-lift-car-before.png)
+![After: the doorway, the room beyond](../evidence/m5/walk-lift-car-after.png)
 ![The Forum's facade before: a room's wall on its plane](../evidence/m5/walk-facade-before.png)
 ![After: the wall 5 cm in](../evidence/m5/walk-facade-after.png)
 ![The Porte Lescot before: one label](../evidence/m5/walk-shops-before.png)

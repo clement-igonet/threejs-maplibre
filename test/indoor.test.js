@@ -5,7 +5,7 @@ import { PerspectiveCamera } from 'three';
 import { createGeoJSONVectorSource } from '../demo/geojson-vector-source.js';
 import { STATION_STYLE } from '../demo/station-style.js';
 import { buildTile } from '../src/build/buildTile.js';
-import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, insetRing } from '../src/build/buildIndoor.js';
+import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, insetRing, appendShaft } from '../src/build/buildIndoor.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { VectorTileMap } from '../src/three/VectorTileMap.js';
@@ -166,6 +166,26 @@ describe( 'indoor', () => {
 		// the station's room walls are off their rings: Aroma-Zone's wall at
 		// Châtelet shares its line with the building's facade and flickered
 		expect( WALL_INSET ).toBe( 0.05 );
+
+	} );
+
+	it( 'builds a lift shaft with a doorway: jambs, and a lintel over the door at every level', () => {
+
+		const projection = { project( x, y, h, out ) { out[ 0 ] = x; out[ 1 ] = h; out[ 2 ] = y; return out; } };
+		const white = [ 255, 255, 255, 255 ];
+		const closed = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		expect( appendShaft( closed, 0, 0, projection, white, 2, - 3, 5.5 ) ).toBe( 16 ); // four sides, two faces each
+		const open = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		// the doorway on the north side (y < 0), levels -1 and 0: three
+		// sides, two jambs, a lintel from -0.8 up to 0 and one from 2.2 to 5.5
+		const t = appendShaft( open, 0, 0, projection, white, 2, - 3, 5.5, { side: 0, levels: [ - 1, 0 ], levelHeight: 3, doorWidth: 1.1, doorHeight: 2.2 } );
+		expect( t ).toBe( 12 + 8 + 8 );
+		// nothing stands in the doorway below the lintels: no vertex on the
+		// north side between the jambs under 2.2 m at level 0
+		const p = open.positions;
+		let inDoor = 0;
+		for ( let i = 0; i < p.length; i += 3 ) if ( Math.abs( p[ i + 2 ] + 1 ) < 1e-6 && Math.abs( p[ i ] ) < 0.5 && p[ i + 1 ] > 0.01 && p[ i + 1 ] < 2.19 ) inDoor ++;
+		expect( inDoor ).toBe( 0 );
 
 	} );
 

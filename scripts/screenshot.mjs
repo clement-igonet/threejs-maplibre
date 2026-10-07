@@ -95,6 +95,10 @@ const SHOTS = [
 	// a shop door in the street-level mall, as a player met it
 	// Chatelet-Les Halles: the start, at an entrance of the Forum
 	{ name: 'walk-chatelet', page: 'walk', query: '&place=chatelet&go=1' },
+	// inside the lift's car at level 1, facing its doorway and the room beyond
+	{ name: 'walk-lift-car', page: 'walk', query: '&lat=48.876167&lon=2.326060&y=3.15&heading=3' },
+	// level 1 of Saint-Lazare, facing the lift's car: its doorway
+	{ name: 'walk-lift-door', page: 'walk', query: '&lat=48.876178&lon=2.326061&y=3.15&heading=168' },
 	// the rue Pierre Lescot northward: the Forum's facade on the left, where a
 	// room's wall on the building's line flickered
 	{ name: 'walk-facade', page: 'walk', query: '&place=chatelet&lat=48.861906&lon=2.348178&y=0&heading=12' },

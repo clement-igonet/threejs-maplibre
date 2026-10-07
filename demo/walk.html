@@ -47,6 +47,9 @@
 			#lift button { font: bold 14px system-ui, sans-serif; padding: 7px 14px; border: 0; border-radius: 6px; color: #fff; background: rgba(255, 255, 255, 0.18); cursor: pointer; }
 			#lift button.here { background: #d9452b; cursor: default; }
 			#lift .keys { margin-top: 2px; font-size: 11px; color: #cde; }
+			#lift.outside button:not(.here) { opacity: 0.4; cursor: default; }
+			#lift .hint { font-size: 12px; color: #ffb199; }
+			#lift:not(.outside) .hint { display: none; }
 			body.touch #lift { right: 120px; bottom: 80px; }
 			#edge { position: absolute; left: 50%; top: 30%; transform: translateX( -50% ); padding: 8px 14px; font: bold 14px ui-monospace, monospace; color: #fff; background: rgba(217, 69, 43, 0.85); border-radius: 6px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 			/* the touch controls: a joystick bottom left, a jump button bottom right */
@@ -75,7 +78,7 @@
 		<div id="stick"><div class="knob"><div class="label">walk</div></div></div>
 		<div id="stick-caption" style="z-index: 1">drag the dot to walk and turn, to the red rim to run</div>
 		<button id="jump">jump</button>
-		<div id="lift"><div class="title">Lift</div><div class="buttons"></div><div class="keys">PageUp / PageDown</div></div>
+		<div id="lift"><div class="title">Lift</div><div class="hint">step into the car</div><div class="buttons"></div><div class="keys">PageUp / PageDown</div></div>
 		<div id="goal"></div>
 		<button id="way">show the way (H)</button>
 		<div id="start"><div class="card">
@@ -367,9 +370,10 @@
 			wayButton.classList.toggle( 'hidden', ! goalNode );
 
 			// the lifts: the graph's lift stops grouped by lift, each with the
-			// levels it serves. Standing within 2.5 m of one, on a level it
-			// serves, a panel offers its levels; the ride carries the
-			// character straight up or down where it stands, 1.2 s a level
+			// levels it serves. Within 2.5 m of one, on a level it serves, a
+			// panel shows its levels; inside the car (the shaft, 2 m square,
+			// its doorway facing the room) the levels can be picked, and the
+			// ride carries the character straight up or down, 1.2 s a level
 			const lifts = new Map();
 			for ( const n of graph.nodes ) {
 
@@ -382,10 +386,10 @@
 
 			for ( const lift of lifts.values() ) lift.levels.sort( ( a, b ) => b - a ); // top first, as on a lift's panel
 			const liftBox = document.getElementById( 'lift' ), liftButtons = liftBox.querySelector( '.buttons' );
-			let liftHere = null, ride = null;
+			let liftHere = null, ride = null, inCar = false;
 			function rideTo( level ) {
 
-				if ( ! liftHere || ride || ! liftHere.levels.includes( level ) ) return;
+				if ( ! liftHere || ! inCar || ride || ! liftHere.levels.includes( level ) ) return;
 				const from = character.position.y, to = level * 3 + 0.15;
 				if ( Math.abs( to - from ) < 0.01 ) return;
 				ride = { from, to, start: performance.now(), duration: 400 + 1200 * Math.abs( level - levelOf( from ) ) };
@@ -393,8 +397,10 @@
 
 			}
 
-			function showLift( lift, level ) {
+			function showLift( lift, level, inside ) {
 
+				inCar = inside;
+				liftBox.classList.toggle( 'outside', ! inside );
 				if ( lift === liftHere && liftBox.dataset.level === String( level ) ) return;
 				liftHere = lift;
 				liftBox.dataset.level = String( level );
@@ -486,7 +492,7 @@
 
 					}
 
-					showLift( found, level );
+					showLift( found, level, found !== null && best < 0.9 );
 
 				}
 
@@ -668,7 +674,7 @@
 			window.__WAY = () => ( { line: wayLine, way, show: showWay } );
 			window.__GRAPH = () => graph;
 			window.__LABELS = () => nearbyLabels;
-			window.__LIFT = () => ( { lift: liftHere, ride, go: rideTo, lifts } );
+			window.__LIFT = () => ( { lift: liftHere, inCar, ride, go: rideTo, lifts } );
 			window.__TOSCENE = toScene;
 			window.__ANIMATIONS = gltf.animations.map( c => c.name );
 			window.__PLAYING = () => current.getClip().name;

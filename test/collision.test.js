@@ -7,7 +7,7 @@ import { buildTile } from '../src/build/buildTile.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { buildColliders, collideCapsule, groundBelow, raycastFirst } from '../src/three/colliders.js';
-import { appendFloor, appendRail, appendRamp, appendWallRun } from '../src/build/buildIndoor.js';
+import { appendFloor, appendRail, appendRamp, appendShaft, appendWallRun } from '../src/build/buildIndoor.js';
 import { CharacterController } from '../src/game/CharacterController.js';
 import { latitudeToNormalized, longitudeToNormalized, normalizedToMeters } from '../src/math/WebMercator.js';
 
@@ -375,6 +375,29 @@ describe( 'CharacterController', () => {
 		for ( let i = 0; i < 10 * 60; i ++ ) along.update( 1 / 60, { forward: 1, right: 0 } );
 		expect( along.position.x ).toBeGreaterThan( 12 );
 		expect( along.position.y ).toBeLessThan( - 2 );
+
+	} );
+
+	it( 'walks into a lift car through its doorway, and not through its walls', () => {
+
+		// a shaft 2 m square at the origin, the doorway on its east side
+		const projection = { project( x, y, h, o ) { o[ 0 ] = x; o[ 1 ] = h; o[ 2 ] = y; return o; } };
+		const white = [ 255, 255, 255, 255 ];
+		const out = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		appendShaft( out, 0, 0, projection, white, 2, 0, 5.5, { side: 1, levels: [ 0 ], levelHeight: 3, doorWidth: 1.1, doorHeight: 2.2 } );
+		const cols = buildColliders( { center: new Vector3(), blocks: [ { type: 'fill-extrusion', indoor: 'lift', level: 0, base: 0, positions: new Float32Array( out.positions ), indices: new Uint32Array( out.indices ) } ] } );
+		const fakeMap = { collideCapsule( a, b, r, o, feet ) { o.set( 0, 0, 0 ); o.onGround = false; return collideCapsule( cols, a, b, r, o, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
+		// from the east, through the doorway, to the far wall inside
+		const inWalker = new CharacterController( fakeMap ).place( 4, 0, 0 );
+		inWalker.heading = Math.PI; // towards -x
+		for ( let i = 0; i < 5 * 60; i ++ ) inWalker.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( inWalker.position.x ).toBeLessThan( 0 );
+		expect( inWalker.position.x ).toBeGreaterThan( - 1 );
+		// from the north, into the wall
+		const blocked = new CharacterController( fakeMap ).place( 0, 0, - 4 );
+		blocked.heading = Math.PI / 2; // towards +z
+		for ( let i = 0; i < 5 * 60; i ++ ) blocked.update( 1 / 60, { forward: 1, right: 0 } );
+		expect( blocked.position.z ).toBeLessThan( - 1 );
 
 	} );
 

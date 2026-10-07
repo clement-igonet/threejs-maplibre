@@ -1,6 +1,7 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
-import { FLOOR_THICKNESS, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, appendFillWithHoles, insetRing, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
+import { pointInRing, ringCentroid } from '../indoor/IndoorGraph.js';
+import { FLOOR_THICKNESS, LIFT_DOOR_HEIGHT, LIFT_DOOR_WIDTH, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, appendFillWithHoles, insetRing, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -322,10 +323,30 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 					} else if ( indoor === 'lift' && feature.type === 1 ) {
 
 						const r = sourceLayer.featureStart[ f ], v = sourceLayer.ringStart[ r ];
+						const lx = sourceLayer.positions[ 2 * v ], ly = sourceLayer.positions[ 2 * v + 1 ];
+						// the doorway faces the middle of the room the lift stands in
+						// (its space in OSM, a room tagged elevator as a rule), or
+						// north when it stands in none
+						const opening = { side: 0, levels, levelHeight, doorWidth: LIFT_DOOR_WIDTH * unitsPerMeter, doorHeight: LIFT_DOOR_HEIGHT };
+						const rooms = tile.layers.indoor;
+						if ( rooms ) for ( let g = 0; g < rooms.featureCount; g ++ ) {
+
+							if ( rooms.types[ g ] !== 3 ) continue;
+							const cls = rooms.properties[ g ].class;
+							if ( cls !== 'room' && cls !== 'area' && cls !== 'corridor' ) continue;
+							const ring = featurePolygons( rooms, g, extent )[ 0 ]?.[ 0 ];
+							if ( ! ring || ! pointInRing( lx, ly, ring ) ) continue;
+							const [ cx, cy ] = ringCentroid( ring );
+							const dx = cx - lx, dy = cy - ly;
+							opening.side = Math.abs( dx ) > Math.abs( dy ) ? ( dx > 0 ? 1 : 3 ) : ( dy > 0 ? 2 : 0 );
+							break;
+
+						}
+
 						for ( const level of levels ) {
 
 							const target = levelBlock( level );
-							const t = appendShaft( target, sourceLayer.positions[ 2 * v ], sourceLayer.positions[ 2 * v + 1 ], projection, rgba, 2 * unitsPerMeter, lo * levelHeight, hi * levelHeight + wallHeight );
+							const t = appendShaft( target, lx, ly, projection, rgba, 2 * unitsPerMeter, lo * levelHeight, hi * levelHeight + wallHeight, opening );
 							if ( t > 0 ) { target.triangles += t; target.features ++; }
 
 						}
