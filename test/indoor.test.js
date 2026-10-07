@@ -1,10 +1,11 @@
+import { wallPieces } from '../src/build/buildPolygons.js';
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera } from 'three';
 import { createGeoJSONVectorSource } from '../demo/geojson-vector-source.js';
 import { STATION_STYLE } from '../demo/station-style.js';
 import { buildTile } from '../src/build/buildTile.js';
-import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex } from '../src/build/buildIndoor.js';
+import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, insetRing, appendShaft } from '../src/build/buildIndoor.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { VectorTileMap } from '../src/three/VectorTileMap.js';
@@ -137,6 +138,67 @@ describe( 'indoor', () => {
 		expect( Math.max( ...y ) ).toBeGreaterThan( 0 ); // and one up
 		const lifts = built.blocks.filter( b => b.id === 'indoor-lift' );
 		expect( lifts.length ).toBeGreaterThan( 0 );
+		// every staircase has its balustrades, in a block of their own that a
+		// character meets as a wall from any side
+		const steps0 = steps.filter( b => b.level === 0 && b.indoor === 'steps' ), rails0 = steps.filter( b => b.level === 0 && b.indoor === 'rail' );
+		expect( steps0.length ).toBe( 1 );
+		expect( rails0.length ).toBe( 1 );
+		expect( rails0[ 0 ].triangles ).toBe( 2 * steps0[ 0 ].triangles ); // two walls of as many quads as the ramp
+		const ry = ys( rails0[ 0 ] );
+		expect( Math.max( ...ry ) - Math.max( ...y ) ).toBeCloseTo( 1.1, 6 );
+		// the hole above a staircase is 10 cm wider than the stairs and no
+		// more, so nothing beside the rails is open to the floor below
+		expect( STAIRWELL_WIDTH - STAIR_WIDTH ).toBeCloseTo( 0.1, 9 );
+
+	} );
+
+	it( 'moves a ring inward by a distance, whichever way it winds, mitred at the corners', () => {
+
+		const square = [ 0, 0, 10, 0, 10, 10, 0, 10 ];
+		expect( insetRing( square, 0.05 ) ).toEqual( [ 0.05, 0.05, 9.95, 0.05, 9.95, 9.95, 0.05, 9.95 ].map( v => expect.closeTo( v, 9 ) ) );
+		const clockwise = [ 0, 0, 0, 10, 10, 10, 10, 0 ];
+		expect( insetRing( clockwise, 0.05 ) ).toEqual( [ 0.05, 0.05, 0.05, 9.95, 9.95, 9.95, 9.95, 0.05 ].map( v => expect.closeTo( v, 9 ) ) );
+		// a closing repeat of the first vertex is dropped
+		expect( insetRing( [ ...square, 0, 0 ], 0.05 ).length ).toBe( 8 );
+		// a sharp corner's mitre is capped: no spike
+		const spike = [ 0, 0, 10, 0, 10, 0.5 ];
+		for ( let i = 0; i < 3; i ++ ) expect( Math.hypot( insetRing( spike, 0.05 )[ 2 * i ] - spike[ 2 * i ], insetRing( spike, 0.05 )[ 2 * i + 1 ] - spike[ 2 * i + 1 ] ) ).toBeLessThanOrEqual( 0.15 + 1e-9 );
+		// the station's room walls are off their rings: Aroma-Zone's wall at
+		// Châtelet shares its line with the building's facade and flickered
+		expect( WALL_INSET ).toBe( 0.05 );
+
+	} );
+
+	it( 'builds a lift shaft with a doorway: jambs, and a lintel over the door at every level', () => {
+
+		const projection = { project( x, y, h, out ) { out[ 0 ] = x; out[ 1 ] = h; out[ 2 ] = y; return out; } };
+		const white = [ 255, 255, 255, 255 ];
+		const closed = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		expect( appendShaft( closed, 0, 0, projection, white, 2, - 3, 5.5 ) ).toBe( 16 ); // four sides, two faces each
+		const open = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		// the doorway on the north side (y < 0), levels -1 and 0: three
+		// sides, two jambs, a lintel from -0.8 up to 0 and one from 2.2 to 5.5
+		const t = appendShaft( open, 0, 0, projection, white, 2, - 3, 5.5, { side: 0, levels: [ - 1, 0 ], levelHeight: 3, doorWidth: 1.1, doorHeight: 2.2 } );
+		expect( t ).toBe( 12 + 8 + 8 );
+		// nothing stands in the doorway below the lintels: no vertex on the
+		// north side between the jambs under 2.2 m at level 0
+		const p = open.positions;
+		let inDoor = 0;
+		for ( let i = 0; i < p.length; i += 3 ) if ( Math.abs( p[ i + 2 ] + 1 ) < 1e-6 && Math.abs( p[ i ] ) < 0.5 && p[ i + 1 ] > 0.01 && p[ i + 1 ] < 2.19 ) inDoor ++;
+		expect( inDoor ).toBe( 0 );
+
+	} );
+
+	it( 'cuts a door into a wall edge when the door sits just past the edge\'s end', () => {
+
+		// an edge from 0 to 10 along x, a 1.2 m door (half 0.6) at the corner
+		// moved 7 cm past the end by the wall inset's mitre: still a cut at
+		// the end; a door 0.5 m off the edge's side is not on it
+		const onEnd = wallPieces( 0, 0, 10, 0, [ [ 10.07, 0.03, 0.6 ] ] );
+		expect( onEnd ).not.toBeNull();
+		expect( onEnd.pieces ).toEqual( [ [ 0, expect.closeTo( 0.947, 3 ) ] ] );
+		expect( wallPieces( 0, 0, 10, 0, [ [ 10.7, 0, 0.6 ] ] ) ).toBeNull(); // past the half width
+		expect( wallPieces( 0, 0, 10, 0, [ [ 5, 0.5, 0.6 ] ] ) ).toBeNull(); // off the side
 
 	} );
 

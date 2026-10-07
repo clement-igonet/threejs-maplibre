@@ -1,6 +1,7 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
-import { FLOOR_THICKNESS, appendFillWithHoles, appendFloor, appendFloorWithHoles, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
+import { pointInRing, ringCentroid } from '../indoor/IndoorGraph.js';
+import { FLOOR_THICKNESS, LIFT_DOOR_HEIGHT, LIFT_DOOR_WIDTH, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, appendFillWithHoles, insetRing, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -95,6 +96,10 @@ function finishBlock( block ) {
 
 }
 
+// a balustrade's height over the stairs: more than a jump (0.8 m at the
+// walk demo's gravity), so the stairs keep the character on them
+export const RAIL_HEIGHT = 1.1;
+
 export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', datum } ) {
 
 	const t0 = performance.now();
@@ -184,7 +189,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 				if ( ways.types[ f ] !== 2 || props.subclass !== 'steps' ) continue;
 				const levels = featureLevels( props );
 				if ( levels.length < 2 ) continue;
-				const quads = featureLines( ways, f, extent ).flatMap( run => stairwell( run.points, 2 * unitsPerMeter ) );
+				const quads = featureLines( ways, f, extent ).flatMap( run => stairwell( run.points, STAIRWELL_WIDTH * unitsPerMeter ) );
 				for ( const level of levels.slice( 1 ) ) {
 
 					if ( ! holesByLevel.has( level ) ) holesByLevel.set( level, [] );
@@ -214,16 +219,17 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 		};
 
 		const levelBlocks = new Map();
-		const levelBlock = level => {
+		const levelBlock = ( level, kind = indoor ) => {
 
-			let b = levelBlocks.get( level );
+			const key = kind === indoor ? level : `${ level }:${ kind }`;
+			let b = levelBlocks.get( key );
 			if ( ! b ) {
 
 				b = newBlock( layer, index, type );
 				b.level = level;
-				b.indoor = indoor; // floor, wall, steps or lift: how a character meets it
+				b.indoor = kind; // floor, wall, steps, lift or rail: how a character meets it
 				b.base = level * levelHeight; // where the level's floor is
-				levelBlocks.set( level, b );
+				levelBlocks.set( key, b );
 
 			}
 
@@ -301,8 +307,14 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 							for ( const level of levels ) {
 
 								const target = levelBlock( level );
-								const t = appendRamp( target, run.points, projection, rgba, 1.5 * unitsPerMeter, ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS );
+								const z0 = ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, z1 = ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS;
+								const t = appendRamp( target, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1 );
 								if ( t > 0 ) { target.triangles += t; target.features ++; }
+								// the balustrades, in a block of their own: solid from
+								// every side, where the ramp holds from above only
+								const rails = levelBlock( level, 'rail' );
+								const tr = appendRail( rails, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1, RAIL_HEIGHT );
+								if ( tr > 0 ) { rails.triangles += tr; rails.features ++; }
 
 							}
 
@@ -311,10 +323,30 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 					} else if ( indoor === 'lift' && feature.type === 1 ) {
 
 						const r = sourceLayer.featureStart[ f ], v = sourceLayer.ringStart[ r ];
+						const lx = sourceLayer.positions[ 2 * v ], ly = sourceLayer.positions[ 2 * v + 1 ];
+						// the doorway faces the middle of the room the lift stands in
+						// (its space in OSM, a room tagged elevator as a rule), or
+						// north when it stands in none
+						const opening = { side: 0, levels, levelHeight, doorWidth: LIFT_DOOR_WIDTH * unitsPerMeter, doorHeight: LIFT_DOOR_HEIGHT };
+						const rooms = tile.layers.indoor;
+						if ( rooms ) for ( let g = 0; g < rooms.featureCount; g ++ ) {
+
+							if ( rooms.types[ g ] !== 3 ) continue;
+							const cls = rooms.properties[ g ].class;
+							if ( cls !== 'room' && cls !== 'area' && cls !== 'corridor' ) continue;
+							const ring = featurePolygons( rooms, g, extent )[ 0 ]?.[ 0 ];
+							if ( ! ring || ! pointInRing( lx, ly, ring ) ) continue;
+							const [ cx, cy ] = ringCentroid( ring );
+							const dx = cx - lx, dy = cy - ly;
+							opening.side = Math.abs( dx ) > Math.abs( dy ) ? ( dx > 0 ? 1 : 3 ) : ( dy > 0 ? 2 : 0 );
+							break;
+
+						}
+
 						for ( const level of levels ) {
 
 							const target = levelBlock( level );
-							const t = appendShaft( target, sourceLayer.positions[ 2 * v ], sourceLayer.positions[ 2 * v + 1 ], projection, rgba, 2 * unitsPerMeter, lo * levelHeight, hi * levelHeight + wallHeight );
+							const t = appendShaft( target, lx, ly, projection, rgba, 2 * unitsPerMeter, lo * levelHeight, hi * levelHeight + wallHeight, opening );
 							if ( t > 0 ) { target.triangles += t; target.features ++; }
 
 						}
@@ -341,7 +373,9 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 					} else if ( indoor === 'wall' ) {
 
 						const openings = doorsByLevel.get( level ) ?? null;
-						if ( polygons ) for ( const polygon of polygons ) for ( const ring of polygon ) t += appendWallRun( target, ring, projection, rgba, base, base + wallHeight, true, openings );
+						// a room's walls 5 cm inside its ring: on the ring they share
+						// a plane with the building's facade and the next room's walls
+						if ( polygons ) for ( const polygon of polygons ) for ( const ring of polygon ) t += appendWallRun( target, insetRing( ring, WALL_INSET * unitsPerMeter ), projection, rgba, base, base + wallHeight, true, openings );
 						if ( runs ) for ( const run of runs ) t += appendWallRun( target, run.points, projection, rgba, base, base + wallHeight, false, openings );
 
 					}

@@ -311,10 +311,14 @@ function convert( osm ) {
 
 		}
 
-		if ( isPoint && ( tags.tourism || tags.amenity ) ) {
+		// points of interest: tourism, amenities, and shops (class 'shop',
+		// the kind of shop in subclass, so a walk can label Levi's as it
+		// labels a café)
+		if ( isPoint && ( tags.tourism || tags.amenity || tags.shop ) ) {
 
 			const props = pruneTags( tags );
-			props.class = tags.tourism ?? tags.amenity;
+			props.class = tags.tourism ?? tags.amenity ?? 'shop';
+			if ( tags.shop ) props.subclass = tags.shop;
 			add( 'poi', feature, props );
 			continue;
 

@@ -13,6 +13,7 @@
   node["place"];
   node["tourism"];
   node["amenity"];
+  node["shop"];
   node["natural"="tree"];
 );
 out body;

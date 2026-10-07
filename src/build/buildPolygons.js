@@ -230,9 +230,15 @@ export function wallPieces( ax, ay, bx, by, openings ) {
 	let height = 0;
 	for ( const [ ox, oy, half, h ] of openings ) {
 
+		// a door within its half width past either end still cuts the edge:
+		// a room's walls stand 5 cm inside its ring, and the mitre at a
+		// corner moves the wall's end a little along the edge, past the
+		// door the mapper put on the corner
 		const t = ( ( ox - ax ) * dx + ( oy - ay ) * dy ) / len2;
-		if ( t < - 1e-6 || t > 1 + 1e-6 ) continue;
-		const px = ax + dx * t - ox, py = ay + dy * t - oy;
+		const slack = half / len;
+		if ( t < - slack || t > 1 + slack ) continue;
+		const tc = Math.min( Math.max( t, 0 ), 1 );
+		const px = ax + dx * tc - ox, py = ay + dy * tc - oy;
 		if ( px * px + py * py > half * half * 0.25 ) continue; // not on this edge
 		cuts.push( [ Math.max( 0, t - half / len ), Math.min( 1, t + half / len ) ] );
 		height = Math.max( height, h ?? Infinity );

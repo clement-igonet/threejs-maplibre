@@ -28,6 +28,14 @@ export function featureLevels( properties ) {
 
 }
 
+// A staircase or an escalator is built this wide, in meters, and the
+// stairwell cut in the floors above it a little wider: the rails up the
+// ramp's edges stand at the hole's edge, and no strip of hole is left
+// beside them to fall through (2 m holes beside 1.5 m ramps left one,
+// 0.25 m beside each, a meter where two escalators ran side by side)
+export const STAIR_WIDTH = 1.5;
+export const STAIRWELL_WIDTH = 1.6;
+
 export function appendFloor( out, polygon, projection, rgba, base ) {
 
 	return appendExtrusion( out, polygon, projection, rgba, base, base + FLOOR_THICKNESS );
@@ -271,26 +279,14 @@ export function appendWallRun( out, points, projection, rgba, base, top, closed 
 // climbs rather than its steps.
 export function appendRamp( out, points, projection, rgba, width, z0, z1 ) {
 
+	const edges = rampEdges( points, width, z0, z1 );
+	if ( edges === null ) return 0;
 	const count = points.length / 2;
-	if ( count < 2 ) return 0;
-	const lengths = [ 0 ];
-	for ( let i = 1; i < count; i ++ ) lengths.push( lengths[ i - 1 ] + Math.hypot( points[ 2 * i ] - points[ 2 * i - 2 ], points[ 2 * i + 1 ] - points[ 2 * i - 1 ] ) );
-	const total = lengths[ count - 1 ];
-	if ( total === 0 ) return 0;
 	const start = out.vertexCount;
 	for ( let i = 0; i < count; i ++ ) {
 
-		// the side direction: the mean of the normals of the two segments at
-		// this vertex
-		let nx = 0, ny = 0;
-		if ( i > 0 ) { const dx = points[ 2 * i ] - points[ 2 * i - 2 ], dy = points[ 2 * i + 1 ] - points[ 2 * i - 1 ], l = Math.hypot( dx, dy ) || 1; nx += - dy / l; ny += dx / l; }
-		if ( i < count - 1 ) { const dx = points[ 2 * i + 2 ] - points[ 2 * i ], dy = points[ 2 * i + 3 ] - points[ 2 * i + 1 ], l = Math.hypot( dx, dy ) || 1; nx += - dy / l; ny += dx / l; }
-		const l = Math.hypot( nx, ny ) || 1;
-		nx = nx / l * width / 2;
-		ny = ny / l * width / 2;
-		const z = z0 + ( z1 - z0 ) * lengths[ i ] / total;
-		push( out, projection, points[ 2 * i ] - nx, points[ 2 * i + 1 ] - ny, z, rgba );
-		push( out, projection, points[ 2 * i ] + nx, points[ 2 * i + 1 ] + ny, z, rgba );
+		push( out, projection, edges.left[ 2 * i ], edges.left[ 2 * i + 1 ], edges.z[ i ], rgba );
+		push( out, projection, edges.right[ 2 * i ], edges.right[ 2 * i + 1 ], edges.z[ i ], rgba );
 
 	}
 
@@ -308,13 +304,163 @@ export function appendRamp( out, points, projection, rgba, width, z0, z1 ) {
 
 }
 
+// The two edges of a ramp, left and right of its way by half its width
+// (flat [ x, y, ... ] each), and its height at every point.
+function rampEdges( points, width, z0, z1 ) {
+
+	const count = points.length / 2;
+	if ( count < 2 ) return null;
+	const lengths = [ 0 ];
+	for ( let i = 1; i < count; i ++ ) lengths.push( lengths[ i - 1 ] + Math.hypot( points[ 2 * i ] - points[ 2 * i - 2 ], points[ 2 * i + 1 ] - points[ 2 * i - 1 ] ) );
+	const total = lengths[ count - 1 ];
+	if ( total === 0 ) return null;
+	const left = [], right = [], z = [];
+	for ( let i = 0; i < count; i ++ ) {
+
+		// the side direction: the mean of the normals of the two segments at
+		// this vertex
+		let nx = 0, ny = 0;
+		if ( i > 0 ) { const dx = points[ 2 * i ] - points[ 2 * i - 2 ], dy = points[ 2 * i + 1 ] - points[ 2 * i - 1 ], l = Math.hypot( dx, dy ) || 1; nx += - dy / l; ny += dx / l; }
+		if ( i < count - 1 ) { const dx = points[ 2 * i + 2 ] - points[ 2 * i ], dy = points[ 2 * i + 3 ] - points[ 2 * i + 1 ], l = Math.hypot( dx, dy ) || 1; nx += - dy / l; ny += dx / l; }
+		const l = Math.hypot( nx, ny ) || 1;
+		nx = nx / l * width / 2;
+		ny = ny / l * width / 2;
+		left.push( points[ 2 * i ] - nx, points[ 2 * i + 1 ] - ny );
+		right.push( points[ 2 * i ] + nx, points[ 2 * i + 1 ] + ny );
+		z.push( z0 + ( z1 - z0 ) * lengths[ i ] / total );
+
+	}
+
+	return { left, right, z };
+
+}
+
+// The balustrades of a ramp: a thin wall up each edge, height over the
+// ramp's surface, both faces (a character keeps to the stairs, and
+// cannot jump off their side; the walls fence the stairwell above too).
+export function appendRail( out, points, projection, rgba, width, z0, z1, height ) {
+
+	const edges = rampEdges( points, width, z0, z1 );
+	if ( edges === null ) return 0;
+	const count = points.length / 2;
+	let triangles = 0;
+	for ( const side of [ edges.left, edges.right ] ) {
+
+		const start = out.vertexCount;
+		for ( let i = 0; i < count; i ++ ) {
+
+			push( out, projection, side[ 2 * i ], side[ 2 * i + 1 ], edges.z[ i ], rgba );
+			push( out, projection, side[ 2 * i ], side[ 2 * i + 1 ], edges.z[ i ] + height, rgba );
+
+		}
+
+		for ( let i = 0; i < count - 1; i ++ ) {
+
+			const a = start + 2 * i, b = a + 1, c = a + 2, d = a + 3;
+			out.indices.push( a, c, b, b, c, d );
+			out.indices.push( a, b, c, b, d, c );
+			triangles += 4;
+
+		}
+
+	}
+
+	return triangles;
+
+}
+
+// A ring moved inward by a distance, in its own units: every vertex
+// along the mean of its two edges' inward normals, mitred (the mitre
+// capped at three times the distance at a sharp corner). A room's walls
+// are built on its ring moved 5 cm in: OSM mappers share the nodes of a
+// room with the building's outline and with the next room, and two
+// walls on one plane flicker as the camera moves (z-fighting).
+export const WALL_INSET = 0.05; // meters
+export function insetRing( ring, distance ) {
+
+	let count = ring.length / 2;
+	if ( count > 1 && ring[ 0 ] === ring[ 2 * count - 2 ] && ring[ 1 ] === ring[ 2 * count - 1 ] ) count --; // a closing repeat
+	if ( count < 3 ) return ring.slice();
+	let area = 0;
+	for ( let i = 0; i < count; i ++ ) {
+
+		const j = ( i + 1 ) % count;
+		area += ring[ 2 * i ] * ring[ 2 * j + 1 ] - ring[ 2 * j ] * ring[ 2 * i + 1 ];
+
+	}
+
+	const inward = area > 0 ? 1 : - 1; // counterclockwise: the inside is to the left of each edge
+	const out = [];
+	for ( let i = 0; i < count; i ++ ) {
+
+		const p = ( i + count - 1 ) % count, n = ( i + 1 ) % count;
+		const ax = ring[ 2 * i ] - ring[ 2 * p ], ay = ring[ 2 * i + 1 ] - ring[ 2 * p + 1 ];
+		const bx = ring[ 2 * n ] - ring[ 2 * i ], by = ring[ 2 * n + 1 ] - ring[ 2 * i + 1 ];
+		const la = Math.hypot( ax, ay ) || 1, lb = Math.hypot( bx, by ) || 1;
+		// the left normals of the edge in and the edge out
+		const n1x = - ay / la * inward, n1y = ax / la * inward;
+		const n2x = - by / lb * inward, n2y = bx / lb * inward;
+		let mx = n1x + n2x, my = n1y + n2y;
+		const lm = Math.hypot( mx, my );
+		if ( lm < 1e-9 ) { mx = n1x; my = n1y; } else {
+
+			// the mitre: along the bisector, by d / cos( half the turn )
+			const cosHalf = Math.max( lm / 2, 1 / 3 );
+			mx = mx / lm / cosHalf;
+			my = my / lm / cosHalf;
+
+		}
+
+		out.push( ring[ 2 * i ] + mx * distance, ring[ 2 * i + 1 ] + my * distance );
+
+	}
+
+	return out;
+
+}
+
 // A lift shaft: four walls of a square of the given side (run units)
 // around a point, from the lowest level served to the top of the highest.
-export function appendShaft( out, x, y, projection, rgba, side, z0, z1 ) {
+// With an opening, one side (0 north, 1 east, 2 south, 3 west, in tile
+// axes where y grows south) is the doorway: two jambs the full height
+// and, over a door doorHeight tall at every level served, a lintel up
+// to the next level's floor. The character walks into the car and rides.
+export const LIFT_DOOR_WIDTH = 1.1; // meters
+export const LIFT_DOOR_HEIGHT = 2.2;
+export function appendShaft( out, x, y, projection, rgba, side, z0, z1, opening = null ) {
 
 	const h = side / 2;
 	const ring = [ x - h, y - h, x + h, y - h, x + h, y + h, x - h, y + h ];
-	return appendWallRun( out, ring, projection, rgba, z0, z1, true );
+	if ( opening === null ) return appendWallRun( out, ring, projection, rgba, z0, z1, true );
+	const { side: s, levels, levelHeight, doorWidth, doorHeight } = opening;
+	let triangles = 0;
+	// the three whole sides: the run from the doorway's far end round to its near end
+	const run = [];
+	for ( let k = 1; k <= 4; k ++ ) { const i = ( s + k ) % 4; run.push( ring[ 2 * i ], ring[ 2 * i + 1 ] ); }
+	triangles += appendWallRun( out, run, projection, rgba, z0, z1, false );
+	// the doorway's side, from a to b, the door centred on it
+	const ax = ring[ 2 * s ], ay = ring[ 2 * s + 1 ], bx = ring[ ( 2 * s + 2 ) % 8 ], by = ring[ ( 2 * s + 3 ) % 8 ];
+	const len = Math.hypot( bx - ax, by - ay ), ux = ( bx - ax ) / len, uy = ( by - ay ) / len;
+	const jamb = Math.max( 0, ( len - doorWidth ) / 2 );
+	const p = ( t ) => [ ax + ux * t, ay + uy * t ];
+	const [ j1x, j1y ] = p( jamb ), [ j2x, j2y ] = p( len - jamb );
+	if ( jamb > 0 ) {
+
+		triangles += appendWallRun( out, [ ax, ay, j1x, j1y ], projection, rgba, z0, z1, false );
+		triangles += appendWallRun( out, [ j2x, j2y, bx, by ], projection, rgba, z0, z1, false );
+
+	}
+
+	const sorted = [ ...levels ].sort( ( a, b ) => a - b );
+	for ( let i = 0; i < sorted.length; i ++ ) {
+
+		const top = sorted[ i ] * levelHeight + doorHeight;
+		const next = i + 1 < sorted.length ? sorted[ i + 1 ] * levelHeight : z1;
+		if ( next > top ) triangles += appendWallRun( out, [ j1x, j1y, j2x, j2y ], projection, rgba, top, Math.min( next, z1 ), false );
+
+	}
+
+	return triangles;
 
 }
 

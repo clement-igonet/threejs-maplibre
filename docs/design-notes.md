@@ -1389,3 +1389,139 @@ headings fall into the gap and come back.
 
 ![Level -1, facing the strip: before, a hole](../evidence/m5/walk-gap-before.png)
 ![After, the level's floor](../evidence/m5/walk-gap-after.png)
+
+### The game: a goal, a clock, the way there
+
+The walk is now something to finish. A start screen names the place and
+the goal, a platform deep under the station: at Saint-Lazare the Métro
+13 platform towards Châtillon-Montrouge, four levels down; at
+Châtelet-Les Halles RER platform 1, five levels down. The streets load
+behind the screen and Start comes on when they have landed, so the
+first step is on solid ground. From then a clock runs and a box keeps
+the goal in view: its name, its level, the distance as the crow flies,
+the levels still to go down. Standing in the goal's space on its level
+ends the walk with the time, and a button to walk again.
+
+The way there is drawn on request (H, or the button): M4's indoor graph
+routed with A* from where the character stands, through the entrance,
+the hall, the stairs, to the platform, as a line 40 cm over the floors
+in the floating-origin root. At Saint-Lazare the graph says 4 min 16 s
+on foot, through levels 0, -1 and -2 to -4; the line is the proof that
+the route the walker takes and the floors the character walks are the
+same data.
+
+Châtelet's start moved to the Porte Lescot. The entrance nearest the
+old start is the Lego store's own door, and its room joins no corridor
+in the data: the station's walking graph there has 110 components, and
+the Lego store is in one of 13 nodes. Porte Lescot joins the big one
+(645 nodes, levels -5 to 0), and from 8 m outside it the graph routes to
+platform 1 in 206 s.
+
+Measured: 220 tests, among them the route from each place's start to
+its goal and the goal's space found under its centre, a staircase cut
+into the street walked down and walked over where the street is whole,
+on a railed ramp a step and a jump across stopped by the rail while the
+walk along it goes down, the shops labelled round the Porte Lescot, a
+ring moved inward and a door cutting an edge from just past its end,
+the lift by the Métro 13 corridor with its five levels, a shaft's
+doorway built with its jambs and lintels, and a walk into the car
+through it and not through its walls. In headless Chrome at
+Saint-Lazare: from the lift room on level 1 the panel shows dimmed,
+the walk to the car ends inside it and the panel lights, the ride to
+level -3 sets the robot down at -8.85 m in the hall of level -3, and it
+walks back out to where it stood.
+
+Playing it, the first thing found was that the stairs down from the
+street could not be taken: at the top of the Métro escalators the robot
+stood on the street and the ramp a meter under it was never the ground.
+The street at 0 counted everywhere for a character at or above it,
+over the stairwell holes included, since the controller knew nothing of
+the holes. It now takes a `street( x, z )` predicate, and the walk page
+gives it the stairwell quads it cuts the ground mesh with: over a hole
+there is no street, the ground is the ramp below, and a jump over a
+hole falls onto it.
+
+The second thing: on an escalator the robot could step or jump off
+the side. Real stairs and escalators have balustrades, and ours had a
+ramp and nothing else. Every ramp now gets a rail up each edge
+(`appendRail`), a thin wall 1.1 m high (`RAIL_HEIGHT`, more than the
+0.8 m a jump reaches at the walk's gravity), drawn as the balustrade and
+built into a block of its own with `indoor: 'rail'`: the ramp holds the
+character from above only, the rail is solid from every side at any
+height, as a wall is only on its own level. The rails fence the
+stairwell cut in the floor above as well.
+
+The third: from the top of the escalators on level 1 a jump still got
+down. The stairwell cut in a floor was 2 m wide over a 1.5 m ramp, so
+a 25 cm strip of hole ran beside each rail, and where two escalators
+run side by side the strips added up to a meter of nothing between the
+rails: a running jump north-east from the landing fell through to
+level 0. The hole is now 10 cm wider than the stairs (`STAIRWELL_WIDTH`
+over `STAIR_WIDTH`, in the walk page's ground too), so the rails stand
+at the hole's edge and the floor between two escalators is floor.
+
+Walking the rue Pierre Lescot at Châtelet, the street was unlabelled
+where OSM shows a shop every ten meters: the extract took points of
+interest from tourism and amenity nodes only, and a shop is a shop
+node. The street queries now ask for `node["shop"]` too, and the
+extract files them as points of interest of class `shop` with the kind
+of shop in `subclass`, which Places already labelled as shops. The
+label of a point sits a few meters inside its shop front, behind the
+building's wall from the street, so a point's label now shows through
+one wall within 6 m of it, where a named space still hides behind any
+wall before it. The labels now reach 60 m and twenty of them, from 35
+and twelve: a street is wide and the shop fronts stand back from where
+one walks, and in a mall the walls hide what is not in the room. (The
+Forum's forecourt is an indoor area in OSM, so indoors was no test to
+switch on.) Both extracts were taken again from Overpass for this.
+
+On the rue Pierre Lescot the Forum's facade flickered as the camera
+moved: z-fighting, two walls on one plane. OSM mappers share a room's
+nodes with the building's outline (Aroma-Zone's wall is the building's
+line there) and with the next room's, so the indoor wall and the facade
+were drawn on the same plane. A room's walls are now built on its ring
+moved 5 cm inward (`insetRing`, mitred, the mitre capped at a sharp
+corner): off the facade, and 10 cm from the next room's wall on a
+shared line. The depth buffer tells 5 cm apart at 30 m with room to
+spare. The inset moved a corner a few centimeters along its edges, past
+the door the mapper had put on the corner, and the Lego store's
+entrance closed: a door now cuts an edge from up to its half width past
+either end.
+
+The lifts ride. A lift was a shaft of four walls and a room with a
+door, and standing in one there was nowhere to go. The walk page takes
+the graph's lift stops (one per level per elevator node), and within
+2.5 m of one, on a level it serves, shows a panel with the lift's
+levels, the current one marked, as the panel in a lift does; PageUp and
+PageDown take the next level. The ride carries the character straight
+up or down where it stands, eased, 1.2 s a level, the controller held
+still meanwhile, and sets it down on the floor of the level chosen,
+which the lift room has on every level it is on.
+
+Then the shaft got its doorway, since a lift one rides from outside
+the car is no lift. OSM maps the elevator as a point, so the car's
+2 m square and its door are the engine's to place: the doorway, 1.1 m
+wide and 2.2 m high at every level served, faces the middle of the room
+the point stands in (its space, as a rule a room tagged elevator), or
+north when it stands in none; two jambs run the shaft's height and a
+lintel closes the door from its top to the next level's floor. The
+panel shows within 2.5 m, dimmed with "step into the car", and the
+levels can be picked from inside the car, within 0.9 m of the point.
+
+The recorded walk: the robot driven along the route in headless Chrome
+(a frame every 3 s of walk time, the way shown), from the forecourt to
+the platform in 3 min 7 s.
+
+![The recorded walk](../evidence/m5/walk-recorded.gif)
+![The start screen](../evidence/m5/walk-start.png)
+![In the lift at level -3: the panel](../evidence/m5/walk-lift.png)
+![Inside the car before: a closed well](../evidence/m5/walk-lift-car-before.png)
+![After: the doorway, the room beyond](../evidence/m5/walk-lift-car-after.png)
+![The Forum's facade before: a room's wall on its plane](../evidence/m5/walk-facade-before.png)
+![After: the wall 5 cm in](../evidence/m5/walk-facade-after.png)
+![The Porte Lescot before: one label](../evidence/m5/walk-shops-before.png)
+![After: the shops, and the police station the hand play found unmapped and mapped](../evidence/m5/walk-shops-after.png)
+![The escalator before its balustrades](../evidence/m5/walk-rails-before.png)
+![And after](../evidence/m5/walk-rails-after.png)
+![The way, from the forecourt](../evidence/m5/walk-way.png)
+![Arrived on the Métro 13 platform](../evidence/m5/walk-done.png)
