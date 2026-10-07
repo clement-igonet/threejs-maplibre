@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
 import { createGeoJSONVectorSource } from '../demo/geojson-vector-source.js';
 import { STATION_STYLE } from '../demo/station-style.js';
+import { LOUVRE_STYLE } from '../demo/louvre-style.js';
 import { buildTile } from '../src/build/buildTile.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
@@ -425,18 +426,23 @@ describe( 'CharacterController', () => {
 		// a hand-play report: the Lentille (building 64046222, glass, no
 		// entrance node in OSM) was a closed shell; two footways cross its
 		// outline, and an opening is cut where they do
+		// built with the walk's own style: roofs and glass, whose walls are
+		// built by the roofed extrusion (the plain one already cut doors)
 		const lat = 48.875604, lon = 2.324175;
+		const walkStyle = new Style( { ...STATION_STYLE, layers: [ ...STATION_STYLE.layers.filter( l => l.id !== 'building' ), LOUVRE_STYLE.layers.find( l => l.id === 'building-3d' ) ] } );
 		const tx = Math.floor( longitudeToNormalized( lon ) * 2 ** z ), ty = Math.floor( latitudeToNormalized( lat ) * 2 ** z );
 		const cols = [];
-		for ( let dx = - 1; dx <= 1; dx ++ ) for ( let dy = - 1; dy <= 1; dy ++ ) cols.push( ...buildColliders( buildTile( decodeVectorTile( tile( z, tx + dx, ty + dy ) ), style, { sourceId: 'openmaptiles', x: tx + dx, y: ty + dy, z, mode: 'planar' } ) ) );
+		for ( let dx = - 1; dx <= 1; dx ++ ) for ( let dy = - 1; dy <= 1; dy ++ ) cols.push( ...buildColliders( buildTile( decodeVectorTile( tile( z, tx + dx, ty + dy ) ), walkStyle, { sourceId: 'openmaptiles', x: tx + dx, y: ty + dy, z, mode: 'planar' } ) ) );
 		const here = { collideCapsule( a, b, r, out, feet ) { out.set( 0, 0, 0 ); out.onGround = false; return collideCapsule( cols, a, b, r, out, feet ); }, groundBelow( p, m ) { return groundBelow( cols, p, m ); } };
 		const [ x0, z0 ] = scene( lat, lon );
 		const k = 1 / Math.cos( lat * Math.PI / 180 );
 		const c = new CharacterController( here ).place( x0, 0, z0 );
-		c.heading = ( 90 - 354 ) * Math.PI / 180;
-		for ( let i = 0; i < 10 * 60; i ++ ) c.update( 1 / 60, { forward: 1, right: 0 } );
+		c.heading = ( 90 - 359 ) * Math.PI / 180;
+		// 20 s: the shell is curved, and a walk straight at it slides along
+		// the glass to the doorway for a few seconds before going in
+		for ( let i = 0; i < 20 * 60; i ++ ) c.update( 1 / 60, { forward: 1, right: 0 } );
 		const walked = Math.hypot( c.position.x - x0, c.position.z - z0 ) / k;
-		expect( walked ).toBeGreaterThan( 10 ); // the bubble's wall is about 8 m away
+		expect( walked ).toBeGreaterThan( 10 ); // the bubble's wall is about 4 m away
 		const dome = layers.building.features.find( f => f.id === 64046222 ).geometry.coordinates[ 0 ].flat();
 		const lonNow = lon + ( c.position.x - x0 ) / k / ( 111320 * Math.cos( lat * Math.PI / 180 ) ), latNow = lat - ( c.position.z - z0 ) / k / 111320;
 		expect( pointInRing( lonNow, latNow, dome ) || c.position.y < - 0.5 ).toBe( true ); // inside it, or already down its escalator

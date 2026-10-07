@@ -1537,7 +1537,16 @@ footways running into it and no entrance node on its outline. A path at
 street level that crosses a building's outline now cuts an opening 2 m
 wide where it does, as a mapped entrance does; the glass shell has its
 two ways in, and the walk down to the Métro begins where the footways
-say.
+say. Two more things stood in the way, found when the first fix was
+played: a building with a roof shape builds its walls in the roofed
+extrusion, which had never been handed the entrances (the plain
+extrusion had them since M4), and a dome the whole building's height
+has walls lower than a door (the Lentille's eave came out at 1 m, its
+dome 5 m over that), so the door cut into them cut a meter of wall and
+the shell above still stopped the robot. The roofed walls take the
+openings now, and a shell whose walls are lower than a door on its
+outline is set on a drum the door's height, 2.5 m, which is near enough
+what the Lentille's glass does.
 
 Stairs are steps. A staircase was a smooth ramp, which reads as a slide;
 `appendSteps` builds it as risers 17 cm high (`STEP_RISER`) and the

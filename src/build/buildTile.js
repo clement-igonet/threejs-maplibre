@@ -476,7 +476,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 					if ( roof ) {
 
-						const t = appendRoofedExtrusion( target, polygon, projection, colours, base, height, roof, unitsPerMeter, coveredFor( f ) );
+						const t = appendRoofedExtrusion( target, polygon, projection, colours, base, height, roof, unitsPerMeter, coveredFor( f ), entrances );
 						triangles += t;
 						if ( target !== block ) { target.triangles += t; block.triangles -= t; }
 
