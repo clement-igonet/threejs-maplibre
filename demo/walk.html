@@ -431,10 +431,15 @@
 				const name = w.space ?? ( w.indoor ? ( w.kind === 'corridor' ? 'corridor' : 'hall' ) : w.street ) ?? w.building ?? place.name;
 				const sub = w.indoor && w.building && w.building !== name ? w.building : '';
 				whereBox.innerHTML = ( w.indoor ? `<span class="level">level ${ level }</span>` : '' ) + escape( name ) + ( sub ? `<span class="sub">${ escape( sub ) }</span>` : '' );
-				nearbyLabels = places.nearby( lon, lat, level, 35, 12 ).map( l => {
+				// 60 m and twenty of them: a street is wide and the shop fronts
+				// stand back from where one walks (the forecourt of the Forum
+				// des Halles is an indoor area in OSM, so indoors is no test
+				// of that); in a mall the walls hide what is not in the room
+				const reach = 60;
+				nearbyLabels = places.nearby( lon, lat, level, reach, 20 ).map( l => {
 
 					const [ x, z ] = toScene( l.lat, l.lon );
-					return { ...l, x, y: l.level * 3 + 2.6, z };
+					return { ...l, x, y: l.level * 3 + 2.6, z, reach };
 
 				} );
 				// hidden behind a wall: the ray from the camera stops short of it
@@ -443,8 +448,12 @@
 
 					_label.set( l.x, l.y, l.z ).sub( _eye );
 					const d = _label.length();
+					// a named space is hidden by any wall before it; a point of
+					// interest sits a few meters inside its shop front, and still
+					// shows from the street through that one wall
 					const hit = map.raycast( _eye, _label.normalize(), d );
-					l.hidden = hit !== null && hit < d - 1;
+					const slack = l.kind === 'room' || l.kind === 'corridor' || l.kind === 'area' || l.kind === 'level' ? 1 : 6;
+					l.hidden = hit !== null && hit < d - slack;
 
 				}
 
@@ -465,7 +474,7 @@
 					div.className = l.kind;
 					const scale = Math.max( 0.7, Math.min( 1.2, 12 / Math.max( l.distance, 1 ) ) );
 					div.style.transform = `translate( ${ ( _label.x * 0.5 + 0.5 ) * w }px, ${ ( 0.5 - _label.y * 0.5 ) * h }px ) translate( -50%, -100% ) scale( ${ scale } )`;
-					div.style.opacity = Math.max( 0.35, 1 - l.distance / 40 );
+					div.style.opacity = Math.max( 0.35, 1 - l.distance / ( l.reach + 10 ) );
 
 				} );
 
@@ -571,6 +580,7 @@
 			window.__PLAY = startGame;
 			window.__WAY = () => ( { line: wayLine, way, show: showWay } );
 			window.__GRAPH = () => graph;
+			window.__LABELS = () => nearbyLabels;
 			window.__TOSCENE = toScene;
 			window.__ANIMATIONS = gltf.animations.map( c => c.name );
 			window.__PLAYING = () => current.getClip().name;

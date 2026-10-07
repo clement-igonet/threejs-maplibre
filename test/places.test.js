@@ -7,6 +7,20 @@ const places = new Places( layers );
 
 describe( 'Places', () => {
 
+	it( 'labels the shops round the Porte Lescot at Châtelet, mapped as nodes', () => {
+
+		// Levi's and Dr. Martens are shop nodes on the rue Pierre Lescot,
+		// not indoor rooms: the extract takes shop nodes as points of
+		// interest since a hand-play report found the street unlabelled
+		const chatelet = new Places( JSON.parse( readFileSync( new URL( '../demo/data/chatelet.json', import.meta.url ) ) ).layers );
+		const near = chatelet.nearby( 2.348104, 48.861732, 0, 40, 30 ).map( l => l.text );
+		expect( near ).toContain( "Levi's" );
+		expect( near ).toContain( 'Dr. Martens' );
+		const levis = chatelet.labels.find( l => l.text === "Levi's" );
+		expect( levis.kind ).toBe( 'shop' );
+
+	} );
+
 	it( 'routes from the walk demo\'s start to its goal, at both places', () => {
 
 		// the demo's goals (demo/walk.html): a platform deep under each

@@ -95,6 +95,8 @@ const SHOTS = [
 	// a shop door in the street-level mall, as a player met it
 	// Chatelet-Les Halles: the start, at an entrance of the Forum
 	{ name: 'walk-chatelet', page: 'walk', query: '&place=chatelet&go=1' },
+	// the rue Pierre Lescot from the Porte Lescot: the shops' labels along it
+	{ name: 'walk-shops', page: 'walk', query: '&place=chatelet&lat=48.86165&lon=2.34778&y=0&heading=70' },
 	{ name: 'walk-door', page: 'walk', query: '&lat=48.8761957&lon=2.3248466&y=0.15&heading=335' },
 	{ name: 'walk-down', page: 'walk', query: '&lat=48.875694&lon=2.324192&y=-0.6&heading=34' },
 	{ name: 'walk-stairs', page: 'walk', query: '&lat=48.87621&lon=2.32513&y=0.15&heading=180' },

@@ -1455,12 +1455,29 @@ level 0. The hole is now 10 cm wider than the stairs (`STAIRWELL_WIDTH`
 over `STAIR_WIDTH`, in the walk page's ground too), so the rails stand
 at the hole's edge and the floor between two escalators is floor.
 
+Walking the rue Pierre Lescot at Châtelet, the street was unlabelled
+where OSM shows a shop every ten meters: the extract took points of
+interest from tourism and amenity nodes only, and a shop is a shop
+node. The street queries now ask for `node["shop"]` too, and the
+extract files them as points of interest of class `shop` with the kind
+of shop in `subclass`, which Places already labelled as shops. The
+label of a point sits a few meters inside its shop front, behind the
+building's wall from the street, so a point's label now shows through
+one wall within 6 m of it, where a named space still hides behind any
+wall before it. The labels now reach 60 m and twenty of them, from 35
+and twelve: a street is wide and the shop fronts stand back from where
+one walks, and in a mall the walls hide what is not in the room. (The
+Forum's forecourt is an indoor area in OSM, so indoors was no test to
+switch on.) Both extracts were taken again from Overpass for this.
+
 The recorded walk: the robot driven along the route in headless Chrome
 (a frame every 3 s of walk time, the way shown), from the forecourt to
 the platform in 3 min 7 s.
 
 ![The recorded walk](../evidence/m5/walk-recorded.gif)
 ![The start screen](../evidence/m5/walk-start.png)
+![The Porte Lescot before: one label](../evidence/m5/walk-shops-before.png)
+![After: the shops, and the police station the hand play found unmapped and mapped](../evidence/m5/walk-shops-after.png)
 ![The escalator before its balustrades](../evidence/m5/walk-rails-before.png)
 ![And after](../evidence/m5/walk-rails-after.png)
 ![The way, from the forecourt](../evidence/m5/walk-way.png)
