@@ -7,6 +7,17 @@ const places = new Places( layers );
 
 describe( 'Places', () => {
 
+	it( 'knows the lift by the Métro 13 corridor at Saint-Lazare and the five levels it serves', () => {
+
+		// a hand-play report: a lift room at level -3 with nowhere to go
+		const here = places.graph.toMeters( 2.326038, 48.876177 );
+		const stops = places.graph.nodes.filter( n => n.kind === 'lift' && Math.hypot( n.x - here.x, n.y - here.y ) < 2.5 );
+		expect( stops.length ).toBe( 5 );
+		expect( new Set( stops.map( n => n.ref ) ).size ).toBe( 1 );
+		expect( stops.map( n => n.level ).sort( ( a, b ) => a - b ) ).toEqual( [ - 3, - 2, - 1, 0, 1 ] );
+
+	} );
+
 	it( 'labels the shops round the Porte Lescot at Châtelet, mapped as nodes', () => {
 
 		// Levi's and Dr. Martens are shop nodes on the rue Pierre Lescot,

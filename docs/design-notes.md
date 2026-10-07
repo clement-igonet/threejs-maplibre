@@ -1483,12 +1483,25 @@ the door the mapper had put on the corner, and the Lego store's
 entrance closed: a door now cuts an edge from up to its half width past
 either end.
 
+The lifts ride. A lift was a shaft of four walls and a room with a
+door, and standing in one there was nowhere to go. The walk page takes
+the graph's lift stops (one per level per elevator node), and within
+2.5 m of one, on a level it serves, shows a panel with the lift's
+levels, the current one marked, as the panel in a lift does; PageUp and
+PageDown take the next level. The ride carries the character straight
+up or down where it stands, eased, 1.2 s a level, the controller held
+still meanwhile, and sets it down on the floor of the level chosen,
+which the lift room has on every level it is on. The shaft itself
+stays solid: it is the car's well in OSM's eyes, the room round it is
+where one stands.
+
 The recorded walk: the robot driven along the route in headless Chrome
 (a frame every 3 s of walk time, the way shown), from the forecourt to
 the platform in 3 min 7 s.
 
 ![The recorded walk](../evidence/m5/walk-recorded.gif)
 ![The start screen](../evidence/m5/walk-start.png)
+![In the lift at level -3: the panel](../evidence/m5/walk-lift.png)
 ![The Forum's facade before: a room's wall on its plane](../evidence/m5/walk-facade-before.png)
 ![After: the wall 5 cm in](../evidence/m5/walk-facade-after.png)
 ![The Porte Lescot before: one label](../evidence/m5/walk-shops-before.png)
