@@ -1,10 +1,11 @@
+import { wallPieces } from '../src/build/buildPolygons.js';
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera } from 'three';
 import { createGeoJSONVectorSource } from '../demo/geojson-vector-source.js';
 import { STATION_STYLE } from '../demo/station-style.js';
 import { buildTile } from '../src/build/buildTile.js';
-import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex, STAIR_WIDTH, STAIRWELL_WIDTH } from '../src/build/buildIndoor.js';
+import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, insetRing } from '../src/build/buildIndoor.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { VectorTileMap } from '../src/three/VectorTileMap.js';
@@ -148,6 +149,36 @@ describe( 'indoor', () => {
 		// the hole above a staircase is 10 cm wider than the stairs and no
 		// more, so nothing beside the rails is open to the floor below
 		expect( STAIRWELL_WIDTH - STAIR_WIDTH ).toBeCloseTo( 0.1, 9 );
+
+	} );
+
+	it( 'moves a ring inward by a distance, whichever way it winds, mitred at the corners', () => {
+
+		const square = [ 0, 0, 10, 0, 10, 10, 0, 10 ];
+		expect( insetRing( square, 0.05 ) ).toEqual( [ 0.05, 0.05, 9.95, 0.05, 9.95, 9.95, 0.05, 9.95 ].map( v => expect.closeTo( v, 9 ) ) );
+		const clockwise = [ 0, 0, 0, 10, 10, 10, 10, 0 ];
+		expect( insetRing( clockwise, 0.05 ) ).toEqual( [ 0.05, 0.05, 0.05, 9.95, 9.95, 9.95, 9.95, 0.05 ].map( v => expect.closeTo( v, 9 ) ) );
+		// a closing repeat of the first vertex is dropped
+		expect( insetRing( [ ...square, 0, 0 ], 0.05 ).length ).toBe( 8 );
+		// a sharp corner's mitre is capped: no spike
+		const spike = [ 0, 0, 10, 0, 10, 0.5 ];
+		for ( let i = 0; i < 3; i ++ ) expect( Math.hypot( insetRing( spike, 0.05 )[ 2 * i ] - spike[ 2 * i ], insetRing( spike, 0.05 )[ 2 * i + 1 ] - spike[ 2 * i + 1 ] ) ).toBeLessThanOrEqual( 0.15 + 1e-9 );
+		// the station's room walls are off their rings: Aroma-Zone's wall at
+		// Châtelet shares its line with the building's facade and flickered
+		expect( WALL_INSET ).toBe( 0.05 );
+
+	} );
+
+	it( 'cuts a door into a wall edge when the door sits just past the edge\'s end', () => {
+
+		// an edge from 0 to 10 along x, a 1.2 m door (half 0.6) at the corner
+		// moved 7 cm past the end by the wall inset's mitre: still a cut at
+		// the end; a door 0.5 m off the edge's side is not on it
+		const onEnd = wallPieces( 0, 0, 10, 0, [ [ 10.07, 0.03, 0.6 ] ] );
+		expect( onEnd ).not.toBeNull();
+		expect( onEnd.pieces ).toEqual( [ [ 0, expect.closeTo( 0.947, 3 ) ] ] );
+		expect( wallPieces( 0, 0, 10, 0, [ [ 10.7, 0, 0.6 ] ] ) ).toBeNull(); // past the half width
+		expect( wallPieces( 0, 0, 10, 0, [ [ 5, 0.5, 0.6 ] ] ) ).toBeNull(); // off the side
 
 	} );
 

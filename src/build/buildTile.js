@@ -1,6 +1,6 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
-import { FLOOR_THICKNESS, STAIR_WIDTH, STAIRWELL_WIDTH, appendFillWithHoles, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
+import { FLOOR_THICKNESS, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, appendFillWithHoles, insetRing, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -352,7 +352,9 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 					} else if ( indoor === 'wall' ) {
 
 						const openings = doorsByLevel.get( level ) ?? null;
-						if ( polygons ) for ( const polygon of polygons ) for ( const ring of polygon ) t += appendWallRun( target, ring, projection, rgba, base, base + wallHeight, true, openings );
+						// a room's walls 5 cm inside its ring: on the ring they share
+						// a plane with the building's facade and the next room's walls
+						if ( polygons ) for ( const polygon of polygons ) for ( const ring of polygon ) t += appendWallRun( target, insetRing( ring, WALL_INSET * unitsPerMeter ), projection, rgba, base, base + wallHeight, true, openings );
 						if ( runs ) for ( const run of runs ) t += appendWallRun( target, run.points, projection, rgba, base, base + wallHeight, false, openings );
 
 					}

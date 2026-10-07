@@ -369,6 +369,56 @@ export function appendRail( out, points, projection, rgba, width, z0, z1, height
 
 }
 
+// A ring moved inward by a distance, in its own units: every vertex
+// along the mean of its two edges' inward normals, mitred (the mitre
+// capped at three times the distance at a sharp corner). A room's walls
+// are built on its ring moved 5 cm in: OSM mappers share the nodes of a
+// room with the building's outline and with the next room, and two
+// walls on one plane flicker as the camera moves (z-fighting).
+export const WALL_INSET = 0.05; // meters
+export function insetRing( ring, distance ) {
+
+	let count = ring.length / 2;
+	if ( count > 1 && ring[ 0 ] === ring[ 2 * count - 2 ] && ring[ 1 ] === ring[ 2 * count - 1 ] ) count --; // a closing repeat
+	if ( count < 3 ) return ring.slice();
+	let area = 0;
+	for ( let i = 0; i < count; i ++ ) {
+
+		const j = ( i + 1 ) % count;
+		area += ring[ 2 * i ] * ring[ 2 * j + 1 ] - ring[ 2 * j ] * ring[ 2 * i + 1 ];
+
+	}
+
+	const inward = area > 0 ? 1 : - 1; // counterclockwise: the inside is to the left of each edge
+	const out = [];
+	for ( let i = 0; i < count; i ++ ) {
+
+		const p = ( i + count - 1 ) % count, n = ( i + 1 ) % count;
+		const ax = ring[ 2 * i ] - ring[ 2 * p ], ay = ring[ 2 * i + 1 ] - ring[ 2 * p + 1 ];
+		const bx = ring[ 2 * n ] - ring[ 2 * i ], by = ring[ 2 * n + 1 ] - ring[ 2 * i + 1 ];
+		const la = Math.hypot( ax, ay ) || 1, lb = Math.hypot( bx, by ) || 1;
+		// the left normals of the edge in and the edge out
+		const n1x = - ay / la * inward, n1y = ax / la * inward;
+		const n2x = - by / lb * inward, n2y = bx / lb * inward;
+		let mx = n1x + n2x, my = n1y + n2y;
+		const lm = Math.hypot( mx, my );
+		if ( lm < 1e-9 ) { mx = n1x; my = n1y; } else {
+
+			// the mitre: along the bisector, by d / cos( half the turn )
+			const cosHalf = Math.max( lm / 2, 1 / 3 );
+			mx = mx / lm / cosHalf;
+			my = my / lm / cosHalf;
+
+		}
+
+		out.push( ring[ 2 * i ] + mx * distance, ring[ 2 * i + 1 ] + my * distance );
+
+	}
+
+	return out;
+
+}
+
 // A lift shaft: four walls of a square of the given side (run units)
 // around a point, from the lowest level served to the top of the highest.
 export function appendShaft( out, x, y, projection, rgba, side, z0, z1 ) {

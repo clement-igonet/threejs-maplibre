@@ -1470,12 +1470,27 @@ one walks, and in a mall the walls hide what is not in the room. (The
 Forum's forecourt is an indoor area in OSM, so indoors was no test to
 switch on.) Both extracts were taken again from Overpass for this.
 
+On the rue Pierre Lescot the Forum's facade flickered as the camera
+moved: z-fighting, two walls on one plane. OSM mappers share a room's
+nodes with the building's outline (Aroma-Zone's wall is the building's
+line there) and with the next room's, so the indoor wall and the facade
+were drawn on the same plane. A room's walls are now built on its ring
+moved 5 cm inward (`insetRing`, mitred, the mitre capped at a sharp
+corner): off the facade, and 10 cm from the next room's wall on a
+shared line. The depth buffer tells 5 cm apart at 30 m with room to
+spare. The inset moved a corner a few centimeters along its edges, past
+the door the mapper had put on the corner, and the Lego store's
+entrance closed: a door now cuts an edge from up to its half width past
+either end.
+
 The recorded walk: the robot driven along the route in headless Chrome
 (a frame every 3 s of walk time, the way shown), from the forecourt to
 the platform in 3 min 7 s.
 
 ![The recorded walk](../evidence/m5/walk-recorded.gif)
 ![The start screen](../evidence/m5/walk-start.png)
+![The Forum's facade before: a room's wall on its plane](../evidence/m5/walk-facade-before.png)
+![After: the wall 5 cm in](../evidence/m5/walk-facade-after.png)
 ![The Porte Lescot before: one label](../evidence/m5/walk-shops-before.png)
 ![After: the shops, and the police station the hand play found unmapped and mapped](../evidence/m5/walk-shops-after.png)
 ![The escalator before its balustrades](../evidence/m5/walk-rails-before.png)
