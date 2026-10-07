@@ -5,7 +5,7 @@ import { PerspectiveCamera } from 'three';
 import { createGeoJSONVectorSource } from '../demo/geojson-vector-source.js';
 import { STATION_STYLE } from '../demo/station-style.js';
 import { buildTile } from '../src/build/buildTile.js';
-import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, insetRing, appendShaft } from '../src/build/buildIndoor.js';
+import { appendFloorWithHoles, appendRamp, appendWallRun, featureLevels, stairwell, subtractConvex, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, insetRing, appendShaft, appendSteps, STEP_RISER } from '../src/build/buildIndoor.js';
 import { decodeVectorTile } from '../src/core/decodeVectorTile.js';
 import { Style } from '../src/style/Style.js';
 import { VectorTileMap } from '../src/three/VectorTileMap.js';
@@ -143,7 +143,8 @@ describe( 'indoor', () => {
 		const steps0 = steps.filter( b => b.level === 0 && b.indoor === 'steps' ), rails0 = steps.filter( b => b.level === 0 && b.indoor === 'rail' );
 		expect( steps0.length ).toBe( 1 );
 		expect( rails0.length ).toBe( 1 );
-		expect( rails0[ 0 ].triangles ).toBe( 2 * steps0[ 0 ].triangles ); // two walls of as many quads as the ramp
+		expect( rails0[ 0 ].triangles ).toBeGreaterThan( 0 );
+		expect( steps0[ 0 ].triangles ).toBeGreaterThan( rails0[ 0 ].triangles ); // steps are many quads, rails two walls
 		const ry = ys( rails0[ 0 ] );
 		expect( Math.max( ...ry ) - Math.max( ...y ) ).toBeCloseTo( 1.1, 6 );
 		// the hole above a staircase is 10 cm wider than the stairs and no
@@ -166,6 +167,36 @@ describe( 'indoor', () => {
 		// the station's room walls are off their rings: Aroma-Zone's wall at
 		// Châtelet shares its line with the building's facade and flickered
 		expect( WALL_INSET ).toBe( 0.05 );
+
+	} );
+
+	it( 'builds a staircase as steps: 17 cm risers, flat treads, up from z0 to z1', () => {
+
+		const projection = { project( x, y, h, out ) { out[ 0 ] = x; out[ 1 ] = h; out[ 2 ] = y; return out; } };
+		const out = { positions: [], colors: [], indices: [], vertexCount: 0 };
+		// 3 m up over 6 m: 18 steps of 16.7 cm, a riser and a tread each, both faces
+		expect( appendSteps( out, [ 0, 0, 6, 0 ], projection, [ 255, 255, 255, 255 ], 1.5, 0.15, 3.15 ) ).toBe( 18 * 8 );
+		const y = ys( out );
+		expect( Math.min( ...y ) ).toBeCloseTo( 0.15, 9 );
+		expect( Math.max( ...y ) ).toBeCloseTo( 3.15, 9 );
+		// the heights are the 19 levels of the steps and nothing between
+		const distinct = [ ...new Set( y.map( v => v.toFixed( 4 ) ) ) ];
+		expect( distinct.length ).toBe( 19 );
+		expect( STEP_RISER ).toBe( 0.17 );
+
+	} );
+
+	it( 'builds the station\'s escalators as moving ramps and its stairs as steps', () => {
+
+		const built = build( 16 );
+		expect( built.escalators.length ).toBeGreaterThan( 5 );
+		for ( const run of built.escalators ) {
+
+			expect( run.positions.length ).toBeGreaterThanOrEqual( 6 );
+			expect( run.halfWidth ).toBeGreaterThan( 0.5 );
+			expect( [ - 1, 0, 1 ] ).toContain( run.direction );
+
+		}
 
 	} );
 

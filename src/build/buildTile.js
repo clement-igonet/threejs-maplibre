@@ -1,7 +1,7 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
 import { pointInRing, ringCentroid } from '../indoor/IndoorGraph.js';
-import { FLOOR_THICKNESS, LIFT_DOOR_HEIGHT, LIFT_DOOR_WIDTH, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, appendFillWithHoles, insetRing, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
+import { FLOOR_THICKNESS, LIFT_DOOR_HEIGHT, LIFT_DOOR_WIDTH, STAIR_WIDTH, STAIRWELL_WIDTH, WALL_INSET, appendFillWithHoles, insetRing, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendSteps, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -104,6 +104,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 	const t0 = performance.now();
 	const blocks = [];
+	const escalators = []; // the moving stairs, for the walk: runs in the built frame
 	const stats = { features: 0, vertices: 0, triangles: 0, buildMs: 0 };
 	let projection = null;
 
@@ -172,6 +173,57 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 				const r = doors.featureStart[ f ], v = doors.ringStart[ r ];
 				const width = parseFloat( doors.properties[ f ].width );
 				( entrances ??= [] ).push( [ doors.positions[ 2 * v ], doors.positions[ 2 * v + 1 ], ( Number.isFinite( width ) ? width : 1.8 ) / 2 * unitsPerMeter, 2.5 ] );
+
+			}
+
+		}
+
+		// and a footway that crosses a building's outline at street level
+		// enters it, whether or not OSM marks the entrance: an opening 2 m
+		// wide where it crosses (the glass bubble over the Cour de Rome
+		// escalators at Saint-Lazare has footways in and no entrance node)
+		if ( type === 'fill-extrusion' && ! indoor && tile.layers.transportation ) {
+
+			const ways = tile.layers.transportation;
+			const segments = [];
+			for ( let f = 0; f < ways.featureCount; f ++ ) {
+
+				const props = ways.properties[ f ];
+				if ( ways.types[ f ] !== 2 || props.class !== 'path' ) continue;
+				const levels = featureLevels( props );
+				if ( levels.length > 0 && ! levels.includes( 0 ) ) continue;
+				for ( const run of featureLines( ways, f, extent ) ) {
+
+					const p = run.points;
+					for ( let i = 0; i + 3 < p.length; i += 2 ) segments.push( [ p[ i ], p[ i + 1 ], p[ i + 2 ], p[ i + 3 ] ] );
+
+				}
+
+			}
+
+			if ( segments.length > 0 ) for ( let f = 0; f < sourceLayer.featureCount; f ++ ) {
+
+				if ( sourceLayer.types[ f ] !== 3 ) continue;
+				for ( const polygon of featurePolygons( sourceLayer, f, extent ) ) {
+
+					const ring = polygon[ 0 ];
+					let minX = Infinity, minY = Infinity, maxX = - Infinity, maxY = - Infinity;
+					for ( let i = 0; i < ring.length; i += 2 ) { minX = Math.min( minX, ring[ i ] ); maxX = Math.max( maxX, ring[ i ] ); minY = Math.min( minY, ring[ i + 1 ] ); maxY = Math.max( maxY, ring[ i + 1 ] ); }
+					for ( const [ ax, ay, bx, by ] of segments ) {
+
+						if ( Math.max( ax, bx ) < minX || Math.min( ax, bx ) > maxX || Math.max( ay, by ) < minY || Math.min( ay, by ) > maxY ) continue;
+						const n = ring.length / 2;
+						for ( let i = 0; i < n; i ++ ) {
+
+							const j = ( i + 1 ) % n;
+							const hit = segmentCrossing( ax, ay, bx, by, ring[ 2 * i ], ring[ 2 * i + 1 ], ring[ 2 * j ], ring[ 2 * j + 1 ] );
+							if ( hit ) ( entrances ??= [] ).push( [ hit[ 0 ], hit[ 1 ], 1.0 * unitsPerMeter, 2.5 ] );
+
+						}
+
+					}
+
+				}
 
 			}
 
@@ -302,13 +354,34 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 					if ( indoor === 'steps' && runs && hi > lo ) {
 
 						const down = feature.properties.incline === 'down';
+						// an escalator (conveying=*) is a smooth ramp that moves the
+						// character (see escalators below); stairs are steps
+						const conveying = feature.properties.conveying;
+						const escalator = conveying !== undefined && conveying !== 'no';
 						for ( const run of runs ) {
+
+							const z0 = ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, z1 = ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS;
+							if ( escalator ) {
+
+								// the run in the built frame, with its heights, its half
+								// width in that frame, and which way the belt goes:
+								// 1 along the way, -1 against it, 0 whichever way one faces
+								const p = run.points, positions = [], v = [ 0, 0, 0 ];
+								const lengths = [ 0 ];
+								for ( let i = 2; i < p.length; i += 2 ) lengths.push( lengths[ lengths.length - 1 ] + Math.hypot( p[ i ] - p[ i - 2 ], p[ i + 1 ] - p[ i - 1 ] ) );
+								const total = lengths[ lengths.length - 1 ] || 1;
+								for ( let i = 0; i < p.length; i += 2 ) { projection.project( p[ i ], p[ i + 1 ], z0 + ( z1 - z0 ) * lengths[ i / 2 ] / total, v ); positions.push( v[ 0 ], v[ 1 ], v[ 2 ] ); }
+								projection.project( p[ 0 ], p[ 1 ], 0, v ); const ax = v[ 0 ], az = v[ 2 ];
+								projection.project( p[ 0 ] + unitsPerMeter, p[ 1 ], 0, v );
+								const scenePerMeter = Math.hypot( v[ 0 ] - ax, v[ 2 ] - az ) || 1;
+								escalators.push( { positions, halfWidth: STAIR_WIDTH / 2 * scenePerMeter, direction: conveying === 'forward' ? 1 : conveying === 'backward' ? - 1 : 0 } );
+
+							}
 
 							for ( const level of levels ) {
 
 								const target = levelBlock( level );
-								const z0 = ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, z1 = ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS;
-								const t = appendRamp( target, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1 );
+								const t = escalator ? appendRamp( target, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1 ) : appendSteps( target, run.points, projection, rgba, STAIR_WIDTH * unitsPerMeter, z0, z1 );
 								if ( t > 0 ) { target.triangles += t; target.features ++; }
 								// the balustrades, in a block of their own: solid from
 								// every side, where the ramp holds from above only
@@ -403,7 +476,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 
 					if ( roof ) {
 
-						const t = appendRoofedExtrusion( target, polygon, projection, colours, base, height, roof, unitsPerMeter, coveredFor( f ) );
+						const t = appendRoofedExtrusion( target, polygon, projection, colours, base, height, roof, unitsPerMeter, coveredFor( f ), entrances );
 						triangles += t;
 						if ( target !== block ) { target.triangles += t; block.triangles -= t; }
 
@@ -470,7 +543,7 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 	}
 
 	stats.buildMs = performance.now() - t0;
-	return { blocks, stats, center: projection ? projection.center : null };
+	return { blocks, stats, center: projection ? projection.center : null, escalators };
 
 }
 
@@ -502,6 +575,19 @@ function tileCenterLatitude( y, z ) {
 // The extrusions of a layer in a tile, for asking which stand at a point:
 // their polygons in tile units with their [ base, height ], in a 16 x 16
 // grid of the tile so a query looks at a handful.
+// Where two segments cross, [ x, y ], or null when they do not
+function segmentCrossing( ax, ay, bx, by, cx, cy, dx, dy ) {
+
+	const r1x = bx - ax, r1y = by - ay, r2x = dx - cx, r2y = dy - cy;
+	const den = r1x * r2y - r1y * r2x;
+	if ( Math.abs( den ) < 1e-12 ) return null;
+	const t = ( ( cx - ax ) * r2y - ( cy - ay ) * r2x ) / den;
+	const u = ( ( cx - ax ) * r1y - ( cy - ay ) * r1x ) / den;
+	if ( t < 0 || t > 1 || u < 0 || u > 1 ) return null;
+	return [ ax + r1x * t, ay + r1y * t ];
+
+}
+
 function indexExtrusions( sourceLayer, layer, zoom, extent ) {
 
 	const cells = 16, size = extent / cells, grid = new Map();

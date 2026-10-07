@@ -304,6 +304,63 @@ export function appendRamp( out, points, projection, rgba, width, z0, z1 ) {
 
 }
 
+// A staircase as steps: risers STEP_RISER high (17 cm, a comfortable
+// stair) and the treads between, along the way from z0 to z1, both faces
+// of each. A character climbs them as kerbs (under its step height) and
+// walks down them as small drops; the escalators keep the smooth ramp
+// and move instead.
+export const STEP_RISER = 0.17;
+export function appendSteps( out, points, projection, rgba, width, z0, z1, riser = STEP_RISER ) {
+
+	const edges = rampEdges( points, width, z0, z1 );
+	if ( edges === null ) return 0;
+	const count = points.length / 2;
+	const lengths = [ 0 ];
+	for ( let i = 1; i < count; i ++ ) lengths.push( lengths[ i - 1 ] + Math.hypot( points[ 2 * i ] - points[ 2 * i - 2 ], points[ 2 * i + 1 ] - points[ 2 * i - 1 ] ) );
+	const total = lengths[ count - 1 ];
+	const steps = Math.max( 1, Math.round( Math.abs( z1 - z0 ) / riser ) );
+	// the edge points at a distance s along the way
+	const at = ( s, side, o ) => {
+
+		let i = 0;
+		while ( i < count - 2 && lengths[ i + 1 ] < s ) i ++;
+		const span = lengths[ i + 1 ] - lengths[ i ] || 1, t = Math.min( 1, Math.max( 0, ( s - lengths[ i ] ) / span ) );
+		o[ 0 ] = side[ 2 * i ] + ( side[ 2 * i + 2 ] - side[ 2 * i ] ) * t;
+		o[ 1 ] = side[ 2 * i + 1 ] + ( side[ 2 * i + 3 ] - side[ 2 * i + 1 ] ) * t;
+
+	};
+
+	const l0 = [ 0, 0 ], r0 = [ 0, 0 ], l1 = [ 0, 0 ], r1 = [ 0, 0 ];
+	let triangles = 0;
+	const quad = ( ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz ) => {
+
+		const start = out.vertexCount;
+		push( out, projection, ax, ay, az, rgba );
+		push( out, projection, bx, by, bz, rgba );
+		push( out, projection, cx, cy, cz, rgba );
+		push( out, projection, dx, dy, dz, rgba );
+		out.indices.push( start, start + 2, start + 1, start + 1, start + 2, start + 3 );
+		out.indices.push( start, start + 1, start + 2, start + 1, start + 3, start + 2 );
+		triangles += 4;
+
+	};
+
+	for ( let k = 0; k < steps; k ++ ) {
+
+		const s0 = total * k / steps, s1 = total * ( k + 1 ) / steps;
+		const zLow = z0 + ( z1 - z0 ) * k / steps, zHigh = z0 + ( z1 - z0 ) * ( k + 1 ) / steps;
+		at( s0, edges.left, l0 ); at( s0, edges.right, r0 ); at( s1, edges.left, l1 ); at( s1, edges.right, r1 );
+		// the riser at the start of the step, from the last tread's height to this one's
+		quad( l0[ 0 ], l0[ 1 ], zLow, r0[ 0 ], r0[ 1 ], zLow, l0[ 0 ], l0[ 1 ], zHigh, r0[ 0 ], r0[ 1 ], zHigh );
+		// the tread, flat at this step's height
+		quad( l0[ 0 ], l0[ 1 ], zHigh, r0[ 0 ], r0[ 1 ], zHigh, l1[ 0 ], l1[ 1 ], zHigh, r1[ 0 ], r1[ 1 ], zHigh );
+
+	}
+
+	return triangles;
+
+}
+
 // The two edges of a ramp, left and right of its way by half its width
 // (flat [ x, y, ... ] each), and its height at every point.
 function rampEdges( points, width, z0, z1 ) {
