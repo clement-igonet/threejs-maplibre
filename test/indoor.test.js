@@ -137,6 +137,14 @@ describe( 'indoor', () => {
 		expect( Math.max( ...y ) ).toBeGreaterThan( 0 ); // and one up
 		const lifts = built.blocks.filter( b => b.id === 'indoor-lift' );
 		expect( lifts.length ).toBeGreaterThan( 0 );
+		// every staircase has its balustrades, in a block of their own that a
+		// character meets as a wall from any side
+		const steps0 = steps.filter( b => b.level === 0 && b.indoor === 'steps' ), rails0 = steps.filter( b => b.level === 0 && b.indoor === 'rail' );
+		expect( steps0.length ).toBe( 1 );
+		expect( rails0.length ).toBe( 1 );
+		expect( rails0[ 0 ].triangles ).toBe( 2 * steps0[ 0 ].triangles ); // two walls of as many quads as the ramp
+		const ry = ys( rails0[ 0 ] );
+		expect( Math.max( ...ry ) - Math.max( ...y ) ).toBeCloseTo( 1.1, 6 );
 
 	} );
 

@@ -45,7 +45,8 @@ export function buildColliders( built ) {
 // times 3 m; a station with levels -1, -0.75 and -0.5 puts floors 0.75 m
 // apart where the real ones are not): a floor or a ramp is stood on and
 // never bumped into from below or from its edge, and a wall blocks only on
-// its own level, within 1.5 m of the feet. A floor holds the character up
+// its own level, within 1.5 m of the feet; a rail (a stair's balustrade)
+// is solid from every side at any height. A floor holds the character up
 // only where it meets the feet, up to knee height: a slab met higher,
 // with the head through it from below, is a ceiling, not ground (that
 // held a fallen character hanging a meter under a floor, its legs hidden).

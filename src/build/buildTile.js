@@ -1,6 +1,6 @@
 import { createTileProjection } from './TileProjection.js';
 import { appendRoofedExtrusion, hasWalls, roofColours, roofFromTags } from './buildRoofs.js';
-import { FLOOR_THICKNESS, appendFillWithHoles, appendFloor, appendFloorWithHoles, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
+import { FLOOR_THICKNESS, appendFillWithHoles, appendFloor, appendFloorWithHoles, appendRail, appendRamp, appendShaft, appendWallRun, featureLevels, stairwell } from './buildIndoor.js';
 import { appendExtrusion, appendFill, featurePolygons } from './buildPolygons.js';
 import { appendLine, featureLines } from './buildLines.js';
 import { EXTRUDE_SCALE, PROPS_SCALE, quantize } from './quantize.js';
@@ -94,6 +94,10 @@ function finishBlock( block ) {
 	return out;
 
 }
+
+// a balustrade's height over the stairs: more than a jump (0.8 m at the
+// walk demo's gravity), so the stairs keep the character on them
+export const RAIL_HEIGHT = 1.1;
 
 export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', datum } ) {
 
@@ -214,16 +218,17 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 		};
 
 		const levelBlocks = new Map();
-		const levelBlock = level => {
+		const levelBlock = ( level, kind = indoor ) => {
 
-			let b = levelBlocks.get( level );
+			const key = kind === indoor ? level : `${ level }:${ kind }`;
+			let b = levelBlocks.get( key );
 			if ( ! b ) {
 
 				b = newBlock( layer, index, type );
 				b.level = level;
-				b.indoor = indoor; // floor, wall, steps or lift: how a character meets it
+				b.indoor = kind; // floor, wall, steps, lift or rail: how a character meets it
 				b.base = level * levelHeight; // where the level's floor is
-				levelBlocks.set( level, b );
+				levelBlocks.set( key, b );
 
 			}
 
@@ -301,8 +306,14 @@ export function buildTile( tile, style, { sourceId, x, y, z, mode = 'globe', dat
 							for ( const level of levels ) {
 
 								const target = levelBlock( level );
-								const t = appendRamp( target, run.points, projection, rgba, 1.5 * unitsPerMeter, ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS );
+								const z0 = ( down ? hi : lo ) * levelHeight + FLOOR_THICKNESS, z1 = ( down ? lo : hi ) * levelHeight + FLOOR_THICKNESS;
+								const t = appendRamp( target, run.points, projection, rgba, 1.5 * unitsPerMeter, z0, z1 );
 								if ( t > 0 ) { target.triangles += t; target.features ++; }
+								// the balustrades, in a block of their own: solid from
+								// every side, where the ramp holds from above only
+								const rails = levelBlock( level, 'rail' );
+								const tr = appendRail( rails, run.points, projection, rgba, 1.5 * unitsPerMeter, z0, z1, RAIL_HEIGHT );
+								if ( tr > 0 ) { rails.triangles += tr; rails.features ++; }
 
 							}
 

@@ -1417,8 +1417,11 @@ the Lego store is in one of 13 nodes. Porte Lescot joins the big one
 (645 nodes, levels -5 to 0), and from 8 m outside it the graph routes to
 platform 1 in 206 s.
 
-Measured: 212 tests, among them the route from each place's start to
-its goal and the goal's space found under its centre. In headless
+Measured: 214 tests, among them the route from each place's start to
+its goal and the goal's space found under its centre, a staircase cut
+into the street walked down and walked over where the street is whole,
+and on a railed ramp a step and a jump across stopped by the rail while
+the walk along it goes down. In headless
 Chrome at Saint-Lazare: the start screen, Start by Enter, the way drawn
 in one frame (256 s, 8 points), and the character placed on the platform
 seen as arrived within 2.5 s, the time shown.
@@ -1433,11 +1436,23 @@ gives it the stairwell quads it cuts the ground mesh with: over a hole
 there is no street, the ground is the ramp below, and a jump over a
 hole falls onto it.
 
+The second thing: on an escalator the robot could step or jump off
+the side. Real stairs and escalators have balustrades, and ours had a
+ramp and nothing else. Every ramp now gets a rail up each edge
+(`appendRail`), a thin wall 1.1 m high (`RAIL_HEIGHT`, more than the
+0.8 m a jump reaches at the walk's gravity), drawn as the balustrade and
+built into a block of its own with `indoor: 'rail'`: the ramp holds the
+character from above only, the rail is solid from every side at any
+height, as a wall is only on its own level. The rails fence the
+stairwell cut in the floor above as well.
+
 The recorded walk: the robot driven along the route in headless Chrome
 (a frame every 3 s of walk time, the way shown), from the forecourt to
 the platform in 3 min 7 s.
 
 ![The recorded walk](../evidence/m5/walk-recorded.gif)
 ![The start screen](../evidence/m5/walk-start.png)
+![The escalator before its balustrades](../evidence/m5/walk-rails-before.png)
+![And after](../evidence/m5/walk-rails-after.png)
 ![The way, from the forecourt](../evidence/m5/walk-way.png)
 ![Arrived on the Métro 13 platform](../evidence/m5/walk-done.png)

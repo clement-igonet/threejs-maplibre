@@ -271,26 +271,14 @@ export function appendWallRun( out, points, projection, rgba, base, top, closed 
 // climbs rather than its steps.
 export function appendRamp( out, points, projection, rgba, width, z0, z1 ) {
 
+	const edges = rampEdges( points, width, z0, z1 );
+	if ( edges === null ) return 0;
 	const count = points.length / 2;
-	if ( count < 2 ) return 0;
-	const lengths = [ 0 ];
-	for ( let i = 1; i < count; i ++ ) lengths.push( lengths[ i - 1 ] + Math.hypot( points[ 2 * i ] - points[ 2 * i - 2 ], points[ 2 * i + 1 ] - points[ 2 * i - 1 ] ) );
-	const total = lengths[ count - 1 ];
-	if ( total === 0 ) return 0;
 	const start = out.vertexCount;
 	for ( let i = 0; i < count; i ++ ) {
 
-		// the side direction: the mean of the normals of the two segments at
-		// this vertex
-		let nx = 0, ny = 0;
-		if ( i > 0 ) { const dx = points[ 2 * i ] - points[ 2 * i - 2 ], dy = points[ 2 * i + 1 ] - points[ 2 * i - 1 ], l = Math.hypot( dx, dy ) || 1; nx += - dy / l; ny += dx / l; }
-		if ( i < count - 1 ) { const dx = points[ 2 * i + 2 ] - points[ 2 * i ], dy = points[ 2 * i + 3 ] - points[ 2 * i + 1 ], l = Math.hypot( dx, dy ) || 1; nx += - dy / l; ny += dx / l; }
-		const l = Math.hypot( nx, ny ) || 1;
-		nx = nx / l * width / 2;
-		ny = ny / l * width / 2;
-		const z = z0 + ( z1 - z0 ) * lengths[ i ] / total;
-		push( out, projection, points[ 2 * i ] - nx, points[ 2 * i + 1 ] - ny, z, rgba );
-		push( out, projection, points[ 2 * i ] + nx, points[ 2 * i + 1 ] + ny, z, rgba );
+		push( out, projection, edges.left[ 2 * i ], edges.left[ 2 * i + 1 ], edges.z[ i ], rgba );
+		push( out, projection, edges.right[ 2 * i ], edges.right[ 2 * i + 1 ], edges.z[ i ], rgba );
 
 	}
 
@@ -301,6 +289,71 @@ export function appendRamp( out, points, projection, rgba, width, z0, z1 ) {
 		out.indices.push( a, c, b, b, c, d );
 		out.indices.push( a, b, c, b, d, c );
 		triangles += 4;
+
+	}
+
+	return triangles;
+
+}
+
+// The two edges of a ramp, left and right of its way by half its width
+// (flat [ x, y, ... ] each), and its height at every point.
+function rampEdges( points, width, z0, z1 ) {
+
+	const count = points.length / 2;
+	if ( count < 2 ) return null;
+	const lengths = [ 0 ];
+	for ( let i = 1; i < count; i ++ ) lengths.push( lengths[ i - 1 ] + Math.hypot( points[ 2 * i ] - points[ 2 * i - 2 ], points[ 2 * i + 1 ] - points[ 2 * i - 1 ] ) );
+	const total = lengths[ count - 1 ];
+	if ( total === 0 ) return null;
+	const left = [], right = [], z = [];
+	for ( let i = 0; i < count; i ++ ) {
+
+		// the side direction: the mean of the normals of the two segments at
+		// this vertex
+		let nx = 0, ny = 0;
+		if ( i > 0 ) { const dx = points[ 2 * i ] - points[ 2 * i - 2 ], dy = points[ 2 * i + 1 ] - points[ 2 * i - 1 ], l = Math.hypot( dx, dy ) || 1; nx += - dy / l; ny += dx / l; }
+		if ( i < count - 1 ) { const dx = points[ 2 * i + 2 ] - points[ 2 * i ], dy = points[ 2 * i + 3 ] - points[ 2 * i + 1 ], l = Math.hypot( dx, dy ) || 1; nx += - dy / l; ny += dx / l; }
+		const l = Math.hypot( nx, ny ) || 1;
+		nx = nx / l * width / 2;
+		ny = ny / l * width / 2;
+		left.push( points[ 2 * i ] - nx, points[ 2 * i + 1 ] - ny );
+		right.push( points[ 2 * i ] + nx, points[ 2 * i + 1 ] + ny );
+		z.push( z0 + ( z1 - z0 ) * lengths[ i ] / total );
+
+	}
+
+	return { left, right, z };
+
+}
+
+// The balustrades of a ramp: a thin wall up each edge, height over the
+// ramp's surface, both faces (a character keeps to the stairs, and
+// cannot jump off their side; the walls fence the stairwell above too).
+export function appendRail( out, points, projection, rgba, width, z0, z1, height ) {
+
+	const edges = rampEdges( points, width, z0, z1 );
+	if ( edges === null ) return 0;
+	const count = points.length / 2;
+	let triangles = 0;
+	for ( const side of [ edges.left, edges.right ] ) {
+
+		const start = out.vertexCount;
+		for ( let i = 0; i < count; i ++ ) {
+
+			push( out, projection, side[ 2 * i ], side[ 2 * i + 1 ], edges.z[ i ], rgba );
+			push( out, projection, side[ 2 * i ], side[ 2 * i + 1 ], edges.z[ i ] + height, rgba );
+
+		}
+
+		for ( let i = 0; i < count - 1; i ++ ) {
+
+			const a = start + 2 * i, b = a + 1, c = a + 2, d = a + 3;
+			out.indices.push( a, c, b, b, c, d );
+			out.indices.push( a, b, c, b, d, c );
+			triangles += 4;
+
+		}
 
 	}
 
