@@ -95,6 +95,43 @@ export function collideCapsule( colliders, start, end, radius, out, feet = null 
 
 }
 
+// The escalator under a point, if any: out gets the unit direction the
+// belt carries a rider, in the frame of the colliders (x, z; y stays 0),
+// and true is returned. escalators are a built tile's runs (positions
+// [ x, y, z, ... ] in the tile's frame round center, a half width, a
+// direction: 1 along the run, -1 against it, 0 whichever way the rider
+// faces, given by facingX and facingZ). A rider is on the belt within its
+// half width of the run and within 1.5 m of its height there.
+export function conveyorAt( escalators, center, position, facingX, facingZ, out ) {
+
+	const px = position.x - center.x, py = position.y - center.y, pz = position.z - center.z;
+	for ( const run of escalators ) {
+
+		const p = run.positions;
+		for ( let i = 0; i + 5 < p.length; i += 3 ) {
+
+			const ax = p[ i ], ay = p[ i + 1 ], az = p[ i + 2 ], bx = p[ i + 3 ], by = p[ i + 4 ], bz = p[ i + 5 ];
+			const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz;
+			if ( len2 === 0 ) continue;
+			const t = ( ( px - ax ) * dx + ( pz - az ) * dz ) / len2;
+			if ( t < 0 || t > 1 ) continue;
+			const qx = ax + dx * t, qz = az + dz * t;
+			if ( Math.hypot( px - qx, pz - qz ) > run.halfWidth ) continue;
+			if ( Math.abs( py - ( ay + ( by - ay ) * t ) ) > 1.5 ) continue;
+			const len = Math.sqrt( len2 );
+			let sign = run.direction;
+			if ( sign === 0 ) sign = facingX * dx + facingZ * dz >= 0 ? 1 : - 1;
+			out.set( dx / len * sign, 0, dz / len * sign );
+			return true;
+
+		}
+
+	}
+
+	return false;
+
+}
+
 // The distance to the first surface along a ray, within maxDistance, or
 // null: what a camera behind a character asks before it goes through a
 // wall.

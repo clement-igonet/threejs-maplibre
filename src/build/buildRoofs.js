@@ -1,7 +1,7 @@
 import { Earcut } from 'three/src/extras/Earcut.js';
 import { Color } from '@maplibre/maplibre-gl-style-spec';
 import { straightSkeleton } from './straightSkeleton.js';
-import { uncovered } from './buildPolygons.js';
+import { uncovered, wallPieces } from './buildPolygons.js';
 
 // Simple 3D Buildings roofs. A fill-extrusion is a footprint pulled up to a
 // flat top, which is all MapLibre can draw and all OpenMapTiles carries;
@@ -166,7 +166,7 @@ function parseMeters( value ) {
 // asked. out is { positions, colors, indices, vertexCount }. Returns the
 // triangle count. The projection's scale (tile units per meter) is what
 // turns the footprint's extent into a roof height when the tags give none.
-export function appendRoofedExtrusion( out, polygon, projection, colours, base, height, roof, unitsPerMeter, covered = null ) {
+export function appendRoofedExtrusion( out, polygon, projection, colours, base, height, roof, unitsPerMeter, covered = null, openings = null ) {
 
 	const ring = polygon[ 0 ];
 	const count = ring.length / 2;
@@ -227,7 +227,26 @@ export function appendRoofedExtrusion( out, polygon, projection, colours, base, 
 
 	}
 
-	const eave = Math.max( base, height - roofHeight );
+	let eave = Math.max( base, height - roofHeight );
+	// a door into a shell whose walls are lower than a door (a dome or a
+	// pyramid the whole building's height, the glass bubble over the Cour
+	// de Rome escalators, whose eave came out at 1 m): the shell is set on
+	// a drum the door's height, so there is a wall to cut the door into
+	if ( openings && roof.walls !== false && eave < base + 2.5 ) {
+
+		let door = 0;
+		const ring = polygon[ 0 ], n = ring.length / 2;
+		for ( let i = 0; i < n; i ++ ) {
+
+			const j = ( i + 1 ) % n;
+			const cut = wallPieces( ring[ 2 * i ], ring[ 2 * i + 1 ], ring[ 2 * j ], ring[ 2 * j + 1 ], openings );
+			if ( cut ) door = Math.max( door, cut.height );
+
+		}
+
+		if ( door > 0 && eave < base + door ) eave = Math.min( height, base + Math.min( door, 2.5 ) );
+
+	}
 	const top = height;
 	let triangles = 0;
 
@@ -241,13 +260,13 @@ export function appendRoofedExtrusion( out, polygon, projection, colours, base, 
 
 		};
 
-		if ( roof.walls !== false ) triangles += appendWalls( out, polygon, projection, colours.wall, base, zOf, covered );
+		if ( roof.walls !== false ) triangles += appendWalls( out, polygon, projection, colours.wall, base, zOf, covered, openings );
 		triangles += appendLiftedFill( out, polygon, projection, colours.roof, zOf );
 		return triangles;
 
 	}
 
-	if ( roof.walls !== false ) triangles += appendWalls( out, polygon, projection, colours.wall, base, () => eave, covered );
+	if ( roof.walls !== false ) triangles += appendWalls( out, polygon, projection, colours.wall, base, () => eave, covered, openings );
 	const roofRGBA = colours.roof;
 
 	if ( POINTED.has( roof.shape ) || ( RIDGED.has( roof.shape ) && E === 0 ) ) {
@@ -473,9 +492,24 @@ function appendDome( out, ring, projection, rgba, eave, top, c, steps = 6 ) {
 }
 
 // Wall quads from base to a top that may differ per vertex.
-function appendWalls( out, polygon, projection, rgba, base, topOf, covered = null ) {
+// openings are the doors at the base, [ x, y, halfWidth, height ] as
+// appendExtrusion takes them (buildPolygons.js): an edge a door lies on
+// is drawn in pieces beside the door up to its top, and whole above it.
+function appendWalls( out, polygon, projection, rgba, base, topOf, covered = null, openings = null ) {
 
 	let triangles = 0;
+	const quad = ( ax, ay, bx, by, z0, zTopA, zTopB ) => {
+
+		const start = out.vertexCount;
+		pushVertex( out, projection, ax, ay, z0, rgba );
+		pushVertex( out, projection, bx, by, z0, rgba );
+		pushVertex( out, projection, bx, by, zTopB, rgba );
+		pushVertex( out, projection, ax, ay, zTopA, rgba );
+		out.indices.push( start, start + 2, start + 1, start, start + 3, start + 2 );
+		triangles += 2;
+
+	};
+
 	for ( const ring of polygon ) {
 
 		const count = ring.length / 2;
@@ -485,16 +519,15 @@ function appendWalls( out, polygon, projection, rgba, base, topOf, covered = nul
 			const ax = ring[ 2 * i ], ay = ring[ 2 * i + 1 ];
 			const bx = ring[ 2 * j ], by = ring[ 2 * j + 1 ];
 			if ( ax === bx && ay === by ) continue;
+			const topA = topOf( ax, ay ), topB = topOf( bx, by );
 			// a wall a neighbour stands against all the way up is not drawn;
 			// a partial one is (the slope of a skillion makes the spans uneven)
-			if ( covered && uncovered( base, Math.max( topOf( ax, ay ), topOf( bx, by ) ), covered( ax, ay, bx, by ) ).length === 0 ) continue;
-			const start = out.vertexCount;
-			pushVertex( out, projection, ax, ay, base, rgba );
-			pushVertex( out, projection, bx, by, base, rgba );
-			pushVertex( out, projection, bx, by, topOf( bx, by ), rgba );
-			pushVertex( out, projection, ax, ay, topOf( ax, ay ), rgba );
-			out.indices.push( start, start + 2, start + 1, start, start + 3, start + 2 );
-			triangles += 2;
+			if ( covered && uncovered( base, Math.max( topA, topB ), covered( ax, ay, bx, by ) ).length === 0 ) continue;
+			const cut = openings ? wallPieces( ax, ay, bx, by, openings ) : null;
+			if ( cut === null ) { quad( ax, ay, bx, by, base, topA, topB ); continue; }
+			const doorTop = Math.min( Math.min( topA, topB ), base + cut.height );
+			for ( const [ s0, s1 ] of cut.pieces ) quad( ax + ( bx - ax ) * s0, ay + ( by - ay ) * s0, ax + ( bx - ax ) * s1, ay + ( by - ay ) * s1, base, doorTop, doorTop );
+			if ( doorTop < Math.max( topA, topB ) ) quad( ax, ay, bx, by, doorTop, Math.max( topA, doorTop ), Math.max( topB, doorTop ) );
 
 		}
 

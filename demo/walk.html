@@ -300,7 +300,7 @@
 			// ground meter (1.52 here): speeds are given in ground meters and
 			// scaled, so a walk is a walk; heights are true meters already
 			const mercator = 1 / Math.cos( startLat * Math.PI / 180 );
-			const character = new CharacterController( map, { bounds, walkSpeed: 1.4 * mercator, runSpeed: 4.2 * mercator, street: streetAt } ).place( sx, num( 'y', 0 ), sz );
+			const character = new CharacterController( map, { bounds, walkSpeed: 1.4 * mercator, runSpeed: 4.2 * mercator, beltSpeed: 0.5 * mercator, street: streetAt } ).place( sx, num( 'y', 0 ), sz );
 			{
 
 				// four translucent walls 2.5 m high, built round their own centre
@@ -613,13 +613,13 @@
 				figure.position.copy( character.position );
 				figure.rotation.y = character.heading + Math.PI / 2;
 				play( ride ? actions.idle : ! character.onGround ? actions.jump : character.speed === 0 ? actions.idle : input.run ? actions.run : actions.walk );
-				const gait = character.speed === 0 ? 'standing' : input.run ? 'running' : 'walking';
+				const gait = character.speed === 0 ? ( character.conveyed ? 'on the escalator' : 'standing' ) : input.run ? 'running' : 'walking';
 				if ( gaitBox.dataset.gait !== gait ) {
 
 					gaitBox.dataset.gait = gait;
 					gaitBox.classList.toggle( 'run', gait === 'running' );
 					gaitBox.firstChild.textContent = gait;
-					gaitBox.querySelector( '.hint' ).textContent = gait === 'running' ? ( input.runToggle ? 'R to walk' : 'release Shift to walk' ) : 'Shift or R to run';
+					gaitBox.querySelector( '.hint' ).textContent = gait === 'running' ? ( input.runToggle ? 'R to walk' : 'release Shift to walk' ) : gait === 'on the escalator' ? 'W to walk on it' : 'Shift or R to run';
 
 				}
 				mixer.update( dt );

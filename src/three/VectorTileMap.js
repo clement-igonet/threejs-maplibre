@@ -1,5 +1,5 @@
 import { BatchedMesh, BufferAttribute, BufferGeometry, DoubleSide, Matrix4, MeshBasicMaterial, MeshLambertMaterial, Object3D, SRGBColorSpace, Vector3 } from 'three';
-import { buildColliders, collideCapsule, groundBelow, raycastFirst } from './colliders.js';
+import { buildColliders, collideCapsule, conveyorAt, groundBelow, raycastFirst } from './colliders.js';
 import { VectorTileLoader } from '../core/VectorTileLoader.js';
 import { EARTH_RADIUS, metersToNormalized, normalizedToLatitude } from '../math/WebMercator.js';
 import { geocentricHeight, rayEllipsoidIntersection } from '../math/Ellipsoid.js';
@@ -402,6 +402,22 @@ export class VectorTileMap extends TileTree {
 		}
 
 		return out;
+
+	}
+
+	// The escalator under a point, if one is loaded there: out gets the
+	// direction its belt carries a rider (see colliders.js), true returned.
+	conveyorAt( position, facingX, facingZ, out ) {
+
+		if ( ! this.collision ) return false;
+		for ( const record of this._records.values() ) {
+
+			if ( ! record.content || ! record.content.escalators || ! record.content.colliders || ! record.object ) continue;
+			if ( conveyorAt( record.content.escalators, record.content.center, position, facingX, facingZ, out ) ) return true;
+
+		}
+
+		return false;
 
 	}
 

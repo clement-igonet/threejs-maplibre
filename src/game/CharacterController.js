@@ -16,11 +16,11 @@ import { Vector3 } from 'three';
 // where the soles rest, in radii from the centre: the centre and four
 // points at the capsule's edge
 const _SOLES = [ [ 0, 0 ], [ 0.8, 0 ], [ - 0.8, 0 ], [ 0, 0.8 ], [ 0, - 0.8 ] ];
-const _start = new Vector3(), _end = new Vector3(), _push = new Vector3(), _move = new Vector3();
+const _start = new Vector3(), _end = new Vector3(), _push = new Vector3(), _move = new Vector3(), _belt = new Vector3();
 
 export class CharacterController {
 
-	constructor( map, { radius = 0.35, height = 1.7, walkSpeed = 1.6, runSpeed = 4.5, gravity = 30, jumpSpeed = 7, steps = 5, steering = true, turnSpeed = 2.4, bounds = null, ledge = 1, street = null } = {} ) {
+	constructor( map, { radius = 0.35, height = 1.7, walkSpeed = 1.6, runSpeed = 4.5, gravity = 30, jumpSpeed = 7, steps = 5, steering = true, turnSpeed = 2.4, bounds = null, ledge = 1, street = null, beltSpeed = 0.5 } = {} ) {
 
 		this.map = map;
 		this.radius = radius;
@@ -43,6 +43,11 @@ export class CharacterController {
 		// there, false over a stairwell cut into it, so a character walks
 		// down the stairs rather than over the hole on air. null: everywhere
 		this.street = street;
+		// an escalator's pace, in the map's units a second: standing on one
+		// (map.conveyorAt) the character is carried at this speed along it,
+		// walking on it adds to that
+		this.beltSpeed = beltSpeed;
+		this.conveyed = false;
 		this.fallDepth = 40; // a fall deeper than this below the last floor stood on is into nothing
 		this.lastSafe = new Vector3();
 		this.home = new Vector3(); // where place() put it: the way out if lastSafe fails too
@@ -107,6 +112,13 @@ export class CharacterController {
 
 		this.velocity.x = _move.x * speed;
 		this.velocity.z = _move.z * speed;
+		this.conveyed = this.onGround && this.map.conveyorAt !== undefined && this.map.conveyorAt( this.position, Math.cos( this.heading ), - Math.sin( this.heading ), _belt );
+		if ( this.conveyed ) {
+
+			this.velocity.x += _belt.x * this.beltSpeed;
+			this.velocity.z += _belt.z * this.beltSpeed;
+
+		}
 		this.speed = pushing ? Math.hypot( this.velocity.x, this.velocity.z ) : 0;
 		this.turning = this.steering && Math.abs( input.right ) > 1e-3;
 		if ( input.jump && this.onGround ) this.velocity.y = this.jumpSpeed;
