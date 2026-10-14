@@ -34,6 +34,8 @@
 			#start button:disabled { background: #666; cursor: wait; }
 			#start .places, #done .places { margin-top: 12px; font-size: 13px; color: #cde; }
 			#start .places a, #done .places a { color: #fff; }
+			#clock { position: absolute; bottom: 62px; right: 8px; padding: 4px 10px; font: 12px ui-monospace, monospace; color: #fff; background: rgba(0, 0, 0, 0.6); border-radius: 4px; pointer-events: none; }
+			body.touch #clock { bottom: 170px; right: 24px; }
 			#goal { position: absolute; top: 48px; right: 8px; padding: 6px 12px; font: 13px/1.5 system-ui, sans-serif; color: #fff; background: rgba(20, 40, 60, 0.75); border-radius: 8px; pointer-events: none; text-align: right; }
 			#goal b { color: #ffb199; }
 			#way { position: absolute; top: 104px; right: 8px; padding: 5px 10px; font: 12px system-ui, sans-serif; color: #fff; background: rgba(20, 40, 60, 0.75); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 6px; cursor: pointer; }
@@ -80,12 +82,13 @@
 		<button id="jump">jump</button>
 		<div id="lift"><div class="title">Lift</div><div class="hint">step into the car</div><div class="buttons"></div><div class="keys">PageUp / PageDown</div></div>
 		<div id="goal"></div>
+		<div id="clock"></div>
 		<button id="way">show the way (H)</button>
 		<div id="start"><div class="card">
 			<h1>A walk: <span class="place"></span></h1>
 			<div>Real OpenStreetMap streets, a real station, every wall and stair solid. Find your way in and down.</div>
 			<div class="goal">Goal: reach <span class="target"></span></div>
-			<div class="keys keyboard"><kbd>W</kbd> walk &nbsp;<kbd>A</kbd><kbd>D</kbd> turn &nbsp;<kbd>S</kbd> back &nbsp;<kbd>Shift</kbd> run &nbsp;<kbd>Space</kbd> jump &nbsp;<kbd>H</kbd> show the way &nbsp;drag to look round. In a lift, pick a level.</div>
+			<div class="keys keyboard"><kbd>W</kbd> walk &nbsp;<kbd>A</kbd><kbd>D</kbd> turn &nbsp;<kbd>S</kbd> back &nbsp;<kbd>Shift</kbd> run &nbsp;<kbd>Space</kbd> jump &nbsp;<kbd>H</kbd> show the way &nbsp;<kbd>[</kbd><kbd>]</kbd> the hour &nbsp;drag to look round. In a lift, pick a level.</div>
 			<div class="keys touch">Drag the dot to walk and turn, to its red rim to run. Tap jump to jump. "Show the way" draws the route. In a lift, tap a level.</div>
 			<button id="play" disabled>loading the streets…</button>
 			<div class="places">Elsewhere: <span class="links"></span></div>
@@ -112,6 +115,7 @@
 			//   ?heading=       the camera's, degrees clockwise from north
 			//   ?place=         saint-lazare (default) or chatelet
 			//   ?go=1           no start screen (a URL with lat= skips it too)
+			//   ?hour=          the time of day in Paris, decimal hours (14.5); now by default
 			//
 			// The game: a goal per place, a platform deep under the station,
 			// to reach from the street; the time it takes; the way there drawn
@@ -119,7 +123,7 @@
 			// floors, from where the character stands.
 
 
-			import { AnimationMixer, BufferAttribute, BufferGeometry, Clock, Color, DirectionalLight, DoubleSide, Group, HemisphereLight, Mesh, MeshBasicMaterial, MeshLambertMaterial, PerspectiveCamera, PlaneGeometry, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
+			import { AnimationMixer, BufferAttribute, BufferGeometry, Clock, Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Scene, SRGBColorSpace, Vector3, WebGLRenderer } from 'three';
 			import * as THREE_NS from 'three';
 			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 			import { Line2 } from 'three/addons/lines/Line2.js';
@@ -130,6 +134,8 @@
 			import { STAIRWELL_WIDTH, featureLevels, stairwell, subtractConvex } from '../src/build/buildIndoor.js';
 			import { CharacterController } from '../src/game/CharacterController.js';
 			import { Input } from '../src/game/Input.js';
+			import { dateAtHour } from '../src/game/sun.js';
+			import { DayNight } from './day-night.js';
 			import { createGeoJSONVectorSource } from './geojson-vector-source.js';
 			import { STATION_STYLE } from './station-style.js';
 			import { LOUVRE_STYLE } from './louvre-style.js';
@@ -166,15 +172,13 @@
 			// under the street the sky is gone: what OSM leaves unmapped down
 			// there is earth, so the backdrop and the haze darken to it, and
 			// the haze closes in, over the first 3 m of the camera's descent
-			const sky = scene.fog.color.clone(), earth = new Color( 0x3b3632 );
+			const earth = new Color( 0x3b3632 );
 			const haze = { near: scene.fog.near, far: scene.fog.far };
 			const camera = new PerspectiveCamera( 55, window.innerWidth / window.innerHeight, 0.1, 5000 );
-			scene.add( new HemisphereLight( 0xffffff, 0x8a8478, 1.0 ) );
-			const sun = new DirectionalLight( 0xffffff, 1.8 );
-			sun.position.set( 300, 600, 200 );
-			scene.add( sun );
+			renderer.shadowMap.enabled = true;
+			renderer.shadowMap.type = PCFSoftShadowMap;
 
-			const map = new VectorTileMap( source, style, { mode: 'planar', sourceId: 'openmaptiles', collision: true, doubleSided: true, viewDistance: 900 } );
+			const map = new VectorTileMap( source, style, { mode: 'planar', sourceId: 'openmaptiles', collision: true, doubleSided: true, shadows: true, viewDistance: 900 } );
 			// a floating origin for everything that is not the map's own batches
 			// (which have theirs): the planar frame is mercator meters, millions
 			// of them, and a skinned mesh or a camera that far from zero loses
@@ -288,6 +292,7 @@
 				geometry.setAttribute( 'position', new BufferAttribute( new Float32Array( positions ), 3 ) );
 				geometry.setAttribute( 'normal', new BufferAttribute( new Float32Array( positions.length ).map( ( v, i ) => i % 3 === 1 ? 1 : 0 ), 3 ) );
 				ground = new Mesh( geometry, groundMaterial );
+				ground.receiveShadow = true;
 				ground.position.set( gx, - 0.02, gz );
 				ground.renderOrder = - 1;
 				root.add( ground );
@@ -323,6 +328,27 @@
 
 			}
 			character.heading = ( 90 - num( 'heading', startHeading ) ) * Math.PI / 180; // facing where the camera looks
+
+			// --- the sky and the hour ----------------------------------------------
+			// the sun over the place at Paris time: now, or ?hour=; [ and ] move
+			// it by half an hour. The sky, the sun's light and its shadows, and
+			// the colours of the fog and the backdrop follow it (demo/day-night.js)
+			const day = new DayNight( root, { latitude: startLat, longitude: startLon } );
+			let hour = num( 'hour', NaN );
+			if ( ! Number.isFinite( hour ) ) { const now = new Intl.DateTimeFormat( 'en-US', { timeZone: 'Europe/Paris', hour: 'numeric', minute: 'numeric', hour12: false } ).formatToParts( new Date() ); hour = parseInt( now.find( p => p.type === 'hour' ).value, 10 ) % 24 + parseInt( now.find( p => p.type === 'minute' ).value, 10 ) / 60; }
+			const clockBox = document.getElementById( 'clock' );
+			function setHour( h ) {
+
+				hour = ( ( h % 24 ) + 24 ) % 24;
+				day.setTime( dateAtHour( hour, 'Europe/Paris' ) );
+				map.setBrightness( 0.25 + 0.75 * day.daylight );
+				const hh = Math.floor( hour ), mm = Math.round( ( hour - hh ) * 60 ) % 60;
+				clockBox.textContent = `${ String( hh ).padStart( 2, '0' ) }:${ String( mm ).padStart( 2, '0' ) } Paris · sun ${ Math.round( day.altitude * 180 / Math.PI ) }°`;
+
+			}
+
+			setHour( hour );
+			window.addEventListener( 'keydown', e => { if ( e.code === 'BracketLeft' ) setHour( hour - 0.5 ); if ( e.code === 'BracketRight' ) setHour( hour + 0.5 ); } );
 
 			// --- the game: a goal, a clock, the way there on request -------------
 			const graph = places.graph;
@@ -439,6 +465,7 @@
 			// the robot stands 1.8 m, whatever the file's units
 			{ const b = new THREE_NS.Box3().setFromObject( figure ); const h = b.max.y - b.min.y; if ( h > 0 ) figure.scale.setScalar( 1.8 / h ); }
 			root.add( figure );
+			figure.traverse( o => { if ( o.isMesh ) o.castShadow = true; } );
 			window.__FIGURE = figure;
 			window.THREE_NS = THREE_NS;
 			window.__COLLIDE = ( await import( '../src/three/colliders.js' ) ).collideCapsule;
@@ -636,8 +663,10 @@
 				camera.lookAt( look.add( root.position ) ); // lookAt takes a world point; the camera lives in the root
 				camera.updateMatrixWorld();
 				const under = Math.min( Math.max( - eye.y / 3, 0 ), 1 );
-				scene.fog.color.lerpColors( sky, earth, under );
+				scene.fog.color.lerpColors( day.fogColor, earth, under );
 				scene.background.copy( scene.fog.color );
+				day.follow( character.position );
+				day.underground( under );
 				scene.fog.near = haze.near + ( 25 - haze.near ) * under;
 				scene.fog.far = haze.far + ( 160 - haze.far ) * under;
 
@@ -675,6 +704,7 @@
 			window.__GRAPH = () => graph;
 			window.__LABELS = () => nearbyLabels;
 			window.__LIFT = () => ( { lift: liftHere, inCar, ride, go: rideTo, lifts } );
+			window.__DAY = () => ( { hour, daylight: day.daylight, altitude: day.altitude * 180 / Math.PI, azimuth: day.azimuth * 180 / Math.PI, sun: day.sun.intensity, set: setHour } );
 			window.__TOSCENE = toScene;
 			window.__ANIMATIONS = gltf.animations.map( c => c.name );
 			window.__PLAYING = () => current.getClip().name;

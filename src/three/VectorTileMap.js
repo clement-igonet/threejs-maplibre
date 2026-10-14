@@ -74,6 +74,10 @@ export class VectorTileMap extends TileTree {
 			// too, for a camera that goes indoors; outward faces only by default,
 			// which is what a map seen from above needs
 			doubleSided = false,
+			// shadows: the batches of fills and extrusions cast and receive
+			// shadows, for a scene with a directional light and a shadow map;
+			// off by default, a map seen from above wants none
+			shadows = false,
 			workers = 2,
 			createWorker,
 			fadeDuration = 0, // vector tiles pop in, as in MapLibre
@@ -92,6 +96,7 @@ export class VectorTileMap extends TileTree {
 		this.style = style;
 		this.collision = collision;
 		this.doubleSided = doubleSided;
+		this.shadows = shadows;
 		this.sourceId = sourceId ?? Object.keys( style.sources )[ 0 ] ?? 'vector';
 		this.zoom = 0; // map zoom derived from the camera, for camera-kind properties
 
@@ -344,6 +349,7 @@ export class VectorTileMap extends TileTree {
 		if ( block.type === 'line' ) {
 
 			material = new VectorLineMaterial();
+			if ( this.lineBrightness !== undefined ) material.brightness = this.lineBrightness;
 
 		} else if ( block.type === 'fill-extrusion' ) {
 
@@ -355,7 +361,13 @@ export class VectorTileMap extends TileTree {
 
 		} else {
 
-			material = new MeshBasicMaterial( { vertexColors: true, transparent: true, depthWrite: false } );
+			// fills are unlit, the style's colours as they are, as a map draws
+			// them; lit (Lambert) when the map casts shadows, so a pavement
+			// darkens with the night and takes a building's shadow
+			// (flat shading: the fills carry no normals, the shader derives them)
+			material = this.shadows
+				? new MeshLambertMaterial( { vertexColors: true, flatShading: true, transparent: true, depthWrite: false } )
+				: new MeshBasicMaterial( { vertexColors: true, transparent: true, depthWrite: false } );
 
 		}
 
@@ -367,6 +379,7 @@ export class VectorTileMap extends TileTree {
 		);
 		batch.renderOrder = block.index;
 		batch.frustumCulled = false; // the quadtree culls per tile already
+		if ( this.shadows && block.type !== 'line' && ! block.glass ) { batch.castShadow = true; batch.receiveShadow = true; }
 		batch.perObjectFrustumCulled = false;
 		batch.sortObjects = false;
 		batch.matrixAutoUpdate = false;
@@ -418,6 +431,17 @@ export class VectorTileMap extends TileTree {
 		}
 
 		return false;
+
+	}
+
+	// The day's light on the lines (roads, casings, paths): a ShaderMaterial
+	// of their own, no scene light reaches them, so a scene with a night
+	// sets their brightness, 1 by day, towards 0 by night.
+	setBrightness( value ) {
+
+		for ( const { material, type } of this._materials.values() ) if ( type === 'line' ) material.brightness = value;
+		this.lineBrightness = value;
+		return this;
 
 	}
 
